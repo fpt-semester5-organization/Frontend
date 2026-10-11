@@ -1,32 +1,40 @@
 /**
- * Base API Response format returned by VeggieLife .NET Web API
+ * Envelope chuẩn của API VeggieLife (Architecture & Deployment — Decision Log):
+ *   thành công: { statusCode, message, data[, meta] }
+ *   lỗi:        { statusCode, errorCode, message[, details] }
+ * KHÔNG có trường `success`.
  */
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  message?: string;
+export interface ApiMeta {
+  page: number;
+  size: number;
+  total: number;
+  /** Chỉ ở GET /recipes cho Khách: xem tới mục thứ N thì mời đăng ký (BR-GUEST-01). */
+  signUpPromptAtItem?: number;
+}
+
+export interface ApiEnvelope<T = unknown> {
+  statusCode: number;
+  message: string;
   data: T;
-  errorCode?: string;
-  timestamp?: string;
+  meta?: ApiMeta;
 }
 
-/**
- * Standard pagination result structure
- */
-export interface PagedResult<T> {
-  items: T[];
-  totalCount: number;
-  pageIndex: number;
-  pageSize: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
+export interface ApiFieldError {
+  field: string;
+  message: string;
 }
 
-/**
- * Common API Error structure
- */
-export interface ApiError {
+export interface ApiErrorBody {
+  statusCode: number;
   errorCode: string;
   message: string;
-  details?: Record<string, string[]>;
+  details?: ApiFieldError[];
+  /** Có ở một số lỗi: remainingAttempts, suspendedUntil, lockedUntil, registerUrl/loginUrl, failedCriteria… */
+  data?: Record<string, unknown> | null;
+  correlationId?: string;
+}
+
+export interface Paged<T> {
+  items: T[];
+  meta: ApiMeta;
 }
