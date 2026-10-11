@@ -1,4 +1,15 @@
-@import "tailwindcss";
+/* Tailwind không kèm preflight: Bootstrap Reboot (styles/bootstrap.scss) đã làm phần reset (D102). */
+@layer bootstrap, theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+}
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -13,4 +24,5 @@ body {
   min-height: 100vh;
   background-color: #f9fafb;
   color: #111827;
+  font-family: inherit;
 }

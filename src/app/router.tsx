@@ -1,6 +1,16 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { AppShell } from '@/app/AppShell';
+import { NotFoundPage } from '@/app/NotFoundPage';
+import { MainLayout } from '@/layouts/MainLayout';
+import { RequireAuth } from '@/routes/guards';
 import { PATHS } from '@/routes/paths';
+
+// Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
+const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
+const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
+const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
+const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -12,14 +22,14 @@ const WelcomePage: React.FC = () => {
     { name: 'Home', path: PATHS.HOME, desc: 'Trang chủ, tìm kiếm công thức & bài viết' },
     { name: 'Recipes', path: PATHS.RECIPES.ROOT, desc: 'Danh sách, chi tiết, tạo công thức món chay' },
     { name: 'Community', path: PATHS.COMMUNITY.ROOT, desc: 'Bảng tin cộng đồng, bình luận đa tầng, tương tác' },
-    { name: 'Videos', path: PATHS.VIDEOS, desc: 'Trình phát video nấu ăn & tóm tắt công thức STT' },
-    { name: 'Profile', path: PATHS.PROFILE.ROOT, desc: 'Hồ sơ người dùng, chỉ số BMI, trường phái ăn chay' },
-    { name: 'Meal Plans', path: PATHS.MEAL_PLANS, desc: 'Lập thực đơn tuần tự động theo dinh dưỡng' },
-    { name: 'Shopping Lists', path: PATHS.SHOPPING_LISTS, desc: 'Danh sách đi chợ thông minh' },
-    { name: 'Scanner', path: PATHS.SCANNER.ROOT, desc: 'Quét mã vạch sản phẩm & OCR nhãn phụ E-numbers' },
+    { name: 'Videos', path: PATHS.VIDEOS.DETAIL(':id'), desc: 'Trình phát video nấu ăn & tóm tắt công thức STT' },
+    { name: 'Profile', path: PATHS.ME.PROFILE, desc: 'Hồ sơ người dùng, chỉ số BMI, trường phái ăn chay' },
+    { name: 'Meal Plans', path: PATHS.MEAL_PLANS.ROOT, desc: 'Lập thực đơn tuần tự động theo dinh dưỡng' },
+    { name: 'Shopping Lists', path: PATHS.SHOPPING_LISTS.DETAIL(':id'), desc: 'Danh sách đi chợ thông minh' },
+    { name: 'Scanner', path: PATHS.SCANNER.ROOT, desc: 'Quét mã vạch sản phẩm & tra phụ gia E-numbers' },
     { name: 'Fridge Vision', path: PATHS.FRIDGE, desc: 'Nhận diện nguyên liệu tủ lạnh qua ảnh AI' },
     { name: 'Venues Map', path: PATHS.VENUES.ROOT, desc: 'Bản đồ quán chay lân cận (HappyCow + Maps)' },
-    { name: 'AI Chatbot', path: PATHS.CHAT, desc: 'Tư vấn dinh dưỡng chuyên sâu & khảo sát' },
+    { name: 'AI Chatbot', path: PATHS.CHAT.ROOT, desc: 'Tư vấn dinh dưỡng chuyên sâu & khảo sát' },
     { name: 'Subscription', path: PATHS.SUBSCRIPTION.PRICING, desc: 'Gói thành viên VIP, thanh toán MoMo / VietQR' },
     { name: 'Admin Portal', path: PATHS.ADMIN.DASHBOARD, desc: 'Quản trị người dùng, kiểm duyệt & giám sát AI' },
   ];
@@ -95,18 +105,29 @@ const WelcomePage: React.FC = () => {
 
 const router = createBrowserRouter([
   {
-    path: PATHS.HOME,
-    element: <WelcomePage />,
-  },
-  {
-    path: '*',
-    element: (
-      <div style={{ textAlign: 'center', padding: '5rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#ef4444' }}>404 - Không tìm thấy trang</h2>
-        <p style={{ color: '#6b7280' }}>Đường dẫn không tồn tại hoặc tính năng đang được phát triển.</p>
-        <a href={PATHS.HOME} style={{ color: '#16a34a', textDecoration: 'underline' }}>Quay về trang chủ</a>
-      </div>
-    ),
+    element: <AppShell />,
+    children: [
+      {
+        element: <MainLayout />,
+        children: [
+          { path: PATHS.HOME, element: <WelcomePage /> },
+
+          // Community (SCR-25 → SCR-28)
+          { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
+          { path: PATHS.COMMUNITY.POST_DETAIL(':id'), element: <PostDetail /> },
+          { path: PATHS.ME.POSTS, element: <MyPosts /> },
+          {
+            element: <RequireAuth />,
+            children: [
+              { path: PATHS.COMMUNITY.NEW_POST, element: <PostEditor /> },
+              { path: PATHS.COMMUNITY.EDIT_POST(':id'), element: <PostEditor /> },
+            ],
+          },
+
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
   },
 ]);
 

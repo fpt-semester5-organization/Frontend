@@ -1,62 +1,85 @@
 /**
- * Application route constants
- * Prevents magic strings and centralizes navigation endpoints
+ * Hằng số URL theo đúng cột "Route" của docs/11. UI Screen Specification (45 màn).
+ * Không thêm route ngoài tài liệu.
  */
 export const PATHS = {
-  // Public & Guest
   HOME: '/',
   AUTH: {
-    LOGIN: '/login',
-    REGISTER: '/register',
-    VERIFY_OTP: '/verify-otp',
-    FORGOT_PASSWORD: '/forgot-password',
-    RESET_PASSWORD: '/reset-password',
+    LOGIN: '/auth/login',
+    REGISTER: '/auth/register',
+    VERIFY_OTP: '/auth/verify-otp',
+    FORGOT_PASSWORD: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
+    CHANGE_PASSWORD: '/auth/change-password',
   },
-
-  // Member Features
+  ME: {
+    PROFILE: '/me',
+    HEALTH: '/me/health',
+    DIETARY_PREFERENCES: '/me/dietary-preferences',
+    RECIPES: '/me/recipes',
+    POSTS: '/me/posts',
+    SUBSCRIPTION: '/me/subscription',
+  },
   RECIPES: {
     ROOT: '/recipes',
     DETAIL: (id: string | number) => `/recipes/${id}`,
-    CREATE: '/recipes/create',
-    MY_RECIPES: '/recipes/my',
+    NEW: '/recipes/new',
+    EDIT: (id: string | number) => `/recipes/${id}/edit`,
+  },
+  SCANNER: {
+    ROOT: '/scanner',
+    HISTORY: '/scanner/history',
+  },
+  FRIDGE: '/fridge',
+  VENUES: {
+    ROOT: '/venues',
+    DETAIL: (id: string | number) => `/venues/${id}`,
+    SUGGEST: '/venues/suggest',
+  },
+  VIDEOS: {
+    DETAIL: (id: string | number) => `/videos/${id}`,
+  },
+  MEAL_PLANS: {
+    ROOT: '/meal-plans',
+    DETAIL: (id: string | number) => `/meal-plans/${id}`,
+    NEW: '/meal-plans/new',
+  },
+  SHOPPING_LISTS: {
+    DETAIL: (id: string | number) => `/shopping-lists/${id}`,
   },
   COMMUNITY: {
     ROOT: '/community',
     POST_DETAIL: (id: string | number) => `/community/posts/${id}`,
-    CREATE_POST: '/community/posts/create',
+    NEW_POST: '/community/posts/new',
+    EDIT_POST: (id: string | number) => `/community/posts/${id}/edit`,
   },
-  VIDEOS: '/videos',
-  MEAL_PLANS: '/meal-plans',
-  SHOPPING_LISTS: '/shopping-lists',
-  FRIDGE: '/fridge',
-  SCANNER: {
-    ROOT: '/scanner',
-    BARCODE: '/scanner/barcode',
-    OCR_LABEL: '/scanner/ocr-label',
-  },
-  VENUES: {
-    ROOT: '/venues',
-    DETAIL: (id: string | number) => `/venues/${id}`,
-  },
-  CHAT: '/chat',
-  PROFILE: {
-    ROOT: '/profile',
-    HEALTH: '/profile/health',
-    DIETARY: '/profile/dietary',
+  CHAT: {
+    ROOT: '/chat',
+    SESSION: (sessionId: string | number) => `/chat/${sessionId}`,
   },
   SUBSCRIPTION: {
-    PRICING: '/pricing',
-    CHECKOUT: '/checkout',
-    PAYMENT_RESULT: '/payment-result',
+    PRICING: '/vip',
+    CHECKOUT: (planId: string | number) => `/vip/checkout/${planId}`,
+    RESULT: '/vip/result',
   },
-
-  // Admin Portal
   ADMIN: {
-    ROOT: '/admin',
-    DASHBOARD: '/admin/dashboard',
-    USERS: '/admin/users',
+    DASHBOARD: '/admin',
     MODERATION: '/admin/moderation',
-    RECIPES: '/admin/recipes',
-    AI_MONITORING: '/admin/ai-monitoring',
+    COMMENT_MODERATION: '/admin/moderation/comments',
+    CATEGORIES: '/admin/categories',
+    RECIPE_VERIFICATION: '/admin/recipe-verification',
+    USERS: '/admin/users',
+    USER_DETAIL: (id: string | number) => `/admin/users/${id}`,
+    AUDIT_LOGS: '/admin/audit-logs',
+    AI: '/admin/ai',
+    DIETARY_SCHOOLS: '/admin/dietary-schools',
+    E_NUMBERS: '/admin/e-numbers',
+    INGREDIENTS: '/admin/ingredients',
+    SUBSCRIPTION_PLANS: '/admin/subscription-plans',
+    VENUES: '/admin/venues',
   },
 } as const;
+
+/** Đường dẫn đăng nhập/đăng ký kèm returnUrl để quay lại sau khi xác thực (BR-GUEST-AUTH-01). */
+export const withReturnUrl = (path: string, returnUrl: string) =>
+  `${path}?returnUrl=${encodeURIComponent(returnUrl)}`;
