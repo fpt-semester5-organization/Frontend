@@ -12,6 +12,8 @@ const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
+const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
+
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -94,7 +96,12 @@ const router = createBrowserRouter([
             ],
           },
 
+          // Chatbot RAG (SCR-29)
+          { path: PATHS.CHAT.ROOT, element: <ChatPage /> },
+          { path: PATHS.CHAT.SESSION(':sessionId'), element: <ChatPage /> },
+
           { path: '*', element: <NotFoundPage /> },
+
         ],
       },
     ],
