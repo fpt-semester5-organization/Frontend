@@ -29,3 +29,15 @@ dist-ssr
 .env
 .env*.local
 !.env.example
+
+# Local planning and personal drafts
+plan-nvtamm/
+
+# Test files and testing utilities
+__tests__/
+src/test/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
