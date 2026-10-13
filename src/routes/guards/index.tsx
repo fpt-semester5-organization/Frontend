@@ -1,51 +1,46 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { PageLoader } from '@/components/common/PageLoader';
 import { useAuthStore } from '@/stores/auth.store';
-import { PATHS } from '@/routes/paths';
+import { PATHS, withReturnUrl } from '@/routes/paths';
 
-/**
- * Guard: Requires user to be logged in as Member or Admin
- */
+const useLoginRedirect = () => {
+  const location = useLocation();
+  return withReturnUrl(PATHS.AUTH.LOGIN, `${location.pathname}${location.search}`);
+};
+
+/** Thành viên (MEMBER/VIP) hoặc Admin. */
 export const RequireAuth: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) {
-    return <Navigate to={PATHS.AUTH.LOGIN} replace />;
-  }
+  const { isAuthenticated, sessionStatus } = useAuthStore();
+  const loginUrl = useLoginRedirect();
+  if (sessionStatus === 'restoring') return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to={loginUrl} replace />;
   return <Outlet />;
 };
 
-/**
- * Guard: Requires user to have active VIP status
- */
+/** Thành viên VIP còn hạn (role VIP + claim isVip, D104). */
 export const RequireVip: React.FC = () => {
-  const { user, isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) {
-    return <Navigate to={PATHS.AUTH.LOGIN} replace />;
-  }
-  if (!user?.isVip) {
-    return <Navigate to={PATHS.SUBSCRIPTION.PRICING} replace />;
-  }
+  const { user, isAuthenticated, sessionStatus } = useAuthStore();
+  const loginUrl = useLoginRedirect();
+  if (sessionStatus === 'restoring') return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to={loginUrl} replace />;
+  if (!user?.isVip) return <Navigate to={PATHS.SUBSCRIPTION.PRICING} replace />;
   return <Outlet />;
 };
 
-/**
- * Guard: Requires user to have ADMIN role
- */
+/** Quản trị viên (role ADMIN). */
 export const RequireAdmin: React.FC = () => {
-  const { user, isAuthenticated } = useAuthStore();
-  if (!isAuthenticated || user?.role !== 'ADMIN') {
-    return <Navigate to={PATHS.AUTH.LOGIN} replace />;
-  }
+  const { user, isAuthenticated, sessionStatus } = useAuthStore();
+  const loginUrl = useLoginRedirect();
+  if (sessionStatus === 'restoring') return <PageLoader />;
+  if (!isAuthenticated || user?.role !== 'ADMIN') return <Navigate to={loginUrl} replace />;
   return <Outlet />;
 };
 
-/**
- * Guard: Only accessible by unauthenticated guests (redirects to Home if logged in)
- */
+/** Trang đăng nhập/đăng ký: đã đăng nhập thì về trang chủ. */
 export const GuestOnly: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
-  if (isAuthenticated) {
-    return <Navigate to={PATHS.HOME} replace />;
-  }
+  const { isAuthenticated, sessionStatus } = useAuthStore();
+  if (sessionStatus === 'restoring') return <PageLoader />;
+  if (isAuthenticated) return <Navigate to={PATHS.HOME} replace />;
   return <Outlet />;
 };

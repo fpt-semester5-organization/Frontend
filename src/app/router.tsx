@@ -1,6 +1,17 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { AppShell } from '@/app/AppShell';
+import { NotFoundPage } from '@/app/NotFoundPage';
+import { MainLayout } from '@/layouts/MainLayout';
+import { RequireAuth } from '@/routes/guards';
+import { LogoMark } from '@/components/common/Logo';
 import { PATHS } from '@/routes/paths';
+
+// Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
+const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
+const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
+const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
+const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -12,101 +23,81 @@ const WelcomePage: React.FC = () => {
     { name: 'Home', path: PATHS.HOME, desc: 'Trang chủ, tìm kiếm công thức & bài viết' },
     { name: 'Recipes', path: PATHS.RECIPES.ROOT, desc: 'Danh sách, chi tiết, tạo công thức món chay' },
     { name: 'Community', path: PATHS.COMMUNITY.ROOT, desc: 'Bảng tin cộng đồng, bình luận đa tầng, tương tác' },
-    { name: 'Videos', path: PATHS.VIDEOS, desc: 'Trình phát video nấu ăn & tóm tắt công thức STT' },
-    { name: 'Profile', path: PATHS.PROFILE.ROOT, desc: 'Hồ sơ người dùng, chỉ số BMI, trường phái ăn chay' },
-    { name: 'Meal Plans', path: PATHS.MEAL_PLANS, desc: 'Lập thực đơn tuần tự động theo dinh dưỡng' },
-    { name: 'Shopping Lists', path: PATHS.SHOPPING_LISTS, desc: 'Danh sách đi chợ thông minh' },
-    { name: 'Scanner', path: PATHS.SCANNER.ROOT, desc: 'Quét mã vạch sản phẩm & OCR nhãn phụ E-numbers' },
+    { name: 'Videos', path: PATHS.VIDEOS.DETAIL(':id'), desc: 'Trình phát video nấu ăn & tóm tắt công thức STT' },
+    { name: 'Profile', path: PATHS.ME.PROFILE, desc: 'Hồ sơ người dùng, chỉ số BMI, trường phái ăn chay' },
+    { name: 'Meal Plans', path: PATHS.MEAL_PLANS.ROOT, desc: 'Lập thực đơn tuần tự động theo dinh dưỡng' },
+    { name: 'Shopping Lists', path: PATHS.SHOPPING_LISTS.DETAIL(':id'), desc: 'Danh sách đi chợ thông minh' },
+    { name: 'Scanner', path: PATHS.SCANNER.ROOT, desc: 'Quét mã vạch sản phẩm & tra phụ gia E-numbers' },
     { name: 'Fridge Vision', path: PATHS.FRIDGE, desc: 'Nhận diện nguyên liệu tủ lạnh qua ảnh AI' },
     { name: 'Venues Map', path: PATHS.VENUES.ROOT, desc: 'Bản đồ quán chay lân cận (HappyCow + Maps)' },
-    { name: 'AI Chatbot', path: PATHS.CHAT, desc: 'Tư vấn dinh dưỡng chuyên sâu & khảo sát' },
+    { name: 'AI Chatbot', path: PATHS.CHAT.ROOT, desc: 'Tư vấn dinh dưỡng chuyên sâu & khảo sát' },
     { name: 'Subscription', path: PATHS.SUBSCRIPTION.PRICING, desc: 'Gói thành viên VIP, thanh toán MoMo / VietQR' },
     { name: 'Admin Portal', path: PATHS.ADMIN.DASHBOARD, desc: 'Quản trị người dùng, kiểm duyệt & giám sát AI' },
   ];
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2.5rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-      <header style={{ marginBottom: '2rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '2rem' }}>🥗</span>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 700, color: '#16a34a', margin: 0 }}>
-            VeggieLife Frontend
-          </h1>
-          <span style={{
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            background: '#dcfce7',
-            color: '#15803d',
-            padding: '0.25rem 0.625rem',
-            borderRadius: '9999px',
-            marginLeft: 'auto'
-          }}>
-            Template Ready (100%)
+    <div className="mx-auto w-full max-w-[1100px] px-margin-mobile py-space-xl sm:px-margin">
+      <header className="mb-space-xl flex flex-col gap-space-sm border-b border-outline-variant/50 pb-space-lg">
+        <div className="flex flex-wrap items-center gap-space-sm">
+          <LogoMark size={40} />
+          <h1 className="font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">VeggieLife Frontend</h1>
+          <span className="ml-auto rounded-full bg-primary-fixed px-2.5 py-1 font-label-sm text-label-sm text-on-primary-fixed">
+            Khung dự án
           </span>
         </div>
-        <p style={{ color: '#4b5563', margin: 0, fontSize: '0.95rem' }}>
-          Khung kiến trúc <strong>Feature-Driven</strong> (React 18 · TypeScript · Vite · Tailwind · React Query · Zustand).
-          Các thành viên vui lòng phát triển mã nguồn trực tiếp trong thư mục <code>src/features/&lt;tên-feature&gt;/</code> tương ứng.
+        <p className="font-body-md text-body-md text-on-surface-variant">
+          Khung kiến trúc theo feature (React 18, TypeScript, Vite, Tailwind, React Query, Zustand). Mỗi thành viên phát
+          triển trong thư mục <code className="rounded bg-surface-container px-1">src/features/&lt;tên-feature&gt;/</code>.
         </p>
       </header>
 
-      <section>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1f2937', marginBottom: '1rem' }}>
-          Danh mục 14 Phân hệ Nghiệp vụ (Features)
+      <section aria-labelledby="modules-title">
+        <h2 id="modules-title" className="mb-space-md font-headline-sm text-headline-sm text-on-surface">
+          14 phân hệ nghiệp vụ
         </h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '1rem'
-        }}>
+        <ul className="grid gap-space-md sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((m) => (
-            <div
-              key={m.name}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                background: '#ffffff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: '#111827' }}>
-                  {m.name}
-                </h3>
-                <code style={{ fontSize: '0.75rem', color: '#16a34a', background: '#f0fdf4', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+            <li key={m.name} className="rounded-xl bg-surface-container-lowest p-space-md shadow-card">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="font-label-lg text-label-lg text-on-surface">{m.name}</h3>
+                <code className="truncate rounded bg-primary-fixed px-1.5 py-0.5 font-label-sm text-label-sm text-on-primary-fixed">
                   {m.path}
                 </code>
               </div>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280', lineHeight: 1.4 }}>
-                {m.desc}
-              </p>
-            </div>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">{m.desc}</p>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
-
-      <footer style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>
-        SWP391 — VeggieLife Project © 2026. Built with Vite + React + TypeScript.
-      </footer>
     </div>
   );
 };
 
 const router = createBrowserRouter([
   {
-    path: PATHS.HOME,
-    element: <WelcomePage />,
-  },
-  {
-    path: '*',
-    element: (
-      <div style={{ textAlign: 'center', padding: '5rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#ef4444' }}>404 - Không tìm thấy trang</h2>
-        <p style={{ color: '#6b7280' }}>Đường dẫn không tồn tại hoặc tính năng đang được phát triển.</p>
-        <a href={PATHS.HOME} style={{ color: '#16a34a', textDecoration: 'underline' }}>Quay về trang chủ</a>
-      </div>
-    ),
+    element: <AppShell />,
+    children: [
+      {
+        element: <MainLayout />,
+        children: [
+          { path: PATHS.HOME, element: <WelcomePage /> },
+
+          // Community (SCR-25 → SCR-28)
+          { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
+          { path: PATHS.COMMUNITY.POST_DETAIL(':id'), element: <PostDetail /> },
+          { path: PATHS.ME.POSTS, element: <MyPosts /> },
+          {
+            element: <RequireAuth />,
+            children: [
+              { path: PATHS.COMMUNITY.NEW_POST, element: <PostEditor /> },
+              { path: PATHS.COMMUNITY.EDIT_POST(':id'), element: <PostEditor /> },
+            ],
+          },
+
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
   },
 ]);
 

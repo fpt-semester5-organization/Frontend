@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "gen:api": "openapi-typescript \"docs/08. OpenAPI Specification.yaml\" -o src/api/generated/schema.ts --default-non-nullable false",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\""
   },
   "dependencies": {
@@ -17,9 +18,11 @@
     "@tanstack/react-query": "^5.62.8",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.7.9",
+    "bootstrap": "^5.3.8",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.1",
     "react-router-dom": "^6.28.0",
@@ -38,10 +41,17 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "msw": "^2.15.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.4.2",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.18.1",
     "vite": "^6.0.3"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

@@ -1,16 +1,325 @@
-@import "tailwindcss";
+/*
+ * Tailwind CSS + Bootstrap 5 (D102, Architecture and Deployment 2.3)
+ * - bootstrap.min.css được nạp trước trong main.tsx và nằm ngoài @layer.
+ * - Tắt preflight của Tailwind: Bootstrap Reboot đã làm phần reset.
+ * - Bật `important` cho utilities: Bootstrap có tiện ích !important trùng tên với Tailwind
+ *   (p-3, gap-4, border, rounded, w-50...). !important trong @layer được ưu tiên hơn !important
+ *   ngoài layer, nên class Tailwind luôn thắng mà không phải đổi cách viết class.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) important;
 
+/*
+ * Design system "Linen & Earth Culinary Sanctuary", bảng màu "Sage & Clay on Linen"
+ * (Stitch: _asset_linen-earth-culinary-sanctuary/DESIGN.md; mọi cặp chữ/nền đạt tương phản >= 4,5:1, NFR UI-7).
+ * Tên token giữ đúng như prototype để dùng chung class: bg-primary-container, text-on-surface, font-headline-md...
+ */
+@theme {
+  /* Màu thương hiệu: xanh sage (primary) và đất nung (secondary) lấy từ logo; nền kem. */
+  --color-primary: #3d5c47;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #4f6f58;
+  --color-on-primary-container: #f2f6f3;
+  --color-primary-fixed: #dfeadf;
+  --color-primary-fixed-dim: #bfd3c3;
+  --color-on-primary-fixed: #1e3326;
+  --color-on-primary-fixed-variant: #3d5c47;
+  --color-inverse-primary: #bfd3c3;
+  --color-surface-tint: #4a6a53;
+
+  --color-secondary: #94532f;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #f2d2c0;
+  --color-on-secondary-container: #5c331c;
+  --color-secondary-fixed: #f8e3d6;
+  --color-secondary-fixed-dim: #ebc3ab;
+  --color-on-secondary-fixed: #3f1f0f;
+  --color-on-secondary-fixed-variant: #7a4429;
+
+  --color-tertiary: #2f342e;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #454a43;
+  --color-on-tertiary-container: #a7a096;
+  --color-tertiary-fixed: #e8e6df;
+  --color-tertiary-fixed-dim: #ccc9c0;
+  --color-on-tertiary-fixed: #1f221d;
+  --color-on-tertiary-fixed-variant: #4b463e;
+
+  /* Bề mặt (giấy lanh ấm) và chữ. */
+  --color-background: #fdf9f4;
+  --color-on-background: #1c1c19;
+  --color-surface: #fdf9f4;
+  --color-surface-bright: #fdf9f4;
+  --color-surface-dim: #ddd9d5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f7f3ee;
+  --color-surface-container: #f1ede8;
+  --color-surface-container-high: #ece7e3;
+  --color-surface-container-highest: #e6e2dd;
+  --color-surface-variant: #e6e2dd;
+  --color-on-surface: #2a2b27;
+  --color-on-surface-variant: #4b5048;
+  --color-inverse-surface: #2f332d;
+  --color-inverse-on-surface: #f2f0ea;
+  --color-outline: #636a60;
+  --color-outline-variant: #cdd1c8;
+
+  /* Màu trạng thái tách khỏi màu thương hiệu. */
+  --color-error: #c62828;
+  --color-on-error: #ffffff;
+  --color-error-container: #fde7e4;
+  --color-on-error-container: #8c1d18;
+  --color-success: #2a7448;
+  --color-success-container: #e3f4ea;
+  --color-warning: #8a5a0b;
+  --color-warning-container: #fdf2d8;
+  --color-info: #245d9b;
+  --color-info-container: #e6f0fa;
+
+  /* Chữ: Merriweather cho tiêu đề, Work Sans cho nội dung và nhãn. */
+  --font-sans: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Merriweather', ui-serif, Georgia, serif;
+  --font-display: 'Merriweather', serif;
+  --font-display-lg: 'Merriweather', serif;
+  --font-display-lg-mobile: 'Merriweather', serif;
+  --font-headline-lg: 'Merriweather', serif;
+  --font-headline-lg-mobile: 'Merriweather', serif;
+  --font-headline-md: 'Merriweather', serif;
+  --font-headline-sm: 'Merriweather', serif;
+  --font-body-lg: 'Work Sans', sans-serif;
+  --font-body-md: 'Work Sans', sans-serif;
+  --font-body-sm: 'Work Sans', sans-serif;
+  --font-label-lg: 'Work Sans', sans-serif;
+  --font-label-md: 'Work Sans', sans-serif;
+  --font-label-sm: 'Work Sans', sans-serif;
+
+  /* Thang cỡ chữ (không có chữ dưới 12px, NFR UI-7). */
+  --text-display-lg: 64px;
+  --text-display-lg--line-height: 72px;
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-lg--font-weight: 700;
+  --text-display-lg-mobile: 38px;
+  --text-display-lg-mobile--line-height: 44px;
+  --text-display-lg-mobile--letter-spacing: -0.02em;
+  --text-display-lg-mobile--font-weight: 700;
+  --text-display: 40px;
+  --text-display--line-height: 52px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 400;
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 42px;
+  --text-headline-lg--letter-spacing: -0.015em;
+  --text-headline-lg--font-weight: 400;
+  --text-headline-lg-mobile: 26px;
+  --text-headline-lg-mobile--line-height: 34px;
+  --text-headline-lg-mobile--letter-spacing: -0.01em;
+  --text-headline-lg-mobile--font-weight: 400;
+  --text-headline-md: 22px;
+  --text-headline-md--line-height: 30px;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 400;
+  --text-headline-sm: 18px;
+  --text-headline-sm--line-height: 26px;
+  --text-headline-sm--font-weight: 700;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 400;
+  --text-body-md: 15px;
+  --text-body-md--line-height: 24px;
+  --text-body-md--font-weight: 400;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 20px;
+  --text-body-sm--font-weight: 400;
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 18px;
+  --text-label-lg--letter-spacing: 0.06em;
+  --text-label-lg--font-weight: 600;
+  --text-label-md: 13px;
+  --text-label-md--line-height: 18px;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 600;
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--letter-spacing: 0.04em;
+  --text-label-sm--font-weight: 600;
+
+  /* Bo góc: nút/ô nhập 4px (lg), thẻ 8px (xl), chip/avatar 12px (full). */
+  --radius: 0.125rem;
+  --radius-sm: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
+
+  /* Khoảng cách theo nhịp của design system. */
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2.5rem;
+  --spacing-space-2xl: 5rem;
+  --spacing-gutter: 1.5rem;
+  --spacing-gutter-sm: 1rem;
+  --spacing-gutter-mobile: 1rem;
+  --spacing-margin: 2rem;
+  --spacing-margin-sm: 1rem;
+  --spacing-margin-mobile: 1.25rem;
+
+  /* Bóng nhẹ màu đất cho thẻ và lớp nổi (DESIGN.md: Elevation & Depth). */
+  --shadow-card: 0 1px 3px rgba(43, 42, 39, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(43, 42, 39, 0.06);
+  --shadow-feed: 0 1px 2px rgb(47 52 46 / 0.04), 0 20px 44px -24px rgb(47 52 46 / 0.18);
+  --shadow-header: 0 1px 8px rgba(0, 0, 0, 0.04);
+}
+
+/*
+ * Bootstrap dùng chung màu, chữ và bo góc với design system: ghi đè bằng custom property --bs-*
+ * (thay cho biến Sass của prototype). Selector :root và class component nạp sau bootstrap.min.css nên thắng.
+ */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --bs-body-font-family: var(--font-sans);
+  --bs-body-color: #2a2b27;
+  --bs-body-color-rgb: 42, 43, 39;
+  --bs-body-bg: #fdf9f4;
+  --bs-body-bg-rgb: 253, 249, 244;
+  --bs-primary: #4f6f58;
+  --bs-primary-rgb: 79, 111, 88;
+  --bs-secondary: #94532f;
+  --bs-secondary-rgb: 148, 83, 47;
+  --bs-danger: #c62828;
+  --bs-danger-rgb: 198, 40, 40;
+  --bs-border-color: #e6e2dd;
+  --bs-border-radius: 0.5rem;
+  --bs-link-color: #3d5c47;
+  --bs-link-color-rgb: 61, 92, 71;
+  --bs-link-hover-color: #1e3326;
+  --bs-link-hover-color-rgb: 30, 51, 38;
   color-scheme: light;
+}
+
+.modal {
+  --bs-modal-bg: #ffffff;
+  --bs-modal-color: #2a2b27;
+  --bs-modal-border-color: #e6e2dd;
+  --bs-modal-border-radius: 0.75rem;
+  --bs-modal-inner-border-radius: calc(0.75rem - 1px);
+  --bs-modal-header-border-color: #e6e2dd;
+  --bs-modal-footer-border-color: #e6e2dd;
+}
+
+.modal-backdrop {
+  --bs-backdrop-bg: #1f2a22;
+  --bs-backdrop-opacity: 0.45;
+}
+
+.dropdown-menu {
+  --bs-dropdown-border-color: #e6e2dd;
+  --bs-dropdown-border-radius: 0.75rem;
+  --bs-dropdown-link-active-bg: #4f6f58;
+}
+
+.offcanvas {
+  --bs-offcanvas-bg: #f7f3ee;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Không cuộn ngang ở 360/768/1280 px (NFR UI-1): lớp an toàn cuối. */
+html,
+body {
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-md);
+  line-height: var(--text-body-md--line-height);
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: rgb(79 111 88 / 0.18);
+}
+
+/*
+ * Preflight đã tắt nên Reboot giữ viền mặc định của nút/ô nhập và margin của chữ, danh sách.
+ * Đưa về 0 (như preflight) để class Tailwind quyết định; selector theo thẻ nên class component
+ * của Bootstrap (.btn, .form-control, .modal-title...) vẫn ưu tiên hơn.
+ */
+button,
+input,
+select,
+textarea {
+  border: 0 solid;
+  background-color: transparent;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+figure,
+pre,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Icon Material Symbols (font nạp ở index.html), dùng qua component Icon. */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Nút và liên kết dạng nút giữ một dòng từ 768px. */
+@media (min-width: 768px) {
+  button,
+  a[class*='px-'][class*='rounded'] {
+    white-space: nowrap;
+  }
+}
+
+/* Vòng focus bàn phím dùng chung (NFR UI-7) và phản hồi khi nhấn. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+:where(input, select, textarea):focus-visible {
+  outline-offset: 0;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
