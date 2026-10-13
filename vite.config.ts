@@ -11,15 +11,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        // Bootstrap 5.3 vẫn dùng @import và hàm màu cũ của Sass; ẩn cảnh báo deprecation từ thư viện.
-        quietDeps: true,
-        silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'if-function'],
-      },
-    },
-  },
   server: {
     port: 3000,
     proxy: {
