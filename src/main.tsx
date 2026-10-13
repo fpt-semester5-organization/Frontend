@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppProviders } from '@/app/providers';
 import { AppRouter } from '@/app/router';
-import '@/styles/bootstrap.scss';
+// Thứ tự nạp CSS theo Architecture and Deployment 2.3 (D102): Bootstrap trước, Tailwind sau.
+import 'bootstrap/dist/css/bootstrap.min.css';
 import '@/styles/index.css';
 
 const rootElement = document.getElementById('root');

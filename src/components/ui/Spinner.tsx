@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/cn';
+import { Icon } from './Icon';
 
 interface SpinnerProps {
   className?: string;
@@ -7,12 +8,7 @@ interface SpinnerProps {
 }
 
 export const Spinner: React.FC<SpinnerProps> = ({ className, label = 'Đang tải' }) => (
-  <span
-    role="status"
-    aria-label={label}
-    className={cn(
-      'inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent',
-      className
-    )}
-  />
+  <span role="status" aria-label={label} className="inline-flex">
+    <Icon name="progress_activity" className={cn('animate-spin text-[18px]', className)} />
+  </span>
 );

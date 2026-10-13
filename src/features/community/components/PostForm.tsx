@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/Button';
+import { FieldError, INPUT_CLASS, INPUT_ERROR_CLASS } from '@/components/ui/forms';
+import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { POST_TITLE_MAX, postFormSchema, type PostFormValues } from '../types/community.schemas';
 import { AttachmentInput } from './AttachmentInput';
@@ -26,16 +29,18 @@ interface PostFormProps {
   defaultValues: PostFormValues;
   submittingIntent: PostSubmitIntent | null;
   onSubmit: (submission: PostFormSubmission, helpers: PostFormHelpers) => void;
-  onCancel: () => void;
+  cancelTo: string;
 }
 
 const VISIBILITY_OPTIONS = [
-  { value: 'PUBLIC', label: 'Công khai', hint: 'Mọi người đều xem được sau khi qua kiểm duyệt.' },
+  { value: 'PUBLIC', label: 'Công khai', hint: 'Mọi người xem được sau khi qua kiểm duyệt.' },
   { value: 'PRIVATE', label: 'Chỉ mình tôi', hint: 'Chỉ bạn xem được bài viết này.' },
 ] as const;
 
-/** Form đăng/sửa bài (SCR-27): tiêu đề 10–150 ký tự, nội dung không rỗng, PUBLIC | PRIVATE. */
-export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submittingIntent, onSubmit, onCancel }) => {
+const CARD = 'rounded-xl bg-surface-container-lowest p-space-lg shadow-card';
+
+/** Form đăng/sửa bài (SCR-27): tiêu đề 10–150 ký tự, nội dung không rỗng, PUBLIC | PRIVATE, tệp đính kèm. */
+export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submittingIntent, onSubmit, cancelTo }) => {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string>();
   const {
@@ -60,114 +65,114 @@ export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submitt
       ? [{ value: 'KEEP', label: 'Giữ nguyên', hint: 'Không đổi chế độ hiển thị hiện tại.' }, ...VISIBILITY_OPTIONS]
       : VISIBILITY_OPTIONS;
 
-  const inputClass =
-    'w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-600 focus:outline-none';
-
   return (
-    <form onSubmit={submitWith(mode === 'edit' ? 'save' : 'publish')} noValidate className="space-y-5">
-      <div>
-        <label htmlFor="post-title" className="mb-1 block text-sm font-medium text-gray-900">
-          Tiêu đề <span className="text-red-600">*</span>
-        </label>
-        <input
-          id="post-title"
-          type="text"
-          maxLength={POST_TITLE_MAX}
-          placeholder="Ví dụ: Một tuần ăn chay đầu tiên của tôi"
-          {...register('title')}
-          aria-invalid={!!errors.title}
-          aria-describedby="post-title-hint"
-          className={cn(inputClass, errors.title && 'ring-red-500')}
-        />
-        <div id="post-title-hint" className="mt-1 flex justify-between gap-2 text-xs">
-          <span className="text-red-600">{errors.title?.message}</span>
-          <span className="text-gray-500">
-            {titleLength}/{POST_TITLE_MAX}
-          </span>
+    <form
+      onSubmit={submitWith(mode === 'edit' ? 'save' : 'publish')}
+      noValidate
+      className="grid grid-cols-1 items-start gap-space-lg lg:grid-cols-12"
+    >
+      <section className="flex flex-col gap-space-lg lg:col-span-8">
+        <div className={cn(CARD, 'space-y-space-md')}>
+          <div className="space-y-space-xs">
+            <div className="flex items-center justify-between">
+              <label htmlFor="post-title" className="font-label-sm text-label-sm text-outline">
+                Tiêu đề bài viết <span className="text-secondary">*</span>
+              </label>
+              <span className="font-label-sm text-label-sm text-outline">
+                {titleLength} / {POST_TITLE_MAX}
+              </span>
+            </div>
+            <input
+              id="post-title"
+              type="text"
+              maxLength={POST_TITLE_MAX}
+              placeholder="Nhập tiêu đề bài viết (10–150 ký tự)"
+              {...register('title')}
+              aria-invalid={!!errors.title}
+              className={cn(INPUT_CLASS, 'font-headline-md text-headline-md', errors.title && INPUT_ERROR_CLASS)}
+            />
+            <FieldError>{errors.title?.message}</FieldError>
+          </div>
+          <div className="space-y-space-xs">
+            <label htmlFor="post-content" className="font-label-sm text-label-sm text-outline">
+              Nội dung <span className="text-secondary">*</span>
+            </label>
+            <textarea
+              id="post-content"
+              rows={14}
+              placeholder="Chia sẻ kinh nghiệm ẩm thực chay của bạn tại đây…"
+              {...register('content')}
+              aria-invalid={!!errors.content}
+              className={cn(INPUT_CLASS, 'resize-y font-body-lg text-body-lg leading-relaxed', errors.content && INPUT_ERROR_CLASS)}
+            />
+            <FieldError>{errors.content?.message}</FieldError>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label htmlFor="post-content" className="mb-1 block text-sm font-medium text-gray-900">
-          Nội dung <span className="text-red-600">*</span>
-        </label>
-        <textarea
-          id="post-content"
-          rows={10}
-          placeholder="Chia sẻ kinh nghiệm, câu chuyện hoặc mẹo nấu ăn chay của bạn..."
-          {...register('content')}
-          aria-invalid={!!errors.content}
-          aria-describedby="post-content-error"
-          className={cn(inputClass, 'resize-y', errors.content && 'ring-red-500')}
-        />
-        <p id="post-content-error" className="mt-1 text-xs text-red-600">
-          {errors.content?.message}
-        </p>
-      </div>
+        <div className={cn(CARD, 'space-y-space-sm')}>
+          <h2 className="font-headline-sm text-headline-sm text-primary">Tệp đính kèm</h2>
+          <AttachmentInput
+            value={file}
+            onChange={(next) => {
+              setFile(next);
+              setFileError(undefined);
+            }}
+            serverError={fileError}
+            disabled={busy}
+          />
+        </div>
+      </section>
 
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium text-gray-900">Chế độ hiển thị</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
+      <aside className="flex flex-col gap-space-lg lg:sticky lg:top-24 lg:col-span-4">
+        <fieldset className={cn(CARD, 'space-y-space-md')}>
+          <legend className="float-left mb-space-md flex w-full items-center gap-space-xs text-primary">
+            <Icon name="visibility" className="text-[20px]" />
+            <span className="font-headline-sm text-[16px] text-on-surface">Cài đặt hiển thị</span>
+          </legend>
           {visibilityOptions.map((option) => (
             <label
               key={option.value}
-              className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-3 ring-1 ring-gray-200 has-[:checked]:bg-brand-50 has-[:checked]:ring-brand-600"
+              className="flex cursor-pointer items-start gap-space-sm rounded-lg bg-surface-container-low p-space-sm hover:bg-surface-container has-[:checked]:bg-primary-fixed"
             >
-              <input
-                type="radio"
-                value={option.value}
-                {...register('visibility')}
-                className="mt-1 accent-brand-600"
-              />
+              <input type="radio" value={option.value} {...register('visibility')} className="mt-1 accent-primary" />
               <span>
-                <span className="block text-sm font-medium text-gray-900">{option.label}</span>
-                <span className="block text-xs text-gray-500">{option.hint}</span>
+                <span className="block font-label-md text-label-md text-on-surface">{option.label}</span>
+                <span className="block font-body-sm text-body-sm text-on-surface-variant">{option.hint}</span>
               </span>
             </label>
           ))}
-        </div>
-        {errors.visibility && <p className="mt-1 text-xs text-red-600">{errors.visibility.message}</p>}
-      </fieldset>
+          <FieldError>{errors.visibility?.message}</FieldError>
+        </fieldset>
 
-      <AttachmentInput
-        value={file}
-        onChange={(next) => {
-          setFile(next);
-          setFileError(undefined);
-        }}
-        serverError={fileError}
-        disabled={busy}
-      />
-
-      <p className="text-xs text-gray-500">
-        Bài viết được AI kiểm duyệt trước khi hiển thị công khai. Sửa nội dung bài đã công khai sẽ được kiểm
-        duyệt lại.
-      </p>
-
-      <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end">
-        <Button variant="ghost" onClick={onCancel} disabled={busy}>
-          Hủy
-        </Button>
-        {mode === 'create' ? (
-          <>
+        <div className={cn(CARD, 'space-y-space-sm shadow-card-hover')}>
+          <Button type="submit" size="lg" className="w-full" loading={submittingIntent === (mode === 'edit' ? 'save' : 'publish')} disabled={busy}>
+            {submittingIntent === null && <Icon name="send" className="text-[18px]" />}
+            {mode === 'edit' ? 'Cập nhật bài viết' : 'Xuất bản bài viết'}
+          </Button>
+          {mode === 'create' && (
             <Button
-              variant="secondary"
+              variant="outline"
+              className="w-full"
               onClick={submitWith('draft')}
               loading={submittingIntent === 'draft'}
               disabled={busy}
             >
-              Lưu nháp
+              {submittingIntent !== 'draft' && <Icon name="save" className="text-[18px] text-outline" />}
+              Lưu bản nháp
             </Button>
-            <Button type="submit" loading={submittingIntent === 'publish'} disabled={busy}>
-              Đăng bài
-            </Button>
-          </>
-        ) : (
-          <Button type="submit" loading={submittingIntent === 'save'} disabled={busy}>
-            Lưu thay đổi
-          </Button>
-        )}
-      </div>
+          )}
+          <p className="font-label-sm text-label-sm text-on-surface-variant">
+            Bài mới được AI kiểm duyệt; sửa bài đã đăng sẽ được kiểm duyệt lại. Giới hạn đăng: 02 bài/ngày (tài khoản dưới 3
+            ngày), sau đó 10 bài/ngày.
+          </p>
+          <Link
+            to={cancelTo}
+            className="block w-full rounded-lg px-space-lg py-2 text-center font-label-sm text-label-sm text-outline no-underline hover:text-on-surface"
+          >
+            Hủy và quay lại
+          </Link>
+        </div>
+      </aside>
     </form>
   );
 };

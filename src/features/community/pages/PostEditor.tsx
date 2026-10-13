@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FileQuestion, Lock } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
+import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { toApiError } from '@/lib/apiError';
 import { applyServerFieldErrors } from '@/lib/formErrors';
@@ -115,16 +115,20 @@ const PostEditor: React.FC = () => {
   };
 
   const header = (
-    <div className="space-y-2">
-      <Link
-        to={isEdit ? PATHS.COMMUNITY.POST_DETAIL(postId) : PATHS.COMMUNITY.ROOT}
-        className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 no-underline hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {isEdit ? 'Quay lại bài viết' : 'Cộng đồng'}
+    <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs py-space-md font-label-md text-label-md text-on-surface-variant">
+      <Link to={PATHS.HOME} className="flex items-center gap-1 text-on-surface-variant no-underline hover:text-primary">
+        <Icon name="home" className="text-[16px]" />
+        Trang chủ
       </Link>
-      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Sửa bài viết' : 'Viết bài mới'}</h1>
-    </div>
+      <span className="text-outline-variant">/</span>
+      <Link to={PATHS.COMMUNITY.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
+        Cộng đồng
+      </Link>
+      <span className="text-outline-variant">/</span>
+      <h1 className="font-label-md text-label-md text-primary" aria-current="page">
+        {isEdit ? 'Sửa bài viết' : 'Viết bài mới'}
+      </h1>
+    </nav>
   );
 
   const renderBody = () => {
@@ -135,19 +139,18 @@ const PostEditor: React.FC = () => {
           defaultValues={EMPTY_FORM}
           submittingIntent={submitting}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(-1)}
+          cancelTo={PATHS.COMMUNITY.ROOT}
         />
       );
     }
     if (!Number.isInteger(postId) || postId <= 0 || (post.isError && toApiError(post.error).status === 404)) {
-      return <EmptyState icon={FileQuestion} title="Không tìm thấy bài viết" description="Bài viết không tồn tại hoặc đã bị xóa." />;
+      return <EmptyState icon="search_off" title="Không tìm thấy bài viết" description="Bài viết không tồn tại hoặc đã bị xóa." />;
     }
     if (post.isPending) {
       return (
-        <div className="space-y-4" aria-busy="true" aria-label="Đang tải bài viết">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-16 w-full" />
+        <div className="grid gap-space-lg lg:grid-cols-12" role="status" aria-busy="true" aria-label="Đang tải bài viết">
+          <Skeleton className="h-[420px] lg:col-span-8" />
+          <Skeleton className="h-64 lg:col-span-4" />
         </div>
       );
     }
@@ -155,13 +158,7 @@ const PostEditor: React.FC = () => {
       return <ErrorState error={post.error} onRetry={() => post.refetch()} retrying={post.isRefetching} />;
     }
     if (post.data.author.userId !== currentUserId) {
-      return (
-        <EmptyState
-          icon={Lock}
-          title="Bạn không thể sửa bài viết này"
-          description="Chỉ tác giả mới được sửa bài viết."
-        />
-      );
+      return <EmptyState icon="lock" title="Bạn không thể sửa bài viết này" description="Chỉ tác giả mới được sửa bài viết." />;
     }
     return (
       <PostForm
@@ -169,15 +166,15 @@ const PostEditor: React.FC = () => {
         defaultValues={{ title: post.data.title, content: post.data.content, visibility: 'KEEP' }}
         submittingIntent={submitting}
         onSubmit={handleSubmit}
-        onCancel={() => navigate(PATHS.COMMUNITY.POST_DETAIL(postId))}
+        cancelTo={PATHS.COMMUNITY.POST_DETAIL(postId)}
       />
     );
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-[1100px] px-margin-mobile pb-space-xl sm:px-margin">
       {header}
-      <div className="rounded-xl bg-white p-5 ring-1 ring-gray-200 sm:p-8">{renderBody()}</div>
+      {renderBody()}
     </div>
   );
 };

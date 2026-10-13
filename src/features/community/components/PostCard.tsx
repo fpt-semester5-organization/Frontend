@@ -1,85 +1,89 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Leaf, MessageCircle } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
+import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
 import type { PostListItem } from '../types/community.types';
+import { VoteButton } from './VoteButton';
 
 interface PostCardProps {
   post: PostListItem;
-  /** Nút thao tác riêng (ví dụ Sửa/Xóa ở "Bài viết của tôi"), nằm trên lớp link của thẻ. */
-  actions?: React.ReactNode;
   className?: string;
 }
 
-export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(({ post, actions, className }, ref) => (
-  <article
-    ref={ref}
-    className={cn(
-      'group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-gray-200 transition-shadow hover:shadow-md',
-      className
-    )}
-  >
-    <div className="aspect-[16/9] bg-brand-50">
+const ACTION =
+  'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 font-label-md text-label-md no-underline transition-colors hover:bg-surface-container';
+
+/** Thẻ bài viết kiểu feed (SCR-25): chỉ hiển thị các trường GET /posts trả về. */
+export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(({ post, className }, ref) => {
+  const to = PATHS.COMMUNITY.POST_DETAIL(post.postId);
+
+  return (
+    <article ref={ref} className={cn('flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-feed', className)}>
+      <header className="flex items-center gap-3 px-4 pt-4 pb-2">
+        <Avatar name={post.authorName} className="h-11 w-11" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-label-md text-label-md text-on-surface">{post.authorName}</p>
+          {post.createdAt && (
+            <time dateTime={post.createdAt} className="font-label-sm text-label-sm text-on-surface-variant">
+              {formatDateTime(post.createdAt)}
+            </time>
+          )}
+        </div>
+      </header>
+
       {post.imageUrl ? (
-        <img src={post.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+        <>
+          <h2 className="px-4 pb-3">
+            <Link to={to} className="font-headline-md text-headline-md text-on-surface no-underline hover:text-primary">
+              {post.title}
+            </Link>
+          </h2>
+          <Link to={to} tabIndex={-1} aria-hidden="true" className="block aspect-[16/9] overflow-hidden bg-surface-container">
+            <img src={post.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          </Link>
+        </>
       ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <Leaf className="h-10 w-10 text-brand-600/40" aria-hidden="true" />
+        <div className="mx-3 flex min-h-[160px] flex-col justify-center rounded-2xl bg-linear-to-br from-primary-fixed/70 via-surface-container-low to-secondary-fixed/60 p-6 sm:p-8">
+          <h2>
+            <Link
+              to={to}
+              className="font-headline-lg text-headline-lg-mobile text-on-surface no-underline hover:text-primary sm:text-headline-lg"
+            >
+              {post.title}
+            </Link>
+          </h2>
         </div>
       )}
-    </div>
-    <div className="flex flex-1 flex-col p-4">
-      <h3 className="line-clamp-2 text-base font-semibold text-gray-900">
-        <Link
-          to={PATHS.COMMUNITY.POST_DETAIL(post.postId)}
-          className="text-inherit no-underline after:absolute after:inset-0 group-hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
-        >
-          {post.title}
-        </Link>
-      </h3>
-      <p className="mt-1 text-sm text-gray-600">
-        {post.authorName}
-        {post.createdAt && (
-          <>
-            <span aria-hidden="true"> · </span>
-            <time dateTime={post.createdAt}>{formatDateTime(post.createdAt)}</time>
-          </>
-        )}
-      </p>
-      <div className="mt-auto flex items-center gap-4 pt-3 text-sm text-gray-600">
-        <span className="inline-flex items-center gap-1" aria-label={`${post.voteCount} lượt thả tim`}>
-          <Heart className="h-4 w-4" aria-hidden="true" />
+
+      <div className="flex items-center justify-between px-4 py-2.5 font-label-md text-label-md text-on-surface-variant">
+        <span className="flex items-center gap-1.5 tabular-nums" aria-label={`${post.voteCount} lượt thích`}>
+          <Icon name="favorite" filled className="text-[18px] text-secondary" />
           {formatNumber(post.voteCount)}
         </span>
-        <span className="inline-flex items-center gap-1" aria-label={`${post.commentCount} bình luận`}>
-          <MessageCircle className="h-4 w-4" aria-hidden="true" />
-          {formatNumber(post.commentCount)}
-        </span>
-        {actions && <div className="relative z-10 ml-auto flex items-center gap-1">{actions}</div>}
+        <Link to={to} className="text-on-surface-variant no-underline tabular-nums hover:underline">
+          {formatNumber(post.commentCount)} bình luận
+        </Link>
       </div>
-    </div>
-  </article>
-));
+      <div className="mx-3 mb-3 flex items-center gap-1 border-t border-outline-variant/40 pt-1.5">
+        <VoteButton postId={post.postId} voteCount={post.voteCount} className="flex-1 justify-center bg-transparent" />
+        <Link to={to} className={cn(ACTION, 'text-on-surface-variant')}>
+          <Icon name="chat_bubble" className="text-[20px]" />
+          Xem & bình luận
+        </Link>
+      </div>
+    </article>
+  );
+});
 PostCard.displayName = 'PostCard';
 
-export const PostCardSkeleton: React.FC = () => (
-  <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200">
-    <Skeleton className="aspect-[16/9] rounded-none" />
-    <div className="space-y-2 p-4">
-      <Skeleton className="h-5 w-4/5" />
-      <Skeleton className="h-4 w-2/5" />
-      <Skeleton className="mt-4 h-4 w-1/3" />
-    </div>
-  </div>
-);
-
-export const PostGridSkeleton: React.FC<{ count?: number }> = ({ count = 6 }) => (
-  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Đang tải bài viết">
+export const PostFeedSkeleton: React.FC<{ count?: number }> = ({ count = 2 }) => (
+  <div className="flex flex-col gap-space-md" role="status" aria-busy="true" aria-label="Đang tải bài viết">
     {Array.from({ length: count }, (_, i) => (
-      <PostCardSkeleton key={i} />
+      <Skeleton key={i} className="h-72 rounded-2xl" />
     ))}
   </div>
 );

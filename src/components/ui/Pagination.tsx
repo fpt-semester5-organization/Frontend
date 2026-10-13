@@ -1,6 +1,6 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Icon } from './Icon';
 
 interface PaginationProps {
   page: number;
@@ -10,69 +10,60 @@ interface PaginationProps {
   className?: string;
 }
 
-/** Phân trang theo meta { page, size, total } (D111). */
+/** Phân trang theo meta { page, size, total } (D111). Trang hiển thị: 1 … (p-1) p (p+1) … cuối. */
 export const Pagination: React.FC<PaginationProps> = ({ page, size, total, onPageChange, className }) => {
-  const totalPages = Math.max(1, Math.ceil(total / size));
-  if (totalPages <= 1) return null;
+  const last = Math.max(1, Math.ceil(total / Math.max(1, size)));
+  if (last <= 1) return null;
 
-  const pages = buildPageList(page, totalPages);
-  const buttonBase =
-    'inline-flex h-9 min-w-9 items-center justify-center rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-brand-600';
+  const pages = [...new Set([1, last, page - 1, page, page + 1])]
+    .filter((n) => n >= 1 && n <= last)
+    .sort((a, b) => a - b);
+  const btn =
+    'flex h-10 w-10 items-center justify-center rounded-xl font-label-md text-label-md shadow-sm transition-colors';
 
   return (
-    <nav aria-label="Phân trang" className={cn('flex flex-wrap items-center justify-center gap-1', className)}>
+    <nav aria-label="Phân trang" className={cn('flex items-center justify-center gap-2 py-space-md', className)}>
       <button
         type="button"
-        className={cn(buttonBase, 'text-gray-700 hover:bg-gray-100 disabled:text-gray-300')}
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
         aria-label="Trang trước"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className={cn(btn, 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container disabled:opacity-40')}
       >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        <Icon name="chevron_left" className="text-[20px]" />
       </button>
-      {pages.map((item, index) =>
-        item === 'gap' ? (
-          <span key={`gap-${index}`} className="px-1 text-gray-400" aria-hidden="true">
-            …
-          </span>
-        ) : (
-          <button
-            key={item}
-            type="button"
-            className={cn(
-              buttonBase,
-              item === page ? 'bg-brand-600 font-medium text-white' : 'text-gray-700 hover:bg-gray-100'
-            )}
-            onClick={() => onPageChange(item)}
-            aria-current={item === page ? 'page' : undefined}
-            aria-label={`Trang ${item}`}
-          >
-            {item}
-          </button>
-        )
-      )}
+      {pages.map((item, index) => (
+        <span key={item} className="flex items-center gap-2">
+          {index > 0 && item - pages[index - 1] > 1 && (
+            <span className="text-outline" aria-hidden="true">
+              …
+            </span>
+          )}
+          {item === page ? (
+            <span aria-current="page" className={cn(btn, 'bg-primary text-on-primary')}>
+              {item}
+            </span>
+          ) : (
+            <button
+              type="button"
+              aria-label={`Trang ${item}`}
+              onClick={() => onPageChange(item)}
+              className={cn(btn, 'bg-surface-container-lowest text-on-surface hover:bg-surface-container')}
+            >
+              {item}
+            </button>
+          )}
+        </span>
+      ))}
       <button
         type="button"
-        className={cn(buttonBase, 'text-gray-700 hover:bg-gray-100 disabled:text-gray-300')}
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
         aria-label="Trang sau"
+        disabled={page >= last}
+        onClick={() => onPageChange(page + 1)}
+        className={cn(btn, 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container disabled:opacity-40')}
       >
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        <Icon name="chevron_right" className="text-[20px]" />
       </button>
     </nav>
   );
 };
-
-/** 1 … 4 5 6 … 12 */
-function buildPageList(page: number, totalPages: number): (number | 'gap')[] {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-  const result: (number | 'gap')[] = [1];
-  const start = Math.max(2, page - 1);
-  const end = Math.min(totalPages - 1, page + 1);
-  if (start > 2) result.push('gap');
-  for (let i = start; i <= end; i++) result.push(i);
-  if (end < totalPages - 1) result.push('gap');
-  result.push(totalPages);
-  return result;
-}

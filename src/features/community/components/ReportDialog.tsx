@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import Modal from 'react-bootstrap/Modal';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/Button';
+import { FieldError } from '@/components/ui/forms';
+import { Modal } from '@/components/ui/Modal';
 import { applyServerFieldErrors } from '@/lib/formErrors';
 import { notifyApiError, notifyInfo, notifySuccess } from '@/lib/notify';
 import { toApiError } from '@/lib/apiError';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/cn';
 import { useCreateReport } from '../hooks/useReport';
 import {
   REPORT_EVIDENCE_MAX,
+  REPORT_EVIDENCE_MIN,
   VIOLATION_TYPE_OPTIONS,
   reportFormSchema,
   type ReportFormValues,
@@ -51,7 +53,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ show, postId, target
     if (show) reset({ evidenceSummary: '' });
   }, [show, reset]);
 
-  const evidenceLength = watch('evidenceSummary')?.length ?? 0;
+  const evidenceLength = watch('evidenceSummary')?.trim().length ?? 0;
 
   const onSubmit = (values: ReportFormValues) => {
     if (!target) return;
@@ -77,81 +79,65 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ show, postId, target
     );
   };
 
-  const label = target ? TARGET_LABEL[target.type] : 'nội dung';
-
   return (
-    <Modal show={show} onHide={report.isPending ? undefined : onClose} centered>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <Modal.Header closeButton={!report.isPending} closeLabel="Đóng">
-          <Modal.Title as="h2" className="text-lg font-semibold">
-            Báo cáo {label}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Nội dung bị báo cáo sẽ được ẩn ngay để quản trị viên xem xét. Mỗi ngày bạn gửi được tối đa 10
-            báo cáo.
-          </p>
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium text-gray-900">Loại vi phạm</legend>
-            <div className="space-y-2">
-              {VIOLATION_TYPE_OPTIONS.map((option) => (
-                <label
-                  key={option.value}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg p-3 ring-1 ring-gray-200 has-[:checked]:bg-brand-50 has-[:checked]:ring-brand-600"
-                >
-                  <input
-                    type="radio"
-                    value={option.value}
-                    {...register('violationType')}
-                    className="mt-1 accent-brand-600"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-gray-900">{option.label}</span>
-                    <span className="block text-xs text-gray-500">{option.hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {errors.violationType && (
-              <p role="alert" className="mt-1 text-sm text-red-600">
-                {errors.violationType.message}
-              </p>
-            )}
-          </fieldset>
-          <div>
-            <label htmlFor="report-evidence" className="mb-1 block text-sm font-medium text-gray-900">
-              Mô tả vi phạm
-            </label>
-            <textarea
-              id="report-evidence"
-              rows={3}
-              maxLength={REPORT_EVIDENCE_MAX}
-              {...register('evidenceSummary')}
-              aria-invalid={!!errors.evidenceSummary}
-              aria-describedby="report-evidence-hint"
-              placeholder="Ví dụ: bài viết gắn nhãn thuần chay nhưng dùng nước mắm."
-              className={cn(
-                'w-full rounded-md bg-white px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:ring-brand-600 focus:outline-none',
-                errors.evidenceSummary && 'ring-red-500'
-              )}
-            />
-            <div id="report-evidence-hint" className="mt-1 flex justify-between gap-2 text-xs">
-              <span className="text-red-600">{errors.evidenceSummary?.message}</span>
-              <span className="text-gray-500">
-                {evidenceLength}/{REPORT_EVIDENCE_MAX}
+    <Modal
+      show={show}
+      onHide={onClose}
+      title={`Báo cáo ${target ? TARGET_LABEL[target.type] : 'vi phạm'}`}
+      size="sm"
+      locked={report.isPending}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-space-sm p-space-lg">
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Nội dung bị báo cáo được ẩn ngay để quản trị viên xem xét.
+        </p>
+        <fieldset className="flex flex-col gap-space-sm">
+          <legend className="sr-only">Loại vi phạm</legend>
+          {VIOLATION_TYPE_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-start gap-space-sm rounded-lg bg-surface-container-low p-space-sm hover:bg-surface-container has-[:checked]:bg-primary-fixed"
+            >
+              <input type="radio" value={option.value} {...register('violationType')} className="mt-1 accent-primary" />
+              <span>
+                <span className="block font-body-md text-body-md text-on-surface">{option.label}</span>
+                <span className="block font-body-sm text-body-sm text-on-surface-variant">{option.hint}</span>
               </span>
-            </div>
+            </label>
+          ))}
+          <FieldError>{errors.violationType?.message}</FieldError>
+        </fieldset>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="report-evidence" className="sr-only">
+            Mô tả vi phạm
+          </label>
+          <textarea
+            id="report-evidence"
+            rows={3}
+            maxLength={REPORT_EVIDENCE_MAX}
+            {...register('evidenceSummary')}
+            aria-invalid={!!errors.evidenceSummary}
+            placeholder={`Mô tả chi tiết vi phạm (${REPORT_EVIDENCE_MIN}–${REPORT_EVIDENCE_MAX} ký tự)…`}
+            className={cn(
+              'w-full resize-none rounded-lg bg-surface-container-low p-space-sm font-body-sm text-body-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary',
+              errors.evidenceSummary && 'ring-1 ring-error focus:ring-error'
+            )}
+          />
+          <div className="flex justify-between gap-2">
+            <FieldError>{errors.evidenceSummary?.message}</FieldError>
+            <span className="ml-auto font-label-sm text-label-sm text-on-surface-variant">
+              {evidenceLength}/{REPORT_EVIDENCE_MAX}
+            </span>
           </div>
-        </Modal.Body>
-        <Modal.Footer className="gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={report.isPending}>
+        </div>
+        <div className="flex items-center justify-end gap-space-sm pt-space-sm">
+          <Button variant="ghost" onClick={onClose} disabled={report.isPending}>
             Hủy
           </Button>
-          <Button type="submit" variant="danger" loading={report.isPending}>
+          <Button type="submit" variant="accent" loading={report.isPending}>
             Gửi báo cáo
           </Button>
-        </Modal.Footer>
+        </div>
       </form>
     </Modal>
   );

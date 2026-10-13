@@ -1,7 +1,7 @@
 import React from 'react';
-import Modal from 'react-bootstrap/Modal';
 import { Link } from 'react-router-dom';
-import { Leaf } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { Modal } from '@/components/ui/Modal';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 import { useUiStore } from '@/stores/ui.store';
 
@@ -13,39 +13,43 @@ export const SignupPromptModal: React.FC = () => {
   const { open, returnUrl } = useUiStore((state) => state.signupPrompt);
   const close = useUiStore((state) => state.closeSignupPrompt);
 
-  const linkClass =
-    'inline-flex h-10 flex-1 items-center justify-center rounded-md px-4 text-sm font-medium no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600';
-
   return (
-    <Modal show={open} onHide={close} centered aria-labelledby="signup-prompt-title">
-      <Modal.Header closeButton closeLabel="Đóng" className="border-0 pb-0" />
-      <Modal.Body className="px-6 pt-0 pb-6 text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-100">
-          <Leaf className="h-6 w-6 text-brand-700" aria-hidden="true" />
+    <Modal show={open} onHide={close} bare size="sm" labelledBy="signup-prompt-title">
+      <div className="flex flex-col items-center gap-space-md p-space-lg text-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container text-on-primary">
+          <Icon name="lock_open" />
         </span>
-        <h2 id="signup-prompt-title" className="mt-3 text-lg font-semibold text-gray-900">
-          Tham gia cộng đồng VeggieLife
+        <h2 id="signup-prompt-title" className="font-headline-sm text-headline-sm text-primary">
+          Đăng ký để tiếp tục
         </h2>
-        <p className="mt-1 text-sm text-gray-600">
-          Đăng ký miễn phí để thả tim, bình luận, đăng bài và dùng các tính năng dinh dưỡng cá nhân.
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Tính năng này dành cho thành viên. Tạo tài khoản miễn phí để thả tim, bình luận, đăng bài và dùng các tính năng
+          dinh dưỡng cá nhân.
         </p>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-space-sm">
           <Link
             to={withReturnUrl(PATHS.AUTH.REGISTER, returnUrl)}
             onClick={close}
-            className={`${linkClass} bg-brand-600 text-white hover:bg-brand-700`}
+            className="rounded-lg bg-primary-container px-4 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary"
           >
-            Đăng ký
+            Đăng ký miễn phí
           </Link>
           <Link
             to={withReturnUrl(PATHS.AUTH.LOGIN, returnUrl)}
             onClick={close}
-            className={`${linkClass} bg-white text-gray-800 ring-1 ring-inset ring-gray-300 hover:bg-gray-50`}
+            className="rounded-lg bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
           >
-            Đăng nhập
+            Tôi đã có tài khoản
+          </Link>
+          <Link
+            to={PATHS.SUBSCRIPTION.PRICING}
+            onClick={close}
+            className="font-label-sm text-label-sm text-secondary no-underline hover:underline"
+          >
+            Xem quyền lợi gói VIP
           </Link>
         </div>
-      </Modal.Body>
+      </div>
     </Modal>
   );
 };

@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, LogIn, Pencil, PenSquare, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageLoader } from '@/components/common/PageLoader';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { Pagination } from '@/components/ui/Pagination';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { formatNumber } from '@/lib/format';
 import { notifyApiError, notifySuccess } from '@/lib/notify';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
-import { PostCard, PostGridSkeleton } from '../components/PostCard';
+import { MyPostRow } from '../components/MyPostRow';
+import { PostListToolbar } from '../components/PostListToolbar';
 import { useDeletePost } from '../hooks/usePostMutations';
 import { usePostList } from '../hooks/usePosts';
-import type { PostListItem } from '../types/community.types';
+import type { PostListItem, PostSort } from '../types/community.types';
 
 const PAGE_SIZE = 10;
-
-const linkButton =
-  'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600';
 
 /**
  * SCR-28 community/MyPosts — GET /posts?authorId=<tôi> (FN-POST-05); chỉ hiện khi đã đăng nhập.
@@ -28,9 +28,11 @@ const MyPosts: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, sessionStatus } = useAuthStore();
+  const keyword = searchParams.get('keyword')?.trim() ?? '';
+  const sort: PostSort = searchParams.get('sort') === 'POPULAR' ? 'POPULAR' : 'NEWEST';
   const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const posts = usePostList(
-    { authorId: user?.userId, sort: 'NEWEST', page, size: PAGE_SIZE },
+    { authorId: user?.userId, keyword: keyword || undefined, sort, page, size: PAGE_SIZE },
     { enabled: !!user }
   );
   const deletePost = useDeletePost();
@@ -41,17 +43,20 @@ const MyPosts: React.FC = () => {
   if (!user) {
     return (
       <EmptyState
-        icon={LogIn}
-        title="Đăng nhập để xem bài viết của bạn"
-        description="Bài viết bạn đã đăng, bản nháp và bài riêng tư sẽ hiển thị ở đây."
+        icon="edit_note"
+        title="Bài viết của tôi"
+        description="Đăng nhập để xem và quản lý bài viết của bạn."
         action={
           <>
-            <Link to={withReturnUrl(PATHS.AUTH.LOGIN, PATHS.ME.POSTS)} className={`${linkButton} bg-brand-600 text-white hover:bg-brand-700`}>
+            <Link
+              to={withReturnUrl(PATHS.AUTH.LOGIN, PATHS.ME.POSTS)}
+              className="rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary"
+            >
               Đăng nhập
             </Link>
             <Link
               to={withReturnUrl(PATHS.AUTH.REGISTER, PATHS.ME.POSTS)}
-              className={`${linkButton} bg-white text-gray-800 ring-1 ring-inset ring-gray-300 hover:bg-gray-50`}
+              className="rounded-lg bg-surface-container px-5 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
             >
               Đăng ký
             </Link>
@@ -61,12 +66,16 @@ const MyPosts: React.FC = () => {
     );
   }
 
-  const goToPage = (nextPage: number) => {
+  const updateParams = (next: { keyword?: string; sort?: PostSort; page?: number }) => {
     const params = new URLSearchParams(searchParams);
-    if (nextPage > 1) params.set('page', String(nextPage));
+    const merged = { keyword, sort, page: 1, ...next };
+    if (merged.keyword) params.set('keyword', merged.keyword);
+    else params.delete('keyword');
+    if (merged.sort !== 'NEWEST') params.set('sort', merged.sort);
+    else params.delete('sort');
+    if (merged.page > 1) params.set('page', String(merged.page));
     else params.delete('page');
     setSearchParams(params);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = () => {
@@ -78,66 +87,85 @@ const MyPosts: React.FC = () => {
     });
   };
 
+  const items = posts.data?.items ?? [];
+  const stats: { label: string; value: number | undefined; tone: string }[] = [
+    { label: 'Tổng số bài', value: posts.data?.meta.total, tone: 'text-tertiary' },
+    { label: 'Lượt thích (trang này)', value: posts.data ? items.reduce((n, p) => n + p.voteCount, 0) : undefined, tone: 'text-secondary' },
+    { label: 'Bình luận (trang này)', value: posts.data ? items.reduce((n, p) => n + p.commentCount, 0) : undefined, tone: 'text-tertiary' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bài viết của tôi</h1>
-          <p className="mt-1 text-sm text-gray-600">Quản lý các bài bạn đã chia sẻ với cộng đồng.</p>
-        </div>
-        <Button onClick={() => navigate(PATHS.COMMUNITY.NEW_POST)}>
-          <PenSquare className="h-4 w-4" aria-hidden="true" />
+    <div className="mx-auto w-full max-w-[1200px] px-margin-mobile py-space-xl sm:px-margin">
+      <div className="mb-space-xl flex flex-col justify-between gap-space-lg md:flex-row md:items-end">
+        <h1 className="font-headline-lg text-headline-lg-mobile tracking-tight text-tertiary sm:text-headline-lg">
+          Bài viết của tôi
+        </h1>
+        <Button size="lg" onClick={() => navigate(PATHS.COMMUNITY.NEW_POST)}>
+          <Icon name="edit_note" className="text-[20px]" />
           Viết bài mới
         </Button>
       </div>
 
+      <dl className="mb-space-xl grid grid-cols-1 gap-space-md sm:grid-cols-3">
+        {stats.map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-surface-container-lowest p-space-md shadow-card">
+            <dt className="font-label-sm text-label-sm text-outline">{stat.label}</dt>
+            <dd className={`mt-0.5 font-headline-md text-headline-md font-bold tabular-nums ${stat.tone}`}>
+              {stat.value === undefined ? '-' : formatNumber(stat.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-card">
+        <PostListToolbar
+          keyword={keyword}
+          sort={sort}
+          placeholder="Tìm theo tiêu đề…"
+          onSearch={(value) => updateParams({ keyword: value })}
+          onSortChange={(value) => updateParams({ sort: value })}
+        />
+      </div>
+
       {posts.isPending ? (
-        <PostGridSkeleton count={3} />
+        <div className="space-y-space-md" role="status" aria-busy="true" aria-label="Đang tải bài viết">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
       ) : posts.isError ? (
         <ErrorState error={posts.error} onRetry={() => posts.refetch()} retrying={posts.isRefetching} />
-      ) : posts.data.items.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="Bạn chưa có bài viết nào"
-          description="Chia sẻ trải nghiệm ăn chay, mẹo nấu ăn hay câu chuyện của bạn với cộng đồng."
-          action={<Button onClick={() => navigate(PATHS.COMMUNITY.NEW_POST)}>Viết bài đầu tiên</Button>}
-        />
+      ) : items.length === 0 ? (
+        keyword ? (
+          <EmptyState
+            icon="search_off"
+            title="Không tìm thấy bài viết phù hợp"
+            description="Thử từ khóa khác hoặc xóa tìm kiếm."
+            action={<Button onClick={() => updateParams({ keyword: '' })}>Xóa tìm kiếm</Button>}
+          />
+        ) : (
+          <EmptyState
+            icon="edit_note"
+            title="Bạn chưa đăng bài nào"
+            description="Chia sẻ trải nghiệm ẩm thực đầu tiên với cộng đồng."
+            action={<Button onClick={() => navigate(PATHS.COMMUNITY.NEW_POST)}>Viết bài</Button>}
+          />
+        )
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {posts.data.items.map((post) => (
-              <PostCard
-                key={post.postId}
-                post={post}
-                actions={
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Sửa bài "${post.title}"`}
-                      onClick={() => navigate(PATHS.COMMUNITY.EDIT_POST(post.postId))}
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      aria-label={`Xóa bài "${post.title}"`}
-                      onClick={() => setToDelete(post)}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </>
-                }
-              />
+          <div className="space-y-space-md">
+            {items.map((post) => (
+              <MyPostRow key={post.postId} post={post} onDelete={setToDelete} />
             ))}
           </div>
           <Pagination
             page={posts.data.meta.page}
             size={posts.data.meta.size}
             total={posts.data.meta.total}
-            onPageChange={goToPage}
+            onPageChange={(next) => {
+              updateParams({ page: next });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         </>
       )}
@@ -147,8 +175,8 @@ const MyPosts: React.FC = () => {
         title="Xóa bài viết?"
         message={
           <>
-            Bài <strong>{toDelete?.title}</strong> sẽ bị xóa khỏi cộng đồng cùng với bình luận và lượt thả tim. Bạn
-            không thể hoàn tác thao tác này.
+            Bài <strong className="text-on-surface">{toDelete?.title}</strong> sẽ bị xóa khỏi cộng đồng cùng với bình luận
+            và lượt thả tim. Bạn không thể hoàn tác thao tác này.
           </>
         }
         confirmLabel="Xóa bài viết"

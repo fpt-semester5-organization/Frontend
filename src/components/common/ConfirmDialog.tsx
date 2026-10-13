@@ -1,6 +1,6 @@
 import React from 'react';
-import Modal from 'react-bootstrap/Modal';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 
 interface ConfirmDialogProps {
   show: boolean;
@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/** Hộp xác nhận cho thao tác nhạy cảm: xóa bài, xóa bình luận... */
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   show,
   title,
@@ -26,20 +27,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => (
-  <Modal show={show} onHide={loading ? undefined : onCancel} centered>
-    <Modal.Header closeButton={!loading} closeLabel="Đóng">
-      <Modal.Title as="h2" className="text-lg font-semibold">
-        {title}
-      </Modal.Title>
-    </Modal.Header>
-    <Modal.Body className="text-sm text-gray-700">{message}</Modal.Body>
-    <Modal.Footer className="gap-2">
-      <Button variant="secondary" onClick={onCancel} disabled={loading}>
-        {cancelLabel}
-      </Button>
-      <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
-        {confirmLabel}
-      </Button>
-    </Modal.Footer>
+  <Modal show={show} onHide={onCancel} title={title} size="sm" locked={loading}>
+    <div className="flex flex-col gap-5 p-space-lg">
+      <div className="font-body-md text-body-md text-on-surface-variant">{message}</div>
+      <div className="flex justify-end gap-3">
+        <Button variant="secondary" onClick={onCancel} disabled={loading}>
+          {cancelLabel}
+        </Button>
+        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </div>
   </Modal>
 );

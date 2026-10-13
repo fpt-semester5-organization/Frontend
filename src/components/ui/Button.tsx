@@ -2,20 +2,24 @@ import React from 'react';
 import { cn } from '@/lib/cn';
 import { Spinner } from './Spinner';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type ButtonSize = 'sm' | 'md';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'accent';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
+// Kiểu nút theo DESIGN.md (Linen & Earth): bo 4px, chữ Work Sans label-md.
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-600/60',
-  secondary:
-    'bg-white text-gray-800 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:text-gray-400',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 disabled:text-gray-400',
-  danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-600/60',
+  primary: 'bg-primary-container text-on-primary shadow-sm hover:bg-primary',
+  secondary: 'bg-surface-container text-on-surface hover:bg-surface-container-high',
+  outline:
+    'bg-surface-container-lowest text-on-surface ring-1 ring-inset ring-outline-variant hover:bg-surface-container-low',
+  ghost: 'bg-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-surface',
+  danger: 'bg-error text-on-error hover:opacity-90',
+  accent: 'bg-secondary text-on-secondary shadow-sm hover:bg-on-secondary-fixed-variant',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-sm',
+  sm: 'h-8 px-3',
+  md: 'h-10 px-4',
+  lg: 'h-12 px-6',
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,16 +36,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium transition-colors',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
-        'disabled:cursor-not-allowed',
+        'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-label-md text-label-md transition-all',
+        'disabled:cursor-not-allowed disabled:opacity-60',
         variantClasses[variant],
         sizeClasses[size],
         className
       )}
       {...rest}
     >
-      {loading && <Spinner className="h-3.5 w-3.5" label="Đang xử lý" />}
+      {loading && <Spinner className="text-[16px]" label="Đang xử lý" />}
       {children}
     </button>
   )

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { CornerDownRight, Flag, Pencil, Reply, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { Avatar } from '@/components/ui/Avatar';
+import { Icon } from '@/components/ui/Icon';
 import { formatDateTime } from '@/lib/format';
 import { notifyApiError, notifySuccess } from '@/lib/notify';
 import { cn } from '@/lib/cn';
@@ -10,6 +11,8 @@ import { CommentForm } from './CommentForm';
 
 export interface CommentThreadContext {
   postId: number;
+  /** Tác giả bài viết: bình luận của họ có nhãn "Tác giả". */
+  postAuthorId: number;
   currentUserId: number | null;
   /** Thành viên được bình luận trên bài này (memberActions.canComment). */
   canComment: boolean;
@@ -28,6 +31,8 @@ interface CommentItemProps {
   isReply?: boolean;
 }
 
+const ACTION = 'font-label-sm text-label-sm transition-colors';
+
 /**
  * Một bình luận và cây phản hồi. Hiển thị tối đa 2 cấp (FN-COMM-01): phản hồi sâu hơn được dàn phẳng
  * vào cấp 2 kèm "Trả lời <tên>", nhưng vẫn gửi đúng parentCommentId.
@@ -39,6 +44,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
   const deleteComment = useDeleteComment(context.postId);
 
   const isOwner = context.currentUserId !== null && comment.author.userId === context.currentUserId;
+  const isPostAuthor = comment.author.userId === context.postAuthorId;
   const replies = isReply ? [] : flattenReplies(comment);
 
   const handleDelete = () =>
@@ -54,105 +60,88 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
       },
     });
 
-  const actionClass =
-    'inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-brand-600';
-
   return (
-    <li className="list-none">
-      <div className="flex gap-3">
-        <span
-          aria-hidden="true"
-          className={cn(
-            'flex shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-800',
-            isReply ? 'h-7 w-7 text-xs' : 'h-9 w-9 text-sm'
-          )}
-        >
-          {comment.author.fullName.trim().charAt(0).toUpperCase() || '?'}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="rounded-lg bg-gray-50 px-3 py-2">
-            <p className="text-sm">
-              <span className="font-semibold text-gray-900">{comment.author.fullName}</span>
+    <li className="flex flex-col gap-space-sm">
+      <div className="flex items-start gap-space-sm">
+        <Avatar name={comment.author.fullName} size={isReply ? 'sm' : 'md'} />
+        <div className={cn('min-w-0 flex-1 rounded-lg p-space-md', isReply ? 'bg-surface-container' : 'bg-surface-container-low')}>
+          <div className="mb-1 flex items-start justify-between gap-space-xs">
+            <div className="flex min-w-0 flex-wrap items-center gap-space-xs">
+              <span className="font-headline-sm text-body-lg font-bold text-on-surface">{comment.author.fullName}</span>
+              {isPostAuthor && (
+                <span className="rounded bg-primary px-1.5 py-0.5 font-label-sm text-label-sm text-on-primary">Tác giả</span>
+              )}
               {replyToName && (
-                <span className="ml-1 inline-flex items-center gap-0.5 text-xs text-gray-500">
-                  <CornerDownRight className="h-3 w-3" aria-hidden="true" />
+                <span className="flex items-center gap-0.5 font-label-sm text-label-sm text-on-surface-variant">
+                  <Icon name="subdirectory_arrow_right" className="text-[14px]" />
                   Trả lời {replyToName}
                 </span>
               )}
-            </p>
-            {mode === 'edit' ? (
-              <div className="mt-2">
-                <CommentForm
-                  label="Sửa bình luận"
-                  submitLabel="Lưu"
-                  initialContent={comment.content}
-                  autoFocus
-                  onCancel={() => setMode('view')}
-                  onSubmit={async (content) => {
-                    const res = await updateComment.mutateAsync({ commentId: comment.commentId, content });
-                    notifySuccess(res.message);
-                    setMode('view');
-                  }}
-                />
-              </div>
-            ) : (
-              <p className="mt-0.5 text-sm break-words whitespace-pre-line text-gray-800">{comment.content}</p>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <time dateTime={comment.createdAt} className="mr-1 text-xs text-gray-500">
+            </div>
+            <time dateTime={comment.createdAt} className="shrink-0 font-label-sm text-label-sm text-on-surface-variant">
               {formatDateTime(comment.createdAt)}
             </time>
+          </div>
+
+          {mode === 'edit' ? (
+            <CommentForm
+              label="Sửa bình luận"
+              submitLabel="Lưu"
+              rows={2}
+              initialContent={comment.content}
+              autoFocus
+              onCancel={() => setMode('view')}
+              onSubmit={async (content) => {
+                const res = await updateComment.mutateAsync({ commentId: comment.commentId, content });
+                notifySuccess(res.message);
+                setMode('view');
+              }}
+            />
+          ) : (
+            <p className="mb-space-sm font-body-md text-body-md leading-relaxed break-words whitespace-pre-line text-on-surface">
+              {comment.content}
+            </p>
+          )}
+
+          <div className="flex items-center gap-space-md text-on-surface-variant">
             {(context.canComment || context.currentUserId === null) && (
               <button
                 type="button"
-                className={actionClass}
+                className={cn(ACTION, 'font-semibold hover:text-primary')}
                 onClick={() => context.requireMember(() => setMode(mode === 'reply' ? 'view' : 'reply'))}
               >
-                <Reply className="h-3.5 w-3.5" aria-hidden="true" />
                 Trả lời
               </button>
             )}
             {isOwner ? (
-              <>
-                <button type="button" className={actionClass} onClick={() => setMode('edit')}>
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  Sửa
-                </button>
-                <button type="button" className={actionClass} onClick={() => setConfirmDelete(true)}>
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Xóa
-                </button>
-              </>
+              mode !== 'edit' && (
+                <>
+                  <button type="button" className={cn(ACTION, 'hover:text-on-surface')} onClick={() => setMode('edit')}>
+                    Chỉnh sửa
+                  </button>
+                  <button type="button" className={cn(ACTION, 'hover:text-error')} onClick={() => setConfirmDelete(true)}>
+                    Xóa
+                  </button>
+                </>
+              )
             ) : (
               <button
                 type="button"
-                className={actionClass}
+                className={cn(ACTION, 'ml-auto hover:text-secondary')}
                 onClick={() => context.requireMember(() => context.onReport(comment.commentId))}
               >
-                <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                 Báo cáo
               </button>
             )}
           </div>
-          {mode === 'reply' && (
-            <div className="mt-2">
-              <CommentForm
-                label={`Trả lời ${comment.author.fullName}`}
-                submitLabel="Gửi trả lời"
-                placeholder={`Trả lời ${comment.author.fullName}...`}
-                autoFocus
-                cooldownSeconds={context.cooldownSeconds}
-                onCancel={() => setMode('view')}
-                onSubmit={async (content) => {
-                  await context.submitReply(comment.commentId, content);
-                  setMode('view');
-                }}
-              />
-            </div>
-          )}
+        </div>
+      </div>
+
+      {(mode === 'reply' || replies.length > 0) && (
+        <div className="relative flex flex-col gap-space-sm pl-10 md:pl-12">
+          <div aria-hidden="true" className="absolute top-0 bottom-4 left-5 w-[2px] bg-surface-container-highest" />
           {replies.length > 0 && (
-            <ul className="mt-3 space-y-3 border-l-2 border-gray-100 pl-3 sm:pl-4">
+            <ul className="flex flex-col gap-space-sm">
               {replies.map(({ reply, parentId, parentName }) => (
                 <CommentItem
                   key={reply.commentId}
@@ -164,8 +153,24 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
               ))}
             </ul>
           )}
+          {mode === 'reply' && (
+            <CommentForm
+              label={`Trả lời ${comment.author.fullName}`}
+              submitLabel="Gửi"
+              rows={2}
+              placeholder={`Phản hồi ${comment.author.fullName}…`}
+              autoFocus
+              cooldownSeconds={context.cooldownSeconds}
+              onCancel={() => setMode('view')}
+              onSubmit={async (content) => {
+                await context.submitReply(comment.commentId, content);
+                setMode('view');
+              }}
+            />
+          )}
         </div>
-      </div>
+      )}
+
       <ConfirmDialog
         show={confirmDelete}
         title="Xóa bình luận?"

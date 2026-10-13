@@ -1,52 +1,46 @@
 import React from 'react';
 import Toast from 'react-bootstrap/Toast';
-import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
+import ToastContainer from 'react-bootstrap/ToastContainer';
+import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { useUiStore, type ToastVariant } from '@/stores/ui.store';
 
-const variantStyle: Record<ToastVariant, { icon: typeof Info; className: string }> = {
-  success: { icon: CheckCircle2, className: 'text-brand-700' },
-  info: { icon: Info, className: 'text-sky-700' },
-  warning: { icon: AlertTriangle, className: 'text-amber-700' },
-  danger: { icon: XCircle, className: 'text-red-700' },
+const STYLE: Record<ToastVariant, { box: string; icon: string }> = {
+  success: { box: 'bg-primary text-on-primary', icon: 'check_circle' },
+  info: { box: 'bg-inverse-surface text-inverse-on-surface', icon: 'info' },
+  warning: { box: 'bg-secondary text-on-secondary', icon: 'warning' },
+  danger: { box: 'bg-error text-on-error', icon: 'error' },
 };
 
-/**
- * Toast qua react-bootstrap (D102). Vị trí đặt bằng Tailwind vì ToastContainer của
- * react-bootstrap dùng class tiện ích Bootstrap (top-0, position-fixed) không được nạp.
- */
+/** Toast toàn cục qua react-bootstrap (D102): khối màu đặc ở góc phải dưới. */
 export const AppToaster: React.FC = () => {
   const toasts = useUiStore((state) => state.toasts);
   const dismiss = useUiStore((state) => state.dismissToast);
 
   return (
-    <div
-      aria-live="polite"
-      className="pointer-events-none fixed top-4 right-4 left-4 z-[1090] flex flex-col items-end gap-2 sm:left-auto"
-    >
-      {toasts.map((toast) => {
-        const { icon: Icon, className } = variantStyle[toast.variant];
-        return (
-          <Toast
-            key={toast.id}
-            onClose={() => dismiss(toast.id)}
-            delay={toast.variant === 'danger' ? 7000 : 4500}
-            autohide
-            className="pointer-events-auto w-full sm:w-[360px]"
-          >
-            <Toast.Body className="flex items-start gap-3">
-              <Icon className={cn('mt-0.5 h-5 w-5 shrink-0', className)} aria-hidden="true" />
-              <span className="flex-1 text-sm text-gray-800">{toast.message}</span>
-              <button
-                type="button"
-                className="btn-close shrink-0"
-                aria-label="Đóng thông báo"
-                onClick={() => dismiss(toast.id)}
-              />
-            </Toast.Body>
-          </Toast>
-        );
-      })}
-    </div>
+    <ToastContainer position="bottom-end" containerPosition="fixed" className="z-[1090] p-4" aria-live="polite">
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          onClose={() => dismiss(toast.id)}
+          delay={toast.variant === 'danger' ? 7000 : 4500}
+          autohide
+          className={cn('rounded-lg border-0 shadow-xl', STYLE[toast.variant].box)}
+        >
+          <div className="flex items-center gap-3 px-space-md py-3">
+            <Icon name={STYLE[toast.variant].icon} className="text-[20px]" />
+            <span className="flex-1 font-body-sm text-body-sm">{toast.message}</span>
+            <button
+              type="button"
+              aria-label="Đóng thông báo"
+              onClick={() => dismiss(toast.id)}
+              className="flex rounded p-0.5 opacity-80 hover:opacity-100"
+            >
+              <Icon name="close" className="text-[18px]" />
+            </button>
+          </div>
+        </Toast>
+      ))}
+    </ToastContainer>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FlaskConical } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 import { login, logout } from '@/features/auth/api/auth.api';
 import { cn } from '@/lib/cn';
 import { notifyApiError } from '@/lib/notify';
@@ -51,18 +51,23 @@ const MockSessionPanel: React.FC = () => {
   ];
 
   return (
-    <div className="fixed bottom-4 left-4 z-[1080] w-64 rounded-lg bg-white text-sm shadow-lg ring-1 ring-amber-300">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-left font-semibold text-amber-900"
-      >
-        <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="truncate">MSW: {user ? user.fullName : 'Khách'}</span>
-      </button>
-      {open && (
-        <div className="space-y-1 p-2">
+    <div className="fixed bottom-3 left-3 z-[1080] font-label-sm text-label-sm">
+      {open ? (
+        <div className="w-64 rounded-xl bg-inverse-surface p-2 text-inverse-on-surface shadow-xl">
+          <div className="flex items-center justify-between gap-2 px-2 pb-1">
+            <span className="flex items-center gap-1.5 opacity-80">
+              <Icon name="science" className="text-[16px]" />
+              Dữ liệu giả (MSW)
+            </span>
+            <button
+              type="button"
+              aria-label="Thu gọn"
+              onClick={() => setOpen(false)}
+              className="flex rounded-full p-0.5 hover:bg-white/10"
+            >
+              <Icon name="close" className="text-[16px]" />
+            </button>
+          </div>
           {options.map((option) => {
             const active = (user?.userId ?? null) === option.id;
             return (
@@ -72,16 +77,26 @@ const MockSessionPanel: React.FC = () => {
                 disabled={busy || active}
                 onClick={() => switchTo(option.id)}
                 className={cn(
-                  'w-full rounded-md px-2 py-1.5 text-left disabled:cursor-default',
-                  active ? 'bg-brand-50 font-medium text-brand-800' : 'text-gray-700 hover:bg-gray-100'
+                  'w-full rounded-lg px-2 py-1.5 text-left disabled:cursor-default',
+                  active ? 'bg-secondary-container text-on-secondary-container' : 'hover:bg-white/10'
                 )}
               >
                 {option.label}
               </button>
             );
           })}
-          <p className="px-2 pt-1 text-xs text-gray-500">Tải lại trang sẽ đưa dữ liệu giả về ban đầu.</p>
+          <p className="px-2 pt-1 font-body-sm text-body-sm opacity-70">Tải lại trang sẽ đưa dữ liệu giả về ban đầu.</p>
         </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={open}
+          className="flex items-center gap-1.5 rounded-full bg-inverse-surface px-3 py-1.5 text-inverse-on-surface shadow-xl"
+        >
+          <Icon name="science" className="text-[16px]" />
+          MSW: {user ? user.fullName : 'Khách'}
+        </button>
       )}
     </div>
   );

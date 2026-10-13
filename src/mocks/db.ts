@@ -83,7 +83,7 @@ export const posts: MockPost[] = [
     title: 'Một tuần ăn chay đầu tiên của tôi',
     content:
       'Tuần trước mình quyết định thử ăn chay trọn 7 ngày. Ngày đầu khá khó vì quen ăn mặn, nhưng từ ngày thứ ba mình bắt đầu thấy nhẹ người hơn.\n\nMẹo của mình: chuẩn bị sẵn đậu phụ, nấm và rau củ cho cả tuần, nấu canh rong biển buổi tối và luôn có một hộp hạt điều để ăn vặt.',
-    imageUrl: cover('#dcfce7', '#16a34a'),
+    imageUrl: cover('#dfeadf', '#4f6f58'),
     visibility: 'PUBLIC',
     status: 'APPROVED_ACTIVE',
     baseVotes: 12,
@@ -97,7 +97,7 @@ export const posts: MockPost[] = [
     title: 'Bí quyết làm nước dùng chay ngọt thanh',
     content:
       'Nước dùng chay ngon cần ba thứ: củ cải trắng, bắp ngọt và nấm hương khô. Hầm lửa nhỏ khoảng 90 phút, vớt bọt thường xuyên, cuối cùng nêm một chút đường phèn.',
-    imageUrl: cover('#fef3c7', '#d97706'),
+    imageUrl: cover('#f8e3d6', '#94532f'),
     visibility: 'PUBLIC',
     status: 'APPROVED_ACTIVE',
     baseVotes: 31,
@@ -125,7 +125,7 @@ export const posts: MockPost[] = [
     title: 'Thực đơn chay cho người bận rộn',
     content:
       'Sáng: yến mạch ngâm qua đêm với sữa hạt. Trưa: cơm gạo lứt, đậu hũ sốt cà, rau luộc. Tối: bún xào rau củ. Chuẩn bị nguyên liệu vào cuối tuần giúp tiết kiệm rất nhiều thời gian.',
-    imageUrl: cover('#e0f2fe', '#0284c7'),
+    imageUrl: cover('#e8e6df', '#636a60'),
     visibility: 'PUBLIC',
     status: 'APPROVED_ACTIVE',
     baseVotes: 18,
@@ -139,7 +139,7 @@ export const posts: MockPost[] = [
     title: 'Những loại nấm dễ mua để nấu món chay',
     content:
       'Nấm rơm, nấm đùi gà, nấm kim châm, nấm hương và nấm mỡ đều dễ mua ở chợ. Nấm đùi gà xé sợi xào sả ớt rất hợp với cơm trắng.',
-    imageUrl: cover('#f3e8ff', '#9333ea'),
+    imageUrl: cover('#f1ede8', '#7a4429'),
     visibility: 'PUBLIC',
     status: 'APPROVED_ACTIVE',
     baseVotes: 9,
@@ -174,13 +174,13 @@ export const posts: MockPost[] = [
     recipes: [],
   },
   ...[
-    ['Làm sữa hạt điều tại nhà chỉ với 3 bước', '#ffedd5', '#ea580c', 3072, 22],
-    ['Món chay ngày Tết: gợi ý mâm cỗ đơn giản', '#fee2e2', '#dc2626', 2048, 27],
-    ['Đậu hũ non sốt nấm: món tủ của gia đình mình', '#fef9c3', '#ca8a04', 3072, 14],
-    ['Ăn chay và tập gym: mình đã thay đổi thế nào', '#dbeafe', '#2563eb', 2048, 38],
-    ['Rau củ theo mùa ở miền Nam nên thử', '#dcfce7', '#15803d', 3072, 7],
-    ['Cách bảo quản rau xanh được lâu trong tủ lạnh', '#ccfbf1', '#0d9488', 2048, 11],
-    ['Bánh mì chay pate nấm cho bữa sáng', '#fae8ff', '#c026d3', 3072, 16],
+    ['Làm sữa hạt điều tại nhà chỉ với 3 bước', '#f8e3d6', '#bd7653', 3072, 22],
+    ['Món chay ngày Tết: gợi ý mâm cỗ đơn giản', '#f2d2c0', '#94532f', 2048, 27],
+    ['Đậu hũ non sốt nấm: món tủ của gia đình mình', '#f7f3ee', '#8a5a0b', 3072, 14],
+    ['Ăn chay và tập gym: mình đã thay đổi thế nào', '#dfeadf', '#3d5c47', 2048, 38],
+    ['Rau củ theo mùa ở miền Nam nên thử', '#e6e2dd', '#4f6f58', 3072, 7],
+    ['Cách bảo quản rau xanh được lâu trong tủ lạnh', '#bfd3c3', '#3d5c47', 2048, 11],
+    ['Bánh mì chay pate nấm cho bữa sáng', '#ebc3ab', '#94532f', 3072, 16],
   ].map(([title, background, accent, authorId, votes], index): MockPost => ({
     postId: 90 + index,
     authorId: authorId as number,

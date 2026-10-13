@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FileQuestion, Flag, MessageCircle, Pencil, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { Button } from '@/components/ui/Button';
+import { Avatar } from '@/components/ui/Avatar';
+import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRequireMember } from '@/hooks/useRequireMember';
 import { toApiError } from '@/lib/apiError';
@@ -13,39 +13,30 @@ import { notifyApiError, notifySuccess } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { CommentSection } from '../components/CommentSection';
-import { PostAttachments } from '../components/PostAttachments';
+import { LinkedRecipes, PostVideos } from '../components/PostAttachments';
 import { ReportDialog } from '../components/ReportDialog';
 import { VoteButton } from '../components/VoteButton';
 import { useDeletePost } from '../hooks/usePostMutations';
 import { usePost } from '../hooks/usePosts';
 
-const BackLink: React.FC = () => (
-  <Link
-    to={PATHS.COMMUNITY.ROOT}
-    className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 no-underline hover:text-brand-700"
-  >
-    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-    Cộng đồng
-  </Link>
-);
+const PAGE = 'mx-auto flex w-full max-w-[900px] flex-col gap-space-xl px-margin-mobile py-space-lg sm:px-margin';
+const ICON_BUTTON =
+  'flex rounded-lg p-2 text-on-surface-variant no-underline transition-colors hover:bg-surface-container-low';
 
 const NotFound: React.FC = () => (
-  <div className="space-y-4">
-    <BackLink />
-    <EmptyState
-      icon={FileQuestion}
-      title="Không tìm thấy bài viết"
-      description="Bài viết không tồn tại, đã bị xóa hoặc đang chờ kiểm duyệt."
-      action={
-        <Link
-          to={PATHS.COMMUNITY.ROOT}
-          className="inline-flex h-10 items-center rounded-md bg-brand-600 px-4 text-sm font-medium text-white no-underline hover:bg-brand-700"
-        >
-          Về trang Cộng đồng
-        </Link>
-      }
-    />
-  </div>
+  <EmptyState
+    icon="search_off"
+    title="Không tìm thấy bài viết"
+    description="Bài viết không tồn tại, đã bị xóa hoặc đang chờ kiểm duyệt."
+    action={
+      <Link
+        to={PATHS.COMMUNITY.ROOT}
+        className="inline-flex rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary"
+      >
+        Về Cộng đồng
+      </Link>
+    }
+  />
 );
 
 /** SCR-26 community/PostDetail — bình luận nhiều tầng, thả tim, báo cáo (FN-POST-06, FN-COMM-01..05). */
@@ -65,24 +56,16 @@ const PostDetail: React.FC = () => {
 
   if (post.isPending) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4" aria-busy="true" aria-label="Đang tải bài viết">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="aspect-[16/9] w-full" />
-        <Skeleton className="h-24 w-full" />
+      <div className={PAGE} role="status" aria-busy="true" aria-label="Đang tải bài viết">
+        <Skeleton className="h-[480px]" />
+        <Skeleton className="h-48" />
       </div>
     );
   }
 
   if (post.isError) {
     if (toApiError(post.error).status === 404) return <NotFound />;
-    return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <BackLink />
-        <ErrorState error={post.error} onRetry={() => post.refetch()} retrying={post.isRefetching} />
-      </div>
-    );
+    return <ErrorState error={post.error} onRetry={() => post.refetch()} retrying={post.isRefetching} />;
   }
 
   const data = post.data;
@@ -101,72 +84,85 @@ const PostDetail: React.FC = () => {
     });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <BackLink />
-
-      <article className="rounded-xl bg-white p-5 ring-1 ring-gray-200 sm:p-8">
-        <header>
-          <h1 className="text-2xl font-bold break-words text-gray-900 sm:text-3xl">{data.title}</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Bởi <span className="font-medium text-gray-900">{data.author.fullName}</span>
-          </p>
+    <div className={PAGE}>
+      <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl">
+        <header className="flex flex-wrap items-center justify-between gap-space-md pb-space-lg">
+          <div className="flex items-center gap-space-sm">
+            <Avatar name={data.author.fullName} size="lg" />
+            <span className="font-headline-sm text-headline-sm text-on-surface">{data.author.fullName}</span>
+          </div>
+          <div className="ml-auto flex items-center gap-space-xs">
+            {isOwner ? (
+              <>
+                <Link to={PATHS.COMMUNITY.EDIT_POST(postId)} title="Sửa bài" aria-label="Sửa bài" className={`${ICON_BUTTON} hover:text-primary`}>
+                  <Icon name="edit" className="text-[20px]" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  title="Xóa bài"
+                  aria-label="Xóa bài"
+                  className={`${ICON_BUTTON} hover:text-error`}
+                >
+                  <Icon name="delete" className="text-[20px]" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => requireMember(() => setReportOpen(true))}
+                title="Báo cáo vi phạm"
+                aria-label="Báo cáo vi phạm"
+                className={`${ICON_BUTTON} hover:text-secondary`}
+              >
+                <Icon name="flag" className="text-[20px]" />
+              </button>
+            )}
+          </div>
         </header>
 
+        <h1 className="mb-space-md font-headline-lg text-headline-lg-mobile leading-tight break-words text-on-surface sm:text-headline-lg">
+          {data.title}
+        </h1>
+
         {data.imageUrl && (
-          <img src={data.imageUrl} alt={`Ảnh minh họa: ${data.title}`} className="mt-5 w-full rounded-lg object-cover" />
+          <figure className="mb-space-lg overflow-hidden rounded-lg">
+            <div className="aspect-[16/9] w-full overflow-hidden bg-surface-container">
+              <img src={data.imageUrl} alt={`Ảnh minh họa: ${data.title}`} className="h-full w-full object-cover" />
+            </div>
+          </figure>
         )}
 
-        <div className="mt-5 text-base leading-relaxed break-words whitespace-pre-line text-gray-800">
+        <div className="mb-space-lg empty:hidden">
+          <LinkedRecipes recipes={data.recipes} />
+        </div>
+
+        <div className="mb-space-xl font-body-md text-body-md leading-relaxed break-words whitespace-pre-line text-on-surface">
           {data.content}
         </div>
 
-        <div className="mt-6">
-          <PostAttachments videos={data.videos} recipes={data.recipes} />
+        <div className="mb-space-xl empty:hidden">
+          <PostVideos videos={data.videos} />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+        <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">
           <VoteButton postId={postId} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
           <a
             href="#comments"
-            className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-gray-700 no-underline ring-1 ring-gray-300 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface no-underline transition-all hover:bg-surface-container"
           >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
             {formatNumber(data.commentCount)} bình luận
           </a>
-          <div className="ml-auto flex items-center gap-1">
-            {isOwner ? (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => navigate(PATHS.COMMUNITY.EDIT_POST(postId))}>
-                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                  Sửa
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:bg-red-50"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  Xóa
-                </Button>
-              </>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={() => requireMember(() => setReportOpen(true))}>
-                <Flag className="h-4 w-4" aria-hidden="true" />
-                Báo cáo
-              </Button>
-            )}
-          </div>
-        </div>
+        </footer>
       </article>
 
-      <div className="rounded-xl bg-white p-5 ring-1 ring-gray-200 sm:p-8">
-        <CommentSection
-          postId={postId}
-          commentCount={data.commentCount}
-          canComment={data.memberActions.canComment}
-        />
-      </div>
+      <CommentSection
+        postId={postId}
+        postAuthorId={data.author.userId}
+        commentCount={data.commentCount}
+        canComment={data.memberActions.canComment}
+      />
 
       <ConfirmDialog
         show={confirmDelete}

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useRequireMember } from '@/hooks/useRequireMember';
@@ -18,13 +18,14 @@ import { ReportDialog } from './ReportDialog';
 
 interface CommentSectionProps {
   postId: number;
+  postAuthorId: number;
   commentCount: number;
   /** memberActions.canComment của GET /posts/{id}. */
   canComment: boolean;
 }
 
 /** Bình luận nhiều tầng của bài viết (FN-COMM-01, 02, 03) và báo cáo bình luận (FN-COMM-05). */
-export const CommentSection: React.FC<CommentSectionProps> = ({ postId, commentCount, canComment }) => {
+export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuthorId, commentCount, canComment }) => {
   const { isMember, requireMember } = useRequireMember();
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
   const comments = usePostComments(postId);
@@ -56,6 +57,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, commentC
   const context: CommentThreadContext = useMemo(
     () => ({
       postId,
+      postAuthorId,
       currentUserId,
       canComment,
       cooldownSeconds,
@@ -63,19 +65,25 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, commentC
       requireMember,
       onReport: setReportCommentId,
     }),
-    [postId, currentUserId, canComment, cooldownSeconds, submitComment, requireMember]
+    [postId, postAuthorId, currentUserId, canComment, cooldownSeconds, submitComment, requireMember]
   );
 
   const items = comments.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <section id="comments" aria-labelledby="comments-title" className="scroll-mt-20">
-      <h2 id="comments-title" className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-        <MessageCircle className="h-5 w-5" aria-hidden="true" />
-        Bình luận ({formatNumber(commentCount)})
+    <section
+      id="comments"
+      aria-labelledby="comments-title"
+      className="scroll-mt-24 rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl"
+    >
+      <h2 id="comments-title" className="flex items-center gap-2 pb-space-lg font-headline-sm text-headline-sm text-on-surface">
+        Thảo luận cộng đồng
+        <span className="rounded-full bg-surface-container px-2 py-0.5 font-label-sm text-label-sm text-on-surface">
+          {formatNumber(commentCount)}
+        </span>
       </h2>
 
-      <div className="mt-4">
+      <div className="mb-space-xl rounded-lg bg-surface-container-low p-space-md">
         {isMember && canComment && (
           <CommentForm
             label="Viết bình luận"
@@ -85,61 +93,59 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, commentC
           />
         )}
         {isMember && !canComment && (
-          <p className="rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          <p className="py-space-xs text-center font-body-md text-body-md text-on-surface-variant">
             Bài viết này hiện chưa nhận bình luận.
           </p>
         )}
         {!isMember && (
-          <button
-            type="button"
-            onClick={() => requireMember(() => undefined)}
-            className="w-full rounded-lg bg-gray-50 px-4 py-3 text-left text-sm text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100"
-          >
-            Đăng nhập hoặc đăng ký để bình luận...
-          </button>
+          <div className="flex flex-col items-center gap-space-sm py-space-sm text-center">
+            <p className="font-body-md text-body-md text-on-surface-variant">Đăng nhập để tham gia bình luận.</p>
+            <Button className="bg-primary hover:bg-primary-container" onClick={() => requireMember(() => undefined)}>
+              Viết bình luận
+            </Button>
+          </div>
         )}
       </div>
 
-      <div className="mt-6">
-        {comments.isPending ? (
-          <ul className="space-y-4" aria-busy="true" aria-label="Đang tải bình luận">
-            {[0, 1, 2].map((i) => (
-              <li key={i} className="flex list-none gap-3">
-                <Skeleton className="h-9 w-9 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-1/4" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              </li>
+      {comments.isPending ? (
+        <div className="flex flex-col gap-space-md" role="status" aria-busy="true" aria-label="Đang tải bình luận">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+      ) : comments.isError ? (
+        <ErrorState
+          className="py-space-lg"
+          error={comments.error}
+          onRetry={() => comments.refetch()}
+          retrying={comments.isRefetching}
+        />
+      ) : items.length === 0 ? (
+        <p className="py-space-md text-center font-body-md text-body-md text-on-surface-variant">
+          Chưa có bình luận nào. Hãy là người đầu tiên chia sẻ.
+        </p>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-space-lg">
+            {items.map((comment) => (
+              <CommentItem key={comment.commentId} comment={comment} context={context} />
             ))}
           </ul>
-        ) : comments.isError ? (
-          <ErrorState error={comments.error} onRetry={() => comments.refetch()} retrying={comments.isRefetching} />
-        ) : items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-500">
-            Chưa có bình luận nào. Hãy là người đầu tiên chia sẻ cảm nghĩ!
-          </p>
-        ) : (
-          <>
-            <ul className="space-y-5 p-0">
-              {items.map((comment) => (
-                <CommentItem key={comment.commentId} comment={comment} context={context} />
-              ))}
-            </ul>
-            {comments.hasNextPage && (
-              <div className="mt-5 text-center">
-                <Button
-                  variant="secondary"
-                  onClick={() => comments.fetchNextPage()}
-                  loading={comments.isFetchingNextPage}
-                >
-                  Xem thêm bình luận
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          {comments.hasNextPage && (
+            <div className="mt-space-xl text-center">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => comments.fetchNextPage()}
+                loading={comments.isFetchingNextPage}
+              >
+                {!comments.isFetchingNextPage && <Icon name="expand_more" className="text-[18px]" />}
+                Tải thêm bình luận
+              </Button>
+            </div>
+          )}
+        </>
+      )}
 
       <ReportDialog
         show={reportCommentId !== null}
