@@ -1,25 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { http } from '../../api/http';
-import { useAuthStore } from '../../stores/auth.store';
+import { useAuthStore, selectIsAuthenticated } from '@/stores/auth.store';
+import { useGuestStore } from '@/stores/guest.store';
+import { QUOTA } from '@/constants/quota';
 
-export const GuestQuotaBadge = () => {
-  const user = useAuthStore(s => s.user);
-  const { data } = useQuery({
-    queryKey: ['guestQuota'],
-    queryFn: () => http.get('/guest/quota'),
-    enabled: !user || user.role === 'GUEST',
-  });
-
-  const remaining = data?.data?.ai?.remaining;
-  if (remaining === undefined) return null;
-
+/** Hiển thị lượt AI dùng thử còn lại của Khách (BR-GUEST-02: 03 lượt/phiên). Ẩn khi đã đăng nhập. */
+export function GuestQuotaBadge({ className = '' }: { className?: string }) {
+  const authed = useAuthStore(selectIsAuthenticated);
+  const remaining = useGuestStore((s) => s.quota?.ai.remaining);
+  if (authed) return null;
+  const left = remaining ?? QUOTA.guest.ai;
   return (
-    <div className="flex items-center space-x-2 bg-yellow-50 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200 shadow-sm">
-      <span className="flex h-2 w-2 relative">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
-      </span>
-      <span>AI: {remaining} lượt</span>
-    </div>
+    <span className={`inline-flex items-center gap-1 rounded-full bg-secondary-fixed px-2.5 py-1 font-label-sm text-label-sm text-on-secondary-fixed ${className}`} title="Lượt AI dùng thử còn lại (Khách)">
+      <span className="material-symbols-outlined text-[14px]">bolt</span>
+      {left}/{QUOTA.guest.ai} lượt AI
+    </span>
   );
-};
+}

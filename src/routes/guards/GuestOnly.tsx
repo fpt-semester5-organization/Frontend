@@ -4,7 +4,7 @@ import { PATHS } from '../paths';
 
 export const GuestOnly = () => {
   const user = useAuthStore((state) => state.user);
-  if (user && user.role !== 'GUEST') {
+  if (user) {
     return <Navigate to={PATHS.HOME} replace />;
   }
   return <Outlet />;

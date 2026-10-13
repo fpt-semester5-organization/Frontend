@@ -1,29 +1,17 @@
-import { http } from '../../../api/http';
-import type { BarcodeScanResponse, UserScanHistory } from '../types/scanner.types';
+import { http, unwrap } from '@/api/http';
+import { unwrapEnvelope, type PageMeta } from '@/features/shared/api/envelope';
+import type { BarcodeResult, ScanHistoryItem, ScanHistoryParams, ScanMethod } from '../types/scanner.types';
 
-export interface ApiResponse<T> {
-  statusCode: number;
-  success: boolean;
-  message: string;
-  data: T;
+/** FN-BAR-01 — GET /products/barcode/{barcode}?method= (Khách: trừ 1 lượt/ngày; 404 không trừ lượt) */
+export const getProductByBarcode = (barcode: string, method: ScanMethod): Promise<BarcodeResult> =>
+  unwrap<BarcodeResult>(http.get(`/products/barcode/${encodeURIComponent(barcode)}`, { params: { method }, timeout: 20_000 }));
+
+/** FN-BAR-02 — GET /users/me/scans */
+export async function listMyScans(p: ScanHistoryParams): Promise<{ items: ScanHistoryItem[]; meta: PageMeta }> {
+  const r = await unwrapEnvelope<ScanHistoryItem[], PageMeta>(
+    http.get('/users/me/scans', {
+      params: { verdict: p.verdict, allergenOnly: p.allergenOnly || undefined, page: p.page, size: p.size },
+    }),
+  );
+  return { items: r.data, meta: r.meta ?? { page: p.page, size: p.size, total: r.data.length } };
 }
-
-export interface PagedResult<T> {
-  items: T[];
-  pageNumber: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
-}
-
-export const scanBarcodeApi = (barcode: string): Promise<ApiResponse<BarcodeScanResponse>> => {
-  return http.get(`/products/barcode/${encodeURIComponent(barcode)}`);
-};
-
-export const getMyScansApi = (page = 1, size = 20): Promise<ApiResponse<PagedResult<UserScanHistory>>> => {
-  return http.get('/users/me/scans', {
-    params: { page, size }
-  });
-};

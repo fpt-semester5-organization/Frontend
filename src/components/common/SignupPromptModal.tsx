@@ -1,25 +1,40 @@
-import { useGuestStore } from '../../stores/guest.store';
 import { Link } from 'react-router-dom';
+import { Modal } from '@/components/ui/Modal';
+import { PATHS } from '@/routes/paths';
+import { useUiStore } from '@/stores/ui.store';
 
-export const SignupPromptModal = () => {
-  const { isPromptOpen, closePrompt } = useGuestStore();
+const COPY = {
+  guest: { title: 'Đăng ký để tiếp tục', body: 'Tính năng này dành cho thành viên. Tạo tài khoản miễn phí để lưu công thức, lập thực đơn và hỏi trợ lý AI.' },
+  quota: { title: 'Bạn đã dùng hết lượt dùng thử', body: 'Khách được dùng thử có hạn mức. Đăng ký thành viên để tiếp tục, hoặc nâng cấp VIP để mở rộng hạn mức.' },
+  personalization: { title: 'Cần đăng nhập để cá nhân hóa', body: 'Hồ sơ sức khỏe, dị ứng và thực đơn riêng chỉ có cho tài khoản thành viên.' },
+} as const;
 
-  if (!isPromptOpen) return null;
-
+/** Mời Khách đăng ký/đăng nhập (spec 13 §1.1: 403 ERR_GUEST_* / ERR_QUOTA_*). Lưu `returnUrl` để quay lại sau khi đăng nhập. */
+export function SignupPromptModal() {
+  const { open, reason, returnUrl } = useUiStore((s) => s.signupPrompt);
+  const close = useUiStore((s) => s.closeSignupPrompt);
+  const copy = COPY[reason];
+  const state = { returnUrl };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 transform transition-all">
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Mở khóa tính năng</h3>
-        <p className="text-gray-600 mb-6">Đăng ký thành viên để sử dụng không giới hạn các tính năng của VeggieLife.</p>
-        <div className="flex space-x-3">
-          <Link to="/register" onClick={closePrompt} className="flex-1 bg-green-600 text-white text-center py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors shadow-sm">
-            Đăng ký ngay
+    <Modal show={open} onHide={close} bare size="sm">
+      <div className="flex flex-col items-center gap-space-md p-space-lg text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container text-on-primary">
+          <span className="material-symbols-outlined">lock_open</span>
+        </div>
+        <h2 className="font-headline-sm text-headline-sm text-primary">{copy.title}</h2>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">{copy.body}</p>
+        <div className="flex w-full flex-col gap-space-sm">
+          <Link to={PATHS.AUTH.REGISTER} state={state} onClick={close} className="rounded-lg bg-primary-container px-4 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary">
+            Đăng ký miễn phí
           </Link>
-          <button onClick={closePrompt} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-            Để sau
-          </button>
+          <Link to={PATHS.AUTH.LOGIN} state={state} onClick={close} className="rounded-lg bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface hover:bg-surface-container-high">
+            Tôi đã có tài khoản
+          </Link>
+          <Link to={PATHS.VIP.ROOT} onClick={close} className="font-label-sm text-label-sm text-secondary hover:underline">
+            Xem quyền lợi gói VIP
+          </Link>
         </div>
       </div>
-    </div>
+    </Modal>
   );
-};
+}

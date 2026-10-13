@@ -1,0 +1,29 @@
+// D102 (Architecture & Deployment §2.3): Bootstrap 5 chỉ cho component tương tác dựng sẵn qua react-bootstrap
+// (Modal, Toast, Dropdown, Offcanvas, Tooltip). KHÔNG nạp reboot / grid / utilities để không đè Tailwind.
+// Màu thương hiệu khai báo 1 lần ở tailwind.config.js (Linen & Earth) và ghi đè biến Bootstrap tương ứng ở đây.
+$font-family-sans-serif: 'Work Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+$body-color: #2a2b27;
+$body-bg: #fdf9f4;
+$primary: #4f6f58;
+$secondary: #94532f;
+$danger: #c62828;
+$border-color: #e6e2dd;
+$border-radius: 0.5rem;
+$modal-content-border-radius: 0.75rem;
+$modal-backdrop-bg: #1f2a22;
+$modal-backdrop-opacity: 0.45;
+$enable-shadows: false;
+
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/variables-dark';
+@import 'bootstrap/scss/maps';
+@import 'bootstrap/scss/mixins';
+@import 'bootstrap/scss/root';
+@import 'bootstrap/scss/transitions';
+@import 'bootstrap/scss/close';
+@import 'bootstrap/scss/modal';
+@import 'bootstrap/scss/toasts';
+@import 'bootstrap/scss/dropdown';
+@import 'bootstrap/scss/offcanvas';
+@import 'bootstrap/scss/tooltip';

@@ -12,7 +12,8 @@ import { VerifyOtp } from '../features/auth/pages/VerifyOtp';
 import { ForgotPassword } from '../features/auth/pages/ForgotPassword';
 import { ResetPassword } from '../features/auth/pages/ResetPassword';
 import { ChangePassword } from '../features/auth/pages/ChangePassword';
-import { ScannerPage } from '../features/scanner/pages/ScannerPage';
+import { BarcodeScanPage } from '../features/scanner/pages/BarcodeScanPage';
+import { ScanHistoryPage } from '../features/scanner/pages/ScanHistoryPage';
 
 const router = createBrowserRouter([
   {
@@ -20,7 +21,8 @@ const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       { index: true, element: <div className="text-center py-20 text-gray-500">Trang chủ</div> },
-      { path: PATHS.SCANNER, element: <ScannerPage /> },
+      { path: PATHS.SCANNER.ROOT, element: <BarcodeScanPage /> },
+      { path: PATHS.SCANNER.HISTORY, element: <ScanHistoryPage /> },
       {
         element: <RequireAuth />,
         children: [

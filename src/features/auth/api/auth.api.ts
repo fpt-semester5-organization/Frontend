@@ -7,3 +7,4 @@ export const verifyOtp = (data: VerifyOtpReq) => http.post('/auth/verify-otp', d
 export const forgotPassword = (data: ForgotPasswordReq) => http.post('/auth/forgot-password', data);
 export const resetPassword = (data: ResetPasswordReq) => http.post('/auth/reset-password', data);
 export const changePassword = (data: ChangePasswordReq) => http.put('/auth/password', data);
+export const logout = () => http.post('/auth/logout');
