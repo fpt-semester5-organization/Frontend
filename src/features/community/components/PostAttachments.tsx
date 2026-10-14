@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
+import { formatDuration } from '@/lib/format';
 import { PATHS } from '@/routes/paths';
 import type { PostRecipeAttachment, PostVideoAttachment } from '../types/community.types';
 
@@ -40,8 +41,11 @@ export const LinkedRecipes: React.FC<{ recipes: PostRecipeAttachment[] }> = ({ r
   );
 };
 
-/** Video đính kèm (FN-POST-06): mỗi video dẫn tới trang xem video và bản phiên âm (SCR-21). */
-export const PostVideos: React.FC<{ videos: PostVideoAttachment[] }> = ({ videos }) => {
+/**
+ * Video đính kèm (FN-POST-06): mỗi video dẫn tới trang xem video và bản phiên âm (SCR-21).
+ * Link kèm postId để trang video lấy URL phát từ chính bài viết này.
+ */
+export const PostVideos: React.FC<{ videos: PostVideoAttachment[]; postId: number }> = ({ videos, postId }) => {
   const list = videos.filter((video) => video.videoId);
   if (list.length === 0) return null;
 
@@ -62,8 +66,13 @@ export const PostVideos: React.FC<{ videos: PostVideoAttachment[] }> = ({ videos
               <p className="truncate font-label-md text-label-md text-on-surface">
                 {video.title || `Video #${video.videoId}`}
               </p>
-              {processing && (
+              {processing ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">Video đang được xử lý, quay lại sau ít phút.</p>
+              ) : (
+                <p className="flex flex-wrap items-center gap-x-space-sm font-body-sm text-body-sm text-on-surface-variant">
+                  {video.durationSeconds !== undefined && <span>{formatDuration(video.durationSeconds)}</span>}
+                  <span className="text-primary">Xem video & tóm tắt công thức</span>
+                </p>
               )}
             </div>
           </>
@@ -75,7 +84,7 @@ export const PostVideos: React.FC<{ videos: PostVideoAttachment[] }> = ({ videos
         ) : (
           <Link
             key={video.videoId}
-            to={PATHS.VIDEOS.DETAIL(video.videoId!)}
+            to={PATHS.VIDEOS.DETAIL(video.videoId!, postId)}
             className="flex items-center gap-space-md rounded-lg bg-surface-container-low p-space-sm no-underline hover:bg-surface-container"
           >
             {body}
