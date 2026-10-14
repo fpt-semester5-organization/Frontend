@@ -6,33 +6,49 @@ export type ApiPaths = paths;
 /** Tham số theo operationId, ví dụ ApiOperations['listPosts']['parameters']['query']. */
 export type ApiOperations = operations;
 
-/** Meta phân trang chuẩn (D111): { page, size, total }. */
-export interface PageMeta {
+/**
+ * Envelope chuẩn của API VeggieLife (Architecture & Deployment — Decision Log):
+ *   thành công: { statusCode, message, data[, meta] }
+ *   lỗi:        { statusCode, errorCode, message[, details] }
+ * KHÔNG có trường `success`.
+ */
+export interface ApiMeta {
   page: number;
   size: number;
   total: number;
+  /** Chỉ ở GET /recipes cho Khách: xem tới mục thứ N thì mời đăng ký (BR-GUEST-01). */
+  signUpPromptAtItem?: number;
 }
 
-/** Envelope thành công (D52): { statusCode, message, data[, meta] }. Không có trường `success`. */
-export interface ApiEnvelope<T> {
+export type PageMeta = ApiMeta;
+
+export interface ApiEnvelope<T = unknown> {
   statusCode: number;
   message: string;
   data: T;
-  meta?: PageMeta;
+  meta?: ApiMeta;
 }
 
-/** Phần tử details[] của lỗi ERR_VALIDATION (API Specification, Quy tắc 1). */
-export interface ApiErrorDetail {
+export interface ApiFieldError {
   field: string;
   message: string;
 }
 
-/** Envelope lỗi (D52): { statusCode, errorCode, message[, details] }. */
+export type ApiErrorDetail = ApiFieldError;
+
 export interface ApiErrorBody {
   statusCode: number;
   errorCode: string;
   message: string;
-  details?: ApiErrorDetail[];
+  details?: ApiFieldError[];
+  /** Có ở một số lỗi: remainingAttempts, suspendedUntil, lockedUntil, registerUrl/loginUrl, failedCriteria… */
+  data?: Record<string, unknown> | null;
+  correlationId?: string;
+}
+
+export interface Paged<T> {
+  items: T[];
+  meta: ApiMeta;
 }
 
 /**
