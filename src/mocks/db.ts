@@ -23,8 +23,29 @@ export interface MockVideo {
   videoId: number;
   videoUrl: string;
   thumbnailUrl?: string;
+  durationSeconds?: number;
   status: 'PROCESSING' | 'READY' | 'FAILED' | 'BANNED';
   title?: string;
+}
+
+export interface MockExtractedRecipe {
+  title: string;
+  ingredients: { name: string; quantity: number; unit: string }[];
+  steps: string[];
+}
+
+/** Bản ghi VideoTranscripts giả. Nội dung là đoạn chữ cố định thay cho kết quả Whisper + Gemini (AI-Service chưa xong). */
+export interface MockTranscript {
+  videoId: number;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  rawTranscript: string;
+  extractedRecipe: MockExtractedRecipe;
+  /** PENDING: mốc (ms) chuyển sang COMPLETED. */
+  readyAt?: number;
+  /** Công thức đã được tác giả xác nhận và duyệt: người xem khác mới thấy (Leader câu 6). */
+  recipeApproved: boolean;
+  /** Số lần POST extract-recipe kế tiếp trả 503 ERR_AI_CIRCUIT_OPEN, để thử banner "Dịch vụ tạm gián đoạn". */
+  circuitOpenTimes?: number;
 }
 
 export interface MockPost {
@@ -204,11 +225,140 @@ export const comments: MockComment[] = [
   { commentId: 305, postId: 78, authorId: 3072, parentCommentId: null, content: 'Thêm vài lát lê vào nồi nước dùng cũng rất ngọt.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(10) },
 ];
 
+// --- Video & bản phiên âm (SCR-21) ---
+
+/** Video mẫu công khai của Cloudinary (nơi lưu video thật của dự án). */
+const SAMPLE_VIDEO_URL = 'https://res.cloudinary.com/demo/video/upload/samples/cld-sample-video.mp4';
+
+const SEED_VIDEOS: (MockVideo & { postId: number })[] = [
+  { postId: 77, videoId: 901, title: 'Canh nấm đậu phụ rong biển', durationSeconds: 185, status: 'READY', videoUrl: SAMPLE_VIDEO_URL, thumbnailUrl: cover('#dfeadf', '#4f6f58') },
+  { postId: 78, videoId: 902, title: 'Nước dùng chay ngọt thanh', durationSeconds: 240, status: 'READY', videoUrl: SAMPLE_VIDEO_URL, thumbnailUrl: cover('#f8e3d6', '#94532f') },
+  { postId: 81, videoId: 903, title: 'Nấm đùi gà xào sả ớt', durationSeconds: 95, status: 'READY', videoUrl: SAMPLE_VIDEO_URL, thumbnailUrl: cover('#f1ede8', '#7a4429') },
+  { postId: 80, videoId: 904, title: 'Cơm gạo lứt đậu hũ sốt cà', durationSeconds: 150, status: 'READY', videoUrl: SAMPLE_VIDEO_URL, thumbnailUrl: cover('#e8e6df', '#636a60') },
+  { postId: 79, videoId: 905, title: 'Bữa sáng giàu đạm cho người ăn chay', durationSeconds: 60, status: 'PROCESSING', videoUrl: SAMPLE_VIDEO_URL },
+  { postId: 90, videoId: 906, title: 'Sữa hạt điều tại nhà', durationSeconds: 120, status: 'READY', videoUrl: SAMPLE_VIDEO_URL, thumbnailUrl: cover('#f8e3d6', '#bd7653') },
+];
+for (const { postId, ...video } of SEED_VIDEOS) posts.find((post) => post.postId === postId)?.videos.push(video);
+
+const CANH_NAM: Pick<MockTranscript, 'rawTranscript' | 'extractedRecipe'> = {
+  rawTranscript:
+    'Xin chào mọi người, hôm nay mình nấu canh nấm đậu phụ rong biển cho bữa tối. Nguyên liệu gồm 200 gam nấm rơm, một bìa đậu phụ non khoảng 300 gam, 10 gam rong biển khô và một lít nước dùng rau củ. Đầu tiên ngâm rong biển với nước ấm khoảng 10 phút rồi vắt ráo. Nấm rơm rửa sạch, cắt đôi. Đậu phụ cắt khối vuông vừa ăn. Đun sôi nước dùng, cho nấm vào nấu 5 phút. Tiếp theo thả đậu phụ và rong biển, nêm một thìa cà phê muối và nửa thìa cà phê đường. Nấu thêm 3 phút là tắt bếp, rắc chút tiêu và rau mùi lên trên. Vậy là xong món canh thanh mát, chúc mọi người ngon miệng!',
+  extractedRecipe: {
+    title: 'Canh nấm đậu phụ rong biển',
+    ingredients: [
+      { name: 'Nấm rơm', quantity: 200, unit: 'g' },
+      { name: 'Đậu phụ non', quantity: 300, unit: 'g' },
+      { name: 'Rong biển khô', quantity: 10, unit: 'g' },
+      { name: 'Nước dùng rau củ', quantity: 1, unit: 'lít' },
+      { name: 'Muối', quantity: 1, unit: 'thìa cà phê' },
+      { name: 'Đường', quantity: 0.5, unit: 'thìa cà phê' },
+    ],
+    steps: [
+      'Ngâm rong biển với nước ấm khoảng 10 phút rồi vắt ráo.',
+      'Rửa sạch nấm rơm, cắt đôi; cắt đậu phụ thành khối vuông vừa ăn.',
+      'Đun sôi nước dùng, cho nấm vào nấu 5 phút.',
+      'Thả đậu phụ và rong biển, nêm muối và đường, nấu thêm 3 phút.',
+      'Tắt bếp, rắc tiêu và rau mùi trước khi dùng.',
+    ],
+  },
+};
+
+const NUOC_DUNG: Pick<MockTranscript, 'rawTranscript' | 'extractedRecipe'> = {
+  rawTranscript:
+    'Chào cả nhà, mình chia sẻ cách nấu nước dùng chay ngọt thanh. Mình dùng một củ cải trắng khoảng 500 gam, hai trái bắp ngọt và 30 gam nấm hương khô. Củ cải gọt vỏ cắt khúc, bắp cắt khoanh, nấm hương ngâm cho mềm. Cho tất cả vào nồi với hai lít rưỡi nước, hầm lửa nhỏ khoảng 90 phút. Trong lúc hầm nhớ vớt bọt thường xuyên để nước trong. Cuối cùng nêm 20 gam đường phèn và một chút muối. Nước dùng này nấu phở chay hay bún chay đều rất ngon.',
+  extractedRecipe: {
+    title: 'Nước dùng chay ngọt thanh',
+    ingredients: [
+      { name: 'Củ cải trắng', quantity: 500, unit: 'g' },
+      { name: 'Bắp ngọt', quantity: 2, unit: 'trái' },
+      { name: 'Nấm hương khô', quantity: 30, unit: 'g' },
+      { name: 'Nước', quantity: 2.5, unit: 'lít' },
+      { name: 'Đường phèn', quantity: 20, unit: 'g' },
+    ],
+    steps: [
+      'Gọt vỏ củ cải, cắt khúc; cắt bắp thành khoanh; ngâm nấm hương cho mềm.',
+      'Cho nguyên liệu vào nồi cùng 2,5 lít nước, hầm lửa nhỏ khoảng 90 phút.',
+      'Vớt bọt thường xuyên trong lúc hầm để nước trong.',
+      'Nêm đường phèn và chút muối cho vừa ăn.',
+    ],
+  },
+};
+
+const NAM_XAO: Pick<MockTranscript, 'rawTranscript' | 'extractedRecipe'> = {
+  rawTranscript:
+    'Hôm nay mình làm món nấm đùi gà xào sả ớt. Cần 300 gam nấm đùi gà, ba cây sả, một trái ớt và hai thìa canh nước tương. Nấm xé sợi, sả băm nhỏ, ớt cắt lát. Phi thơm sả ớt với một thìa dầu, cho nấm vào xào lửa lớn khoảng 5 phút. Nêm nước tương và một chút đường, đảo đều thêm 2 phút. Món này ăn với cơm trắng rất hao cơm!',
+  extractedRecipe: {
+    title: 'Nấm đùi gà xào sả ớt',
+    ingredients: [
+      { name: 'Nấm đùi gà', quantity: 300, unit: 'g' },
+      { name: 'Sả', quantity: 3, unit: 'cây' },
+      { name: 'Ớt', quantity: 1, unit: 'trái' },
+      { name: 'Nước tương', quantity: 2, unit: 'thìa canh' },
+    ],
+    steps: [
+      'Xé nấm thành sợi, băm nhỏ sả, cắt ớt thành lát.',
+      'Phi thơm sả và ớt với một thìa dầu.',
+      'Cho nấm vào xào lửa lớn khoảng 5 phút.',
+      'Nêm nước tương và chút đường, đảo đều thêm 2 phút.',
+    ],
+  },
+};
+
+const COM_GAO_LUT: Pick<MockTranscript, 'rawTranscript' | 'extractedRecipe'> = {
+  rawTranscript:
+    'Bữa trưa hôm nay là cơm gạo lứt với đậu hũ sốt cà chua. Mình dùng hai bìa đậu hũ, ba trái cà chua chín và một chén cơm gạo lứt. Đậu hũ cắt miếng rồi chiên vàng các mặt. Cà chua băm nhuyễn, xào với chút dầu cho ra màu đỏ đẹp. Cho đậu hũ vào rim với sốt cà khoảng 7 phút, nêm nước tương và hạt nêm chay. Dọn ra ăn cùng cơm gạo lứt nóng.',
+  extractedRecipe: {
+    title: 'Cơm gạo lứt đậu hũ sốt cà',
+    ingredients: [
+      { name: 'Đậu hũ', quantity: 2, unit: 'bìa' },
+      { name: 'Cà chua', quantity: 3, unit: 'trái' },
+      { name: 'Cơm gạo lứt', quantity: 1, unit: 'chén' },
+    ],
+    steps: [
+      'Cắt đậu hũ thành miếng, chiên vàng các mặt.',
+      'Băm nhuyễn cà chua, xào với chút dầu đến khi ra màu.',
+      'Cho đậu hũ vào rim với sốt cà khoảng 7 phút, nêm nước tương và hạt nêm chay.',
+      'Dọn ra ăn cùng cơm gạo lứt nóng.',
+    ],
+  },
+};
+
+const SUA_HAT_DIEU: Pick<MockTranscript, 'rawTranscript' | 'extractedRecipe'> = {
+  rawTranscript:
+    'Mình hướng dẫn làm sữa hạt điều tại nhà chỉ với ba bước. Chuẩn bị 100 gam hạt điều sống và một lít nước lọc. Bước một, ngâm hạt điều khoảng 4 tiếng rồi rửa lại. Bước hai, xay hạt điều với nước thật mịn. Bước ba, lọc qua túi vải, thêm hai quả chà là nếu thích ngọt. Sữa để tủ lạnh dùng trong hai ngày.',
+  extractedRecipe: {
+    title: 'Sữa hạt điều',
+    ingredients: [
+      { name: 'Hạt điều sống', quantity: 100, unit: 'g' },
+      { name: 'Nước lọc', quantity: 1, unit: 'lít' },
+      { name: 'Chà là', quantity: 2, unit: 'quả' },
+    ],
+    steps: [
+      'Ngâm hạt điều khoảng 4 tiếng rồi rửa lại.',
+      'Xay hạt điều với nước đến khi thật mịn.',
+      'Lọc qua túi vải, thêm chà là nếu thích ngọt; bảo quản lạnh, dùng trong 2 ngày.',
+    ],
+  },
+};
+
+/** Kết quả cố định cho video tải lên trong phiên (thay cho Whisper + Gemini). */
+export const UPLOADED_VIDEO_TRANSCRIPT = CANH_NAM;
+
+export const transcripts: MockTranscript[] = [
+  { videoId: 901, status: 'COMPLETED', recipeApproved: true, ...CANH_NAM },
+  { videoId: 902, status: 'COMPLETED', recipeApproved: false, ...NUOC_DUNG },
+  // Đang bóc tách: xong sau 45 giây kể từ lúc mở app (bản thật mất 2–3 phút).
+  { videoId: 903, status: 'PENDING', readyAt: Date.now() + 45 * 1000, recipeApproved: false, ...NAM_XAO },
+  // Thất bại: lần bóc tách lại đầu tiên trả 503, lần sau mới nhận.
+  { videoId: 904, status: 'FAILED', recipeApproved: false, circuitOpenTimes: 1, ...COM_GAO_LUT },
+  { videoId: 906, status: 'COMPLETED', recipeApproved: true, ...SUA_HAT_DIEU },
+];
+
 /** `${userId}:${postId}` của các lượt thả tim do người dùng giả tạo trong phiên. */
 export const votes = new Set<string>();
 export const reports: MockReport[] = [];
 /** Lần bình luận gần nhất theo userId, để mô phỏng giãn cách 15 giây (BR-USR-04). */
 export const lastCommentAt = new Map<number, number>();
 
-const counters = { post: 200, comment: 1000, report: 1, video: 1 };
+const counters = { post: 200, comment: 1000, report: 1, video: 1000 };
 export const nextId = (key: keyof typeof counters) => counters[key]++;
