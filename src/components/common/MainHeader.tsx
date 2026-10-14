@@ -103,15 +103,16 @@ export const MainHeader: React.FC = () => {
             </>
           ) : (
             <>
+              {/* Màn hẹp (360 px) không đủ chỗ cho cả hai nút: "Đăng nhập" chuyển vào menu trượt. */}
               <Link
                 to={withReturnUrl(PATHS.AUTH.LOGIN, returnUrl)}
-                className="rounded-lg px-3 py-2 font-label-md text-label-md text-on-surface-variant no-underline hover:bg-surface-container hover:text-on-surface"
+                className="hidden rounded-lg px-3 py-2 font-label-md text-label-md text-on-surface-variant no-underline hover:bg-surface-container hover:text-on-surface sm:inline-flex"
               >
                 Đăng nhập
               </Link>
               <Link
                 to={withReturnUrl(PATHS.AUTH.REGISTER, returnUrl)}
-                className="rounded-lg bg-primary-container px-space-md py-2 font-label-md text-label-md text-on-primary no-underline shadow-sm hover:bg-primary"
+                className="rounded-lg bg-primary-container px-3 py-2 font-label-md text-label-md text-on-primary no-underline shadow-sm hover:bg-primary sm:px-space-md"
               >
                 Đăng ký
               </Link>
@@ -145,6 +146,24 @@ export const MainHeader: React.FC = () => {
               </NavLink>
             ))}
           </nav>
+          {sessionStatus !== 'restoring' && !user && (
+            <div className="mt-space-md flex flex-col gap-space-sm border-t border-surface-container pt-space-md">
+              <Link
+                to={withReturnUrl(PATHS.AUTH.LOGIN, returnUrl)}
+                onClick={() => setMenuOpen(false)}
+                className="rounded-lg px-space-md py-2.5 text-center font-label-md text-label-md text-on-surface no-underline ring-1 ring-inset ring-outline-variant hover:bg-surface-container"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                to={withReturnUrl(PATHS.AUTH.REGISTER, returnUrl)}
+                onClick={() => setMenuOpen(false)}
+                className="rounded-lg bg-primary-container px-space-md py-2.5 text-center font-label-md text-label-md text-on-primary no-underline hover:bg-primary"
+              >
+                Đăng ký
+              </Link>
+            </div>
+          )}
         </Offcanvas.Body>
       </Offcanvas>
     </header>
