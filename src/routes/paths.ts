@@ -37,7 +37,8 @@ export const PATHS = {
     SUGGEST: '/venues/suggest',
   },
   VIDEOS: {
-    DETAIL: (id: string | number) => `/videos/${id}`,
+    /** postId (query) để trang video lấy URL phát từ videos[] của GET /posts/{postId} (đã thống nhất 13/10/2026). */
+    DETAIL: (id: string | number, postId?: number) => (postId ? `/videos/${id}?postId=${postId}` : `/videos/${id}`),
   },
   MEAL_PLANS: {
     ROOT: '/meal-plans',

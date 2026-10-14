@@ -12,6 +12,7 @@ const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
+const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -93,6 +94,9 @@ const router = createBrowserRouter([
               { path: PATHS.COMMUNITY.EDIT_POST(':id'), element: <PostEditor /> },
             ],
           },
+
+          // Videos (SCR-21)
+          { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
 
           { path: '*', element: <NotFoundPage /> },
         ],
