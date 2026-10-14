@@ -71,8 +71,11 @@ http.interceptors.response.use(
     const apiError = toApiError(error);
 
     // 403 ERR_GUEST_* hoặc ERR_QUOTA_* của Khách: mở SignupPromptModal (UI Spec 1.1).
+    // Trừ ERR_GUEST_REGION_UNSUPPORTED: ở ngoài Việt Nam thì đăng ký cũng không dùng được bản đồ,
+    // màn hình tự hiện thông báo khu vực chưa hỗ trợ (BR-GUEST-06, NFR CO-22).
     if (
       status === 403 &&
+      apiError.errorCode !== 'ERR_GUEST_REGION_UNSUPPORTED' &&
       (apiError.errorCode.startsWith('ERR_GUEST_') ||
         (apiError.errorCode.startsWith('ERR_QUOTA_') && !isAuthenticated))
     ) {
