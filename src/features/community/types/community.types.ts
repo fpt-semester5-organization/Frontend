@@ -7,16 +7,21 @@ export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][num
 export type PostListParams = NonNullable<ApiOperations['listPosts']['parameters']['query']>;
 export type PostSort = NonNullable<PostListParams['sort']>;
 
+/** Videos.Status: PROCESSING (đang mã hóa), READY, FAILED, BANNED. */
+export type VideoStatus = 'PROCESSING' | 'READY' | 'FAILED' | 'BANNED';
+
 /**
  * UNSPECIFIED: OpenAPI chưa mô tả phần tử của videos[] và recipes[] trong GET /posts/{id}.
- * Tạm đọc các field dưới đây theo bảng Videos/Recipes (Data Dictionary); cần Leader bổ sung schema.
+ * videos[]: Leader đã đồng ý ngày 13/10/2026 dùng các field dưới đây (theo bảng Videos), chờ BE cập nhật OpenAPI.
+ * recipes[]: tạm đọc theo bảng Recipes, chưa chốt.
  */
 export interface PostVideoAttachment {
   videoId?: number;
+  title?: string;
   videoUrl?: string;
   thumbnailUrl?: string;
-  status?: string;
-  title?: string;
+  durationSeconds?: number;
+  status?: VideoStatus;
 }
 export interface PostRecipeAttachment {
   recipeId?: number;
