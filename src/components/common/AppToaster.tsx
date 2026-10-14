@@ -1,6 +1,7 @@
 import React from 'react';
 import Toast from 'react-bootstrap/Toast';
 import ToastContainer from 'react-bootstrap/ToastContainer';
+import { Link } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { useUiStore, type ToastVariant } from '@/stores/ui.store';
@@ -23,13 +24,23 @@ export const AppToaster: React.FC = () => {
         <Toast
           key={toast.id}
           onClose={() => dismiss(toast.id)}
-          delay={toast.variant === 'danger' ? 7000 : 4500}
+          // Toast có nút dẫn trang giữ lâu hơn để người dùng kịp bấm.
+          delay={toast.action ? 10000 : toast.variant === 'danger' ? 7000 : 4500}
           autohide
           className={cn('rounded-lg border-0 shadow-xl', STYLE[toast.variant].box)}
         >
           <div className="flex items-center gap-3 px-space-md py-3">
             <Icon name={STYLE[toast.variant].icon} className="text-[20px]" />
             <span className="flex-1 font-body-sm text-body-sm">{toast.message}</span>
+            {toast.action && (
+              <Link
+                to={toast.action.to}
+                onClick={() => dismiss(toast.id)}
+                className="shrink-0 rounded-md bg-white/15 px-2.5 py-1 font-label-md text-label-md text-inherit no-underline hover:bg-white/25"
+              >
+                {toast.action.label}
+              </Link>
+            )}
             <button
               type="button"
               aria-label="Đóng thông báo"
