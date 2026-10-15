@@ -15,11 +15,12 @@ import { VerifyOtpPage } from '@/features/auth/pages/VerifyOtpPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
-import { ScannerPage } from '@/features/scanner/pages/ScannerPage';
 
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
+const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
+const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
@@ -111,8 +112,12 @@ const router = createBrowserRouter([
           { path: PATHS.CHAT.ROOT, element: <ChatPage /> },
           { path: PATHS.CHAT.SESSION(':sessionId'), element: <ChatPage /> },
 
-          // Scanner
-          { path: PATHS.SCANNER.ROOT, element: <ScannerPage /> },
+          // Quét mã vạch (SCR-15: mọi người dùng) và lịch sử quét (SCR-16: chỉ Thành viên)
+          { path: PATHS.SCANNER.ROOT, element: <BarcodeScan /> },
+          {
+            element: <RequireAuth />,
+            children: [{ path: PATHS.SCANNER.HISTORY, element: <ScanHistory /> }],
+          },
 
           // Fridge Vision (SCR-17)
           { path: PATHS.FRIDGE, element: <FridgePage /> },
