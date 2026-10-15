@@ -14,6 +14,7 @@ import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { CommentSection } from '../components/CommentSection';
 import { LinkedRecipes, PostVideos } from '../components/PostAttachments';
+import { RelatedPosts } from '../components/RelatedPosts';
 import { ReportDialog } from '../components/ReportDialog';
 import { VoteButton } from '../components/VoteButton';
 import { useDeletePost } from '../hooks/usePostMutations';
@@ -156,6 +157,8 @@ const PostDetail: React.FC = () => {
           </a>
         </footer>
       </article>
+
+      <RelatedPosts currentPostId={postId} />
 
       <CommentSection
         postId={postId}

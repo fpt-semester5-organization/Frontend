@@ -19,11 +19,12 @@ import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
+const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
+const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
-const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
-const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
+const FridgePage = lazy(() => import('@/features/fridge/pages/FridgePage'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -117,6 +118,9 @@ const router = createBrowserRouter([
             element: <RequireAuth />,
             children: [{ path: PATHS.SCANNER.HISTORY, element: <ScanHistory /> }],
           },
+
+          // Fridge Vision (SCR-17)
+          { path: PATHS.FRIDGE, element: <FridgePage /> },
 
           { path: '*', element: <NotFoundPage /> },
         ],
