@@ -33,11 +33,6 @@ dist-ssr
 # Local planning and personal drafts
 plan-nvtamm/
 
-# Test files and testing utilities
-__tests__/
-src/test/
-*.test.ts
-*.test.tsx
+# Kiểm thử E2E (Playwright) nằm ngoài unit test; unit test *.test.ts(x), src/test/ và vitest.config.ts được commit
 *.spec.ts
 *.spec.tsx
-vitest.config.ts
