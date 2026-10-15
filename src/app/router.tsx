@@ -23,6 +23,7 @@ const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
+const FridgePage = lazy(() => import('@/features/fridge/pages/FridgePage'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -112,6 +113,9 @@ const router = createBrowserRouter([
 
           // Scanner
           { path: PATHS.SCANNER.ROOT, element: <ScannerPage /> },
+
+          // Fridge Vision (SCR-17)
+          { path: PATHS.FRIDGE, element: <FridgePage /> },
 
           { path: '*', element: <NotFoundPage /> },
         ],
