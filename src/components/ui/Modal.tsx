@@ -1,62 +1,62 @@
-import React from 'react';
-import BsModal from 'react-bootstrap/Modal';
-import { cn } from '@/lib/cn';
-import { Icon } from './Icon';
+import React, { type ReactNode } from 'react';
 
-interface ModalProps {
+export interface ModalProps {
   show: boolean;
   onHide: () => void;
-  title?: React.ReactNode;
-  children: React.ReactNode;
+  title?: ReactNode;
+  children: ReactNode;
   size?: 'sm' | 'lg' | 'xl';
-  /** Class cho khung nội dung hộp thoại. */
   className?: string;
-  /** Ẩn thanh tiêu đề mặc định để nội dung tự vẽ. */
   bare?: boolean;
-  /** Đang gửi: khóa đóng hộp thoại. */
   locked?: boolean;
   labelledBy?: string;
 }
 
-/** Hộp thoại react-bootstrap (D102) với giao diện của design system: thẻ trắng bo 12px, thanh tiêu đề màu lanh. */
 export const Modal: React.FC<ModalProps> = ({
   show,
   onHide,
   title,
   children,
   size,
-  className,
-  bare = false,
+  className = '',
+  bare,
   locked = false,
   labelledBy,
 }) => {
   const titleId = React.useId();
+  if (!show) return null;
+
+  const sizeClass =
+    size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : size === 'xl' ? 'max-w-4xl' : 'max-w-lg';
+
   return (
-    <BsModal
-      show={show}
-      onHide={locked ? undefined : onHide}
-      size={size}
-      centered
+    <div
+      role="dialog"
+      aria-modal="true"
       aria-labelledby={labelledBy ?? (title ? titleId : undefined)}
-      contentClassName={cn('border-0 overflow-hidden rounded-xl bg-surface-container-lowest shadow-xl', className)}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+      onClick={locked ? undefined : onHide}
     >
-      {!bare && title && (
-        <div className="flex items-center justify-between gap-space-md bg-surface-container-low px-space-lg py-space-md">
-          <h2 id={titleId} className="font-headline-sm text-headline-sm text-primary">
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={onHide}
-            disabled={locked}
-            aria-label="Đóng"
-            className="flex rounded-lg p-1 text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-40"
-          >
-            <Icon name="close" />
-          </button>
-        </div>
-      )}
-      {children}
-    </BsModal>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full ${sizeClass} overflow-hidden rounded-xl border border-surface-container-high bg-surface-container-lowest shadow-2xl transition-all ${className}`}
+      >
+        {!bare && title && (
+          <div className="flex items-center justify-between bg-surface-container-low px-space-lg py-space-md border-b border-surface-container-high">
+            <h2 id={titleId} className="font-headline-sm text-headline-sm text-primary">{title}</h2>
+            <button
+              type="button"
+              onClick={onHide}
+              disabled={locked}
+              aria-label="Đóng"
+              className="text-on-surface-variant hover:text-on-surface p-1 transition-colors disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
   );
 };
