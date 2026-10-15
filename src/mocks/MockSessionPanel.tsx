@@ -24,8 +24,9 @@ const MockSessionPanel: React.FC = () => {
         useAuthStore.getState().logout();
       } else {
         const target = users.find((item) => item.userId === userId)!;
-        const res = await login({ email: target.email, password: MOCK_PASSWORD });
-        const { accessToken, user: account } = res.data;
+        const res = await login({ email: target.email, password: MOCK_PASSWORD, restoreAccount: false });
+        const { accessToken, user: account } = res;
+
         useAuthStore.getState().setAuth(
           {
             userId: account.userId,

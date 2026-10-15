@@ -20,6 +20,11 @@ export const PATHS = {
     POSTS: '/me/posts',
     SUBSCRIPTION: '/me/subscription',
   },
+  PROFILE: {
+    ROOT: '/me',
+    HEALTH: '/me/health',
+  },
+
   RECIPES: {
     ROOT: '/recipes',
     DETAIL: (id: string | number) => `/recipes/${id}`,
@@ -64,6 +69,7 @@ export const PATHS = {
     RESULT: '/vip/result',
   },
   ADMIN: {
+    ROOT: '/admin',
     DASHBOARD: '/admin',
     MODERATION: '/admin/moderation',
     COMMENT_MODERATION: '/admin/moderation/comments',

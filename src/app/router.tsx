@@ -3,16 +3,27 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { NotFoundPage } from '@/app/NotFoundPage';
 import { MainLayout } from '@/layouts/MainLayout';
-import { RequireAuth } from '@/routes/guards';
+import { AuthLayout } from '@/layouts/AuthLayout';
+import { AdminLayout } from '@/layouts/AdminLayout';
+import { RequireAuth, GuestOnly, RequireAdmin } from '@/routes/guards';
 import { LogoMark } from '@/components/common/Logo';
 import { PATHS } from '@/routes/paths';
 
+import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { RegisterPage } from '@/features/auth/pages/RegisterPage';
+import { VerifyOtpPage } from '@/features/auth/pages/VerifyOtpPage';
+import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
+import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
+import { ScannerPage } from '@/features/scanner/pages/ScannerPage';
+
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
+const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
-const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
+const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 
 /**
  * Starter Welcome Page - displays system status and feature module status
@@ -83,6 +94,9 @@ const router = createBrowserRouter([
         children: [
           { path: PATHS.HOME, element: <WelcomePage /> },
 
+          // Videos (SCR-21)
+          { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
+
           // Community (SCR-25 → SCR-28)
           { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
           { path: PATHS.COMMUNITY.POST_DETAIL(':id'), element: <PostDetail /> },
@@ -92,19 +106,47 @@ const router = createBrowserRouter([
             children: [
               { path: PATHS.COMMUNITY.NEW_POST, element: <PostEditor /> },
               { path: PATHS.COMMUNITY.EDIT_POST(':id'), element: <PostEditor /> },
+              { path: PATHS.AUTH.CHANGE_PASSWORD, element: <ChangePasswordPage /> },
             ],
           },
 
-          // Videos (SCR-21)
-          { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
+          // Chatbot RAG (SCR-29)
+          { path: PATHS.CHAT.ROOT, element: <ChatPage /> },
+          { path: PATHS.CHAT.SESSION(':sessionId'), element: <ChatPage /> },
+
+          // Scanner
+          { path: PATHS.SCANNER.ROOT, element: <ScannerPage /> },
 
           { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+      {
+        element: <GuestOnly />,
+        children: [
+          {
+            element: <AuthLayout />,
+            children: [
+              { path: PATHS.AUTH.LOGIN, element: <LoginPage /> },
+              { path: PATHS.AUTH.REGISTER, element: <RegisterPage /> },
+              { path: PATHS.AUTH.VERIFY_OTP, element: <VerifyOtpPage /> },
+              { path: PATHS.AUTH.FORGOT_PASSWORD, element: <ForgotPasswordPage /> },
+              { path: PATHS.AUTH.RESET_PASSWORD, element: <ResetPasswordPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: PATHS.ADMIN.DASHBOARD,
+        element: <RequireAdmin />,
+        children: [
+          {
+            element: <AdminLayout />,
+            children: [{ index: true, element: <div className="p-8">Admin Dashboard</div> }],
+          },
         ],
       },
     ],
   },
 ]);
 
-export const AppRouter: React.FC = () => {
-  return <RouterProvider router={router} />;
-};
+export const AppRouter = () => <RouterProvider router={router} />;

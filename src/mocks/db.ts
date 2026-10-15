@@ -360,5 +360,96 @@ export const reports: MockReport[] = [];
 /** Lần bình luận gần nhất theo userId, để mô phỏng giãn cách 15 giây (BR-USR-04). */
 export const lastCommentAt = new Map<number, number>();
 
-const counters = { post: 200, comment: 1000, report: 1, video: 1000 };
+const counters = { post: 200, comment: 1000, report: 1, video: 1000, chatSession: 50, chatMessage: 500, survey: 100 };
 export const nextId = (key: keyof typeof counters) => counters[key]++;
+
+export interface MockChatSession {
+  sessionId: number;
+  userId: number | null;
+  guestUuid: string | null;
+  title: string;
+  contextType: string;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export interface MockChatMessage {
+  messageId: number;
+  sessionId: number;
+  senderType: 'USER' | 'ASSISTANT';
+  content: string;
+  disclaimer?: string | null;
+  sources?: { type: string; id: number; title: string }[];
+  ragUsed?: boolean;
+  recommendedRecipes?: { recipeId: number; title: string; cookTimeMinutes?: number | null }[];
+  createdAt: string;
+}
+
+export interface MockSurvey {
+  surveyId: number;
+  chatSessionId?: number;
+  userId: number;
+  contextQuestion: string;
+  ratingScore: number;
+  feedbackContent?: string;
+  createdAt: string;
+}
+
+export const chatSessions: MockChatSession[] = [
+  {
+    sessionId: 1,
+    userId: 1024,
+    guestUuid: null,
+    title: 'Tối ưu 75g đạm thực vật mỗi ngày',
+    contextType: 'NUTRITION_CONSULTATION',
+    startedAt: hoursAgo(24),
+    updatedAt: hoursAgo(2),
+  },
+  {
+    sessionId: 2,
+    userId: 1024,
+    guestUuid: null,
+    title: 'Cân bằng dinh dưỡng bữa tối dưỡng sinh',
+    contextType: 'NUTRITION_CONSULTATION',
+    startedAt: hoursAgo(48),
+    updatedAt: hoursAgo(20),
+  },
+  {
+    sessionId: 3,
+    userId: 1024,
+    guestUuid: null,
+    title: 'Gợi ý món chay từ đậu phụ và nấm',
+    contextType: 'NUTRITION_CONSULTATION',
+    startedAt: hoursAgo(72),
+    updatedAt: hoursAgo(50),
+  },
+];
+
+export const chatMessages: MockChatMessage[] = [
+  {
+    messageId: 101,
+    sessionId: 1,
+    senderType: 'USER',
+    content: 'Tôi ăn thuần chay trường và tập thể thao 4 buổi/tuần, làm sao đảm bảo 75g đạm mỗi ngày mà không bị đầy hơi chướng bụng?',
+    createdAt: hoursAgo(2),
+  },
+  {
+    messageId: 102,
+    sessionId: 1,
+    senderType: 'ASSISTANT',
+    content: 'Chào bạn, để nạp đủ 75g đạm/ngày mà không sinh khí chướng bụng, giải pháp cốt lõi là phân tách nhỏ 4 nguồn đạm đã kích hoạt enzyme & lên men vi sinh: Đậu gà kết hợp Kombu [S1], hạt gai dầu & yến mạch [S2], tempeh lên men vi sinh và nấm hầu thủ.\n\nBạn có thể thử làm món Canh nấm đậu phụ rong biển [S1] hoặc Tempeh áp chảo để hỗ trợ tiêu hóa tốt nhất.',
+    disclaimer: 'Khuyến nghị mang tính chất tham khảo dinh dưỡng, vui lòng tham vấn ý kiến bác sĩ chuyên khoa đối với các bệnh lý nền.',
+    sources: [
+      { type: 'RECIPE', id: 512, title: 'Canh nấm đậu phụ rong biển' },
+      { type: 'NUTRITION_DOC', id: 10, title: 'Cẩm nang dinh dưỡng thực vật (WHO & Viện Dinh Dưỡng)' },
+    ],
+    ragUsed: true,
+    recommendedRecipes: [
+      { recipeId: 512, title: 'Canh nấm đậu phụ rong biển', cookTimeMinutes: 25 },
+    ],
+    createdAt: hoursAgo(1.9),
+  },
+];
+
+export const surveys: MockSurvey[] = [];
+
