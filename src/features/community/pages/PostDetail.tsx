@@ -143,7 +143,7 @@ const PostDetail: React.FC = () => {
         </div>
 
         <div className="mb-space-xl empty:hidden">
-          <PostVideos videos={data.videos} />
+          <PostVideos videos={data.videos} postId={data.postId} />
         </div>
 
         <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">

@@ -5,6 +5,8 @@ import {
   nextId,
   posts,
   reports,
+  transcripts,
+  UPLOADED_VIDEO_TRANSCRIPT,
   users,
   votes,
   type MockComment,
@@ -26,7 +28,7 @@ const commentCount = (postId: number) =>
   comments.filter((comment) => comment.postId === postId && isVisibleComment(comment)).length;
 
 /** Bài xem được: APPROVED_ACTIVE + PUBLIC, hoặc bài (chưa xóa) của chính người xem (FN-POST-06). */
-const canView = (post: MockPost, me: MockUser | null) =>
+export const canView = (post: MockPost, me: MockUser | null) =>
   post.status !== 'DELETED' &&
   ((post.status === 'APPROVED_ACTIVE' && post.visibility === 'PUBLIC') || me?.userId === post.authorId);
 
@@ -260,13 +262,21 @@ export const communityHandlers = [
       post.imageUrl = url;
       return ok({ videoId, status: 'READY' }, 'Đã tải ảnh lên.', 202);
     }
-    const video = { videoId, videoUrl: url, status: 'PROCESSING' as const, title: file.name };
+    const video = { videoId, videoUrl: url, status: 'PROCESSING' as const, title: file.name, durationSeconds: 95 };
     post.videos.push(video);
     // Mô phỏng xử lý ngầm: PROCESSING → READY sau vài giây.
     setTimeout(() => {
       const stored = post.videos.find((item) => item.videoId === videoId);
       if (stored) stored.status = 'READY';
     }, 8000);
+    // Bóc tách công thức chạy ngầm (FN-POST-10): bản thật mất 2–3 phút, mock rút còn 40 giây, nội dung cố định.
+    transcripts.push({
+      videoId,
+      status: 'PENDING',
+      readyAt: Date.now() + 40 * 1000,
+      recipeApproved: false,
+      ...UPLOADED_VIDEO_TRANSCRIPT,
+    });
     return ok({ videoId, status: 'PROCESSING' }, 'Đã nhận video, đang xử lý.', 202);
   }),
 

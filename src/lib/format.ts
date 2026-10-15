@@ -27,3 +27,9 @@ export const formatNumber = (value: number) => numberFormatter.format(value);
 
 /** 12 400 000 → "12.400.000 ₫" */
 export const formatVnd = (value: number) => `${numberFormatter.format(value)} ₫`;
+
+/** Thời lượng video: 95 → "1:35". */
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}

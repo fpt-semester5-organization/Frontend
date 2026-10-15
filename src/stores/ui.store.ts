@@ -3,11 +3,18 @@ import { create } from 'zustand';
 export type ToastVariant = 'success' | 'info' | 'warning' | 'danger';
 export type ToastKind = 'success' | 'error' | 'warning' | 'info';
 
+/** Nút dẫn trang kèm toast, ví dụ "Xem kết quả" khi bóc tách video xong. */
+export interface ToastAction {
+  label: string;
+  to: string;
+}
+
 export interface ToastItem {
   id: number;
   variant: ToastVariant;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
 }
 
 export type Toast = ToastItem;
@@ -18,7 +25,7 @@ interface UiState {
   toasts: ToastItem[];
   signupPrompt: { open: boolean; reason: SignupPromptReason; returnUrl: string };
   serviceBanner: string | null;
-  pushToast: (variantOrKind: ToastVariant | ToastKind, message: string) => void;
+  pushToast: (variantOrKind: ToastVariant | ToastKind, message: string, action?: ToastAction) => void;
   dismissToast: (id: number) => void;
   openSignupPrompt: (arg?: SignupPromptReason | string) => void;
   closeSignupPrompt: () => void;
@@ -27,16 +34,19 @@ interface UiState {
 
 let seq = 0;
 
+/** Thời gian hiển thị: toast có nút dẫn trang giữ lâu hơn để người dùng kịp bấm. */
+const toastDuration = (variant: ToastVariant, action?: ToastAction) => (action ? 10000 : variant === 'danger' ? 7000 : 4500);
+
 export const useUiStore = create<UiState>((set, get) => ({
   toasts: [],
   signupPrompt: { open: false, reason: 'guest', returnUrl: '/' },
   serviceBanner: null,
-  pushToast: (variantOrKind, message) => {
+  pushToast: (variantOrKind, message, action) => {
     const id = ++seq;
     const variant: ToastVariant = variantOrKind === 'error' ? 'danger' : variantOrKind;
     const kind: ToastKind = variantOrKind === 'danger' ? 'error' : variantOrKind;
-    set((s) => ({ toasts: [...s.toasts, { id, variant, kind, message }] }));
-    window.setTimeout(() => get().dismissToast(id), 4500);
+    set((s) => ({ toasts: [...s.toasts, { id, variant, kind, message, action }] }));
+    window.setTimeout(() => get().dismissToast(id), toastDuration(variant, action));
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   openSignupPrompt: (arg) => {

@@ -50,7 +50,7 @@ const MockSessionPanel: React.FC = () => {
 
   const options = [
     { id: null, label: 'Khách (chưa đăng nhập)' },
-    ...users.slice(0, 2).map((item) => ({ id: item.userId, label: `${item.fullName} (${ROLE_LABEL[item.role]})` })),
+    ...users.map((item) => ({ id: item.userId, label: `${item.fullName} (${ROLE_LABEL[item.role]})` })),
   ];
 
   return (

@@ -18,6 +18,7 @@ import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
 
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
+const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
 const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
@@ -102,6 +103,9 @@ const router = createBrowserRouter([
           { path: PATHS.VENUES.ROOT, element: <VenueMap /> },
 
           { path: PATHS.HOME, element: <WelcomePage /> },
+
+          // Videos (SCR-21)
+          { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
 
           // Community (SCR-25 → SCR-28)
           { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
