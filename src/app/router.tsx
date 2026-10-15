@@ -13,6 +13,8 @@ const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
+const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
+const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 
 
 /**
@@ -99,6 +101,13 @@ const router = createBrowserRouter([
           // Chatbot RAG (SCR-29)
           { path: PATHS.CHAT.ROOT, element: <ChatPage /> },
           { path: PATHS.CHAT.SESSION(':sessionId'), element: <ChatPage /> },
+
+          // Quét mã vạch (SCR-15: mọi người dùng) và lịch sử quét (SCR-16: chỉ Thành viên)
+          { path: PATHS.SCANNER.ROOT, element: <BarcodeScan /> },
+          {
+            element: <RequireAuth />,
+            children: [{ path: PATHS.SCANNER.HISTORY, element: <ScanHistory /> }],
+          },
 
           { path: '*', element: <NotFoundPage /> },
 
