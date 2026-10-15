@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { notifyApiError } from '@/lib/notify';
 import { useAuthStore } from '@/stores/auth.store';
 import { MOCK_PASSWORD, users } from './db';
+import { mockForeignIp } from './handlers/venues.handlers';
 
 const ROLE_LABEL = { MEMBER: 'Thành viên', VIP: 'VIP', ADMIN: 'Admin' } as const;
 
@@ -15,6 +16,7 @@ const MockSessionPanel: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [foreignIp, setForeignIp] = useState(mockForeignIp.get);
 
   const switchTo = async (userId: number | null) => {
     setBusy(true);
@@ -86,6 +88,18 @@ const MockSessionPanel: React.FC = () => {
               </button>
             );
           })}
+          <label className="mt-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10">
+            <input
+              type="checkbox"
+              checked={foreignIp}
+              onChange={(event) => {
+                mockForeignIp.set(event.target.checked);
+                setForeignIp(event.target.checked);
+              }}
+              className="accent-secondary-container"
+            />
+            Giả lập truy cập từ nước ngoài
+          </label>
           <p className="px-2 pt-1 font-body-sm text-body-sm opacity-70">Tải lại trang sẽ đưa dữ liệu giả về ban đầu.</p>
         </div>
       ) : (
