@@ -69,11 +69,28 @@ const PostFeed: React.FC = () => {
               <Icon name="chevron_right" className="ml-auto text-[20px] text-outline" />
             </Link>
           ) : (
-            <div className={cn(sideLink, 'flex-1 flex-col items-start gap-space-xs lg:flex-none')}>
-              <p className="font-label-md text-label-md text-on-surface">Tham gia cộng đồng</p>
+            <div
+              onClick={() => requireMember(() => undefined)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  requireMember(() => undefined);
+                }
+              }}
+              className={cn(sideLink, 'cursor-pointer flex-1 flex-col items-start gap-space-xs lg:flex-none hover:border-primary')}
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-container text-on-primary">
+                  <Icon name="person_add" className="text-[18px]" />
+                </span>
+                <p className="font-label-md text-label-md font-bold text-on-surface">Tham gia cộng đồng</p>
+              </div>
               <p className="font-body-sm text-body-sm text-on-surface-variant">
                 Đăng ký để thả tim, bình luận và chia sẻ hành trình ăn chay của bạn.
               </p>
+              <span className="mt-1 font-label-sm text-label-sm font-semibold text-primary">Đăng ký / Đăng nhập →</span>
             </div>
           )}
         </aside>

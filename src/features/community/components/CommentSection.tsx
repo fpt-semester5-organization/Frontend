@@ -98,11 +98,30 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuth
           </p>
         )}
         {!isMember && (
-          <div className="flex flex-col items-center gap-space-sm py-space-sm text-center">
-            <p className="font-body-md text-body-md text-on-surface-variant">Đăng nhập để tham gia bình luận.</p>
-            <Button className="bg-primary hover:bg-primary-container" onClick={() => requireMember(() => undefined)}>
-              Viết bình luận
-            </Button>
+          <div
+            onClick={() => requireMember(() => undefined)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                requireMember(() => undefined);
+              }
+            }}
+            aria-label="Đăng nhập để tham gia bình luận"
+            className="group flex cursor-pointer flex-col gap-space-sm rounded-lg border border-dashed border-outline-variant bg-surface-container-lowest p-space-md transition-all hover:border-primary hover:bg-surface-container-low"
+          >
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              Chia sẻ cảm nghĩ hoặc đặt câu hỏi cùng cộng đồng…
+            </p>
+            <div className="flex items-center justify-between pt-space-xs">
+              <span className="font-label-sm text-label-sm text-primary">
+                Đăng nhập hoặc đăng ký để tham gia thảo luận →
+              </span>
+              <Button size="sm" className="pointer-events-none bg-primary hover:bg-primary-container">
+                Viết bình luận
+              </Button>
+            </div>
           </div>
         )}
       </div>
