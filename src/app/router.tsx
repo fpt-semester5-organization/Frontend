@@ -23,6 +23,10 @@ const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
 const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
+const MealPlanList = lazy(() => import('@/features/meal-plans/pages/MealPlanList'));
+const MealPlanGenerate = lazy(() => import('@/features/meal-plans/pages/MealPlanGenerate'));
+const MealPlanDetail = lazy(() => import('@/features/meal-plans/pages/MealPlanDetail'));
+const ShoppingList = lazy(() => import('@/features/shopping-lists/pages/ShoppingList'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 const FridgePage = lazy(() => import('@/features/fridge/pages/FridgePage'));
 
@@ -105,6 +109,17 @@ const router = createBrowserRouter([
               { path: PATHS.COMMUNITY.NEW_POST, element: <PostEditor /> },
               { path: PATHS.COMMUNITY.EDIT_POST(':id'), element: <PostEditor /> },
               { path: PATHS.AUTH.CHANGE_PASSWORD, element: <ChangePasswordPage /> },
+            ],
+          },
+
+          // Thực đơn tuần & danh sách đi chợ (SCR-22 → SCR-24): chỉ Thành viên/VIP
+          {
+            element: <RequireAuth />,
+            children: [
+              { path: PATHS.MEAL_PLANS.ROOT, element: <MealPlanList /> },
+              { path: PATHS.MEAL_PLANS.NEW, element: <MealPlanGenerate /> },
+              { path: PATHS.MEAL_PLANS.DETAIL(':id'), element: <MealPlanDetail /> },
+              { path: PATHS.SHOPPING_LISTS.DETAIL(':id'), element: <ShoppingList /> },
             ],
           },
 
