@@ -10,7 +10,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useGuestStore } from '@/stores/guest.store';
 import { useUiStore } from '@/stores/ui.store';
 import { AssistantBubble, UserBubble } from '../components/MessageBubble';
-import { QuotaMeter } from '../components/QuotaMeter';
 import {
   appendMessages,
   flattenMessages,
@@ -139,6 +138,33 @@ export const ChatPage: React.FC = () => {
   const [histOpen, setHistOpen] = useState(true);
   const [profOpen, setProfOpen] = useState(true);
 
+  // Trạng thái tìm kiếm, lọc và ghim phiên hội thoại (phong cách Gemini)
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'PINNED'>('ALL');
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('veggielife_chat_pinned_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePin = (e: React.MouseEvent, sid: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPinnedIds((prev) => {
+      const next = prev.includes(sid) ? prev.filter((id) => id !== sid) : [sid, ...prev];
+      try {
+        localStorage.setItem('veggielife_chat_pinned_sessions', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   const [input, setInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const contextType: ContextType = 'NUTRITION_CONSULTATION';
@@ -150,7 +176,7 @@ export const ChatPage: React.FC = () => {
     retryable: boolean;
     unsafe: boolean;
   } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<{ id: number; title: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeId = routeId ?? draftId;
@@ -164,6 +190,21 @@ export const ChatPage: React.FC = () => {
   }, [routeId]);
 
   useEffect(() => {
+    if (routeId && messagesQ.isError) {
+      const err = messagesQ.error as {
+        status?: number;
+        errorCode?: string;
+        response?: { status?: number; data?: { errorCode?: string } };
+      };
+      const status = err?.status ?? err?.response?.status;
+      const code = err?.errorCode ?? err?.response?.data?.errorCode;
+      if (status === 404 || code === 'ERR_CHAT_SESSION_NOT_FOUND') {
+        navigate(PATHS.CHAT.ROOT, { replace: true });
+      }
+    }
+  }, [routeId, messagesQ.isError, messagesQ.error, navigate]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, pendingText, sendError]);
 
@@ -173,6 +214,48 @@ export const ChatPage: React.FC = () => {
   const used = !authed ? (guestAi?.used ?? 0) : (memberQuota.data?.used ?? 0);
   const unit = authed ? 'câu' : 'lượt';
   const quotaLabel = authed ? 'Lượt hỏi hôm nay' : 'Lượt dùng thử miễn phí';
+
+  // Lọc và sắp xếp các phiên trò chuyện (tìm kiếm & ghim lên đầu)
+  const filteredSessions = useMemo(() => {
+    let list = sessions.data?.items ?? [];
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (s) =>
+          (s.title || '').toLowerCase().includes(q) ||
+          (s.lastMessagePreview || '').toLowerCase().includes(q)
+      );
+    }
+    if (filterMode === 'PINNED') {
+      list = list.filter((s) => pinnedIds.includes(s.sessionId));
+    }
+    return [...list].sort((a, b) => {
+      const aPinned = pinnedIds.includes(a.sessionId);
+      const bPinned = pinnedIds.includes(b.sessionId);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+  }, [sessions.data?.items, searchQuery, filterMode, pinnedIds]);
+
+  // Thông tin tài khoản ở thanh điều hướng dưới cùng
+  const displayName = authed
+    ? user?.fullName || user?.email?.split('@')[0] || 'Thành viên VeggieLife'
+    : 'Khách trải nghiệm';
+  const planName = !authed ? 'Khách' : isVip ? 'Pro' : 'Thành viên';
+  const initials = authed
+    ? user?.fullName
+      ? user.fullName
+          .split(' ')
+          .filter(Boolean)
+          .slice(-2)
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+      : 'VL'
+    : 'K';
+  const percentage = Math.min(100, Math.max(0, Math.round((used / Math.max(1, limit)) * 100)));
+  const isNearLimit = percentage >= 80;
 
   const send = async (raw?: string) => {
     if (sending) return;
@@ -233,6 +316,9 @@ export const ChatPage: React.FC = () => {
 
       if (code === 'ERR_CHAT_SESSION_NOT_FOUND') {
         setDraftId(null);
+        if (routeId) {
+          navigate(PATHS.CHAT.ROOT, { replace: true });
+        }
       }
 
       const retryable =
@@ -266,16 +352,21 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleDeleteSession = () => {
-    if (!routeId) return;
-    del.mutate(routeId, {
+    if (!sessionToDelete) return;
+    const targetId = sessionToDelete.id;
+    const isCurrent = routeId === targetId;
+
+    if (isCurrent) {
+      navigate(PATHS.CHAT.ROOT, { replace: true });
+    }
+
+    del.mutate(targetId, {
       onSuccess: () => {
-        setConfirmDelete(false);
-        qc.removeQueries({ queryKey: ['chat', 'messages', routeId] });
-        notifySuccess('Đã xóa phiên hội thoại thành công.');
-        navigate(PATHS.CHAT.ROOT);
+        setSessionToDelete(null);
+        notifySuccess('Đã xóa cuộc trò chuyện.');
       },
       onError: (err) => {
-        setConfirmDelete(false);
+        setSessionToDelete(null);
         notifyApiError(err);
       },
     });
@@ -283,7 +374,7 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div className="relative flex h-[calc(100dvh-72px)] w-full overflow-hidden bg-surface">
-      {/* 1. Panel Trái: Lịch sử hội thoại & Hạn mức AI */}
+      {/* 1. Panel Trái: Lịch sử hội thoại & Tài khoản (Phong cách Gemini) */}
       <aside
         aria-label="Lịch sử chat"
         className={`flex shrink-0 flex-col bg-surface-container-low transition-[width] duration-300 max-lg:absolute max-lg:inset-y-0 max-lg:z-20 max-lg:shadow-xl ${
@@ -292,24 +383,97 @@ export const ChatPage: React.FC = () => {
       >
         {histOpen ? (
           <>
-            <div className="flex items-center justify-between border-b border-outline-variant/30 px-4 py-3">
-              <span className="font-headline-sm text-headline-sm text-on-surface">Lịch sử</span>
-              <IconBtn icon="left_panel_close" label="Thu gọn lịch sử" onClick={() => setHistOpen(false)} />
+            {/* Header: Logo VeggieLife + Search Icon + Collapse Icon */}
+            <div className="flex items-center justify-between px-3.5 py-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-2xs">
+                  <span className="material-symbols-outlined text-[18px]">psychology</span>
+                </div>
+                <span className="font-headline-sm text-sm font-bold tracking-tight text-on-surface">
+                  VeggieLife
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <IconBtn
+                  icon={showSearch ? 'search_off' : 'search'}
+                  label={showSearch ? 'Đóng tìm kiếm' : 'Tìm kiếm cuộc trò chuyện'}
+                  onClick={() => {
+                    setShowSearch((prev) => !prev);
+                    if (showSearch) setSearchQuery('');
+                  }}
+                  className="!h-8 !w-8"
+                />
+                <IconBtn
+                  icon="left_panel_close"
+                  label="Thu gọn lịch sử"
+                  onClick={() => setHistOpen(false)}
+                  className="!h-8 !w-8"
+                />
+              </div>
             </div>
 
-            <div className="p-3">
+            {/* Ô tìm kiếm mở rộng khi bấm nút search */}
+            {showSearch && (
+              <div className="px-3 pt-1 pb-2">
+                <div className="flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1.5 text-xs text-on-surface border border-outline-variant/30 focus-within:border-primary">
+                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant">search</span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tìm kiếm cuộc trò chuyện..."
+                    className="w-full bg-transparent outline-none placeholder:text-on-surface-variant/70 text-xs"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="text-on-surface-variant hover:text-on-surface"
+                      title="Xóa tìm kiếm"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">close</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Nút Cuộc trò chuyện mới (Capsule bo tròn phong cách Gemini) */}
+            <div className="px-3 py-1.5">
               <button
                 type="button"
                 id="btn-new-session"
                 onClick={handleNewChat}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-label-md text-label-md text-on-primary transition hover:opacity-90 active:scale-[0.98]"
+                className="flex w-full items-center gap-2.5 rounded-full bg-surface-container px-4 py-2.5 font-label-md text-xs sm:text-sm font-medium text-on-surface transition-all hover:bg-surface-container-high hover:shadow-2xs active:scale-[0.99] border border-outline-variant/20"
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                Cuộc trò chuyện mới
+                <span className="material-symbols-outlined text-[19px] text-on-surface-variant">
+                  edit_square
+                </span>
+                <span>Cuộc trò chuyện mới</span>
               </button>
             </div>
 
-            <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-1" aria-label="Các phiên tư vấn">
+            {/* Hàng bộ lọc: Tất cả / Đã ghim + Icon lọc */}
+            <div className="flex items-center justify-between px-4 pt-2 pb-1 text-xs text-on-surface-variant">
+              <span className="font-medium">
+                {filterMode === 'PINNED' ? 'Đã ghim' : 'Tất cả'}
+                {searchQuery.trim() && ` (${filteredSessions.length})`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterMode((prev) => (prev === 'ALL' ? 'PINNED' : 'ALL'))}
+                title={filterMode === 'PINNED' ? 'Xem tất cả' : 'Chỉ xem cuộc trò chuyện đã ghim'}
+                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-surface-container ${
+                  filterMode === 'PINNED' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">tune</span>
+              </button>
+            </div>
+
+            {/* Danh sách các phiên trò chuyện (Phong cách tối giản Gemini) */}
+            <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-1" aria-label="Các phiên tư vấn">
               {!authed ? (
                 <div className="p-3 text-center">
                   <p className="font-body-sm text-xs text-on-surface-variant">
@@ -324,9 +488,9 @@ export const ChatPage: React.FC = () => {
                   </button>
                 </div>
               ) : sessions.isPending ? (
-                <div className="flex flex-col gap-2 p-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-9 animate-pulse rounded-lg bg-surface-container" />
+                <div className="flex flex-col gap-1.5 p-2">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="h-8 animate-pulse rounded-lg bg-surface-container" />
                   ))}
                 </div>
               ) : sessions.isError ? (
@@ -340,46 +504,160 @@ export const ChatPage: React.FC = () => {
                     Thử lại
                   </button>
                 </div>
-              ) : sessions.data?.items.length === 0 ? (
+              ) : filteredSessions.length === 0 ? (
                 <p className="p-3 text-center font-body-sm text-xs text-on-surface-variant">
-                  Chưa có cuộc trò chuyện nào. Hãy chọn một câu hỏi gợi ý bên cạnh nhé!
+                  {searchQuery.trim()
+                    ? 'Không tìm thấy cuộc trò chuyện phù hợp.'
+                    : filterMode === 'PINNED'
+                    ? 'Chưa có cuộc trò chuyện nào được ghim.'
+                    : 'Chưa có cuộc trò chuyện nào.'}
                 </p>
               ) : (
-                sessions.data?.items.map((s) => (
-                  <Link
-                    key={s.sessionId}
-                    to={PATHS.CHAT.SESSION(s.sessionId)}
-                    title={s.lastMessagePreview ?? s.title}
-                    className={`group flex items-center gap-2 rounded-xl px-3 py-2.5 font-body-sm text-xs transition-all ${
-                      s.sessionId === routeId
-                        ? 'border-l-2 border-primary bg-primary/10 font-semibold text-primary shadow-2xs'
-                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[17px] shrink-0 text-primary/80">
-                      chat_bubble_outline
-                    </span>
-                    <span className="truncate flex-1">{s.title || 'Phiên tư vấn'}</span>
-                  </Link>
-                ))
+                filteredSessions.map((s) => {
+                  const isActive = s.sessionId === routeId;
+                  const isPinned = pinnedIds.includes(s.sessionId);
+                  return (
+                    <div
+                      key={s.sessionId}
+                      className={`group relative flex items-center justify-between rounded-lg px-3 py-2 text-[13px] transition-colors ${
+                        isActive
+                          ? 'bg-surface-container-high font-semibold text-primary'
+                          : 'text-on-surface hover:bg-surface-container/70'
+                      }`}
+                    >
+                      <Link
+                        to={PATHS.CHAT.SESSION(s.sessionId)}
+                        title={s.lastMessagePreview ?? s.title}
+                        className="truncate flex-1 !no-underline text-inherit"
+                      >
+                        {s.title || 'Phiên tư vấn'}
+                      </Link>
+                      <div className="ml-2 flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => togglePin(e, s.sessionId)}
+                          title={isPinned ? 'Bỏ ghim' : 'Ghim cuộc trò chuyện lên đầu'}
+                          aria-label={isPinned ? 'Bỏ ghim' : 'Ghim cuộc trò chuyện'}
+                          className={`p-1 rounded-md text-on-surface-variant transition-opacity hover:bg-surface-container-high hover:text-primary ${
+                            isPinned ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100'
+                          }`}
+                        >
+                          <span className={`material-symbols-outlined text-[16px] ${isPinned ? 'rotate-[-45deg]' : ''}`}>
+                            push_pin
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSessionToDelete({ id: s.sessionId, title: s.title || 'Phiên tư vấn' });
+                          }}
+                          title="Xóa cuộc trò chuyện"
+                          aria-label="Xóa cuộc trò chuyện"
+                          className="p-1 rounded-md text-on-surface-variant opacity-0 transition-opacity hover:bg-surface-container-high hover:text-error group-hover:opacity-100"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">
+                            delete
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </nav>
 
-            <div className="p-3">
-              <QuotaMeter
-                label={quotaLabel}
-                used={used}
-                limit={limit}
-                unit={unit}
-                isVip={isVip}
-                isAuthenticated={authed}
-              />
+            {/* 3. Phần tài khoản bên dưới (kèm hạn mức lượt hỏi) */}
+            <div className="mt-auto border-t border-outline-variant/20 p-2">
+              <div className="flex items-center justify-between gap-2 rounded-xl p-2 transition-colors hover:bg-surface-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (authed) {
+                      navigate(PATHS.ME.PROFILE);
+                    } else {
+                      openSignupPrompt();
+                    }
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 text-left !no-underline cursor-pointer"
+                  title={authed ? 'Trang cá nhân & Cài đặt' : 'Đăng nhập / Đăng ký'}
+                >
+                  {/* Avatar */}
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={displayName}
+                      className="h-9 w-9 shrink-0 rounded-full object-cover border border-outline-variant/30"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-xs shadow-2xs">
+                      {initials}
+                    </div>
+                  )}
+
+                  {/* Tên & Hạn mức */}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-body-md text-xs sm:text-[13px] font-semibold text-on-surface">
+                      {displayName}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+                      <span className={isVip ? 'font-bold text-secondary' : 'font-medium'}>
+                        {planName}
+                      </span>
+                      <span>•</span>
+                      <span className="font-mono font-medium">
+                        {used}/{limit} {unit}
+                      </span>
+                    </div>
+                    {/* Thanh tiến trình mini */}
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-container-highest">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isNearLimit ? 'bg-warning' : 'bg-primary'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Nút cài đặt (Icon bánh răng) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (authed) {
+                      navigate(PATHS.ME.PROFILE);
+                    } else {
+                      openSignupPrompt();
+                    }
+                  }}
+                  aria-label="Cài đặt tài khoản"
+                  title={authed ? 'Cài đặt tài khoản' : 'Đăng nhập'}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">settings</span>
+                </button>
+              </div>
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-2 py-3">
-            <IconBtn icon="left_panel_open" label="Mở lịch sử" onClick={() => setHistOpen(true)} />
-            <IconBtn icon="add" label="Phiên tư vấn mới" onClick={handleNewChat} />
+          <div className="flex h-full flex-col items-center justify-between py-3">
+            <div className="flex flex-col items-center gap-2">
+              <IconBtn icon="left_panel_open" label="Mở lịch sử" onClick={() => setHistOpen(true)} />
+              <IconBtn icon="edit_square" label="Cuộc trò chuyện mới" onClick={handleNewChat} />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (authed) navigate(PATHS.ME.PROFILE);
+                else openSignupPrompt();
+              }}
+              title={`${displayName} (${used}/${limit} ${unit})`}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-on-primary font-bold text-xs"
+            >
+              {initials}
+            </button>
           </div>
         )}
       </aside>
@@ -407,21 +685,13 @@ export const ChatPage: React.FC = () => {
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
                     </span>
-                    Tham vấn dinh dưỡng chuẩn y khoa
+                    Tư vấn dinh dưỡng & thực đơn chay
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
-              {routeId && authed && (
-                <IconBtn
-                  icon="delete"
-                  label="Xóa phiên"
-                  onClick={() => setConfirmDelete(true)}
-                  className="hover:!text-error"
-                />
-              )}
               <IconBtn
                 icon="badge"
                 label="Hồ sơ & Lối tắt"
@@ -445,14 +715,7 @@ export const ChatPage: React.FC = () => {
               <div className="m-auto flex w-full max-w-3xl flex-col gap-6 py-4">
                 {/* Header dẫn nhập */}
                 <div className="flex flex-col items-start text-left">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 font-label-sm text-xs font-semibold text-primary">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-                    </span>
-                    Trợ lý Dinh dưỡng VeggieLife
-                  </div>
-                  <h2 className="mt-3 font-headline-sm text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
+                  <h2 className="font-headline-sm text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
                     Bạn muốn tìm hiểu gì về dinh dưỡng hôm nay?
                   </h2>
                   <p className="mt-2 max-w-[58ch] font-body-md text-sm leading-relaxed text-on-surface-variant">
@@ -647,18 +910,11 @@ export const ChatPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-2 flex items-center justify-between px-1">
+            <div className="mt-2 px-1">
               <p className="flex items-center gap-1 font-label-sm text-[11px] text-on-surface-variant">
                 <span className="material-symbols-outlined text-[13px] text-outline">info</span>
                 {MEDICAL_DISCLAIMER}
               </p>
-              <span
-                className={`font-label-sm text-[11px] tabular-nums ${
-                  input.length > MESSAGE_MAX ? 'text-error font-bold' : 'text-on-surface-variant'
-                }`}
-              >
-                {input.length}/{MESSAGE_MAX}
-              </span>
             </div>
             {inputError && (
               <p role="alert" className="mt-1 px-1 font-label-sm text-xs text-error">
@@ -826,14 +1082,14 @@ export const ChatPage: React.FC = () => {
 
       {/* Hộp xác nhận xóa phiên */}
       <ConfirmDialog
-        show={confirmDelete}
-        title="Xóa phiên hội thoại?"
-        message="Phiên hội thoại và toàn bộ tin nhắn liên quan sẽ bị xóa vĩnh viễn. Các đánh giá câu trả lời đã gửi vẫn được lưu lại."
-        confirmLabel={del.isPending ? 'Đang xóa…' : 'Xóa phiên'}
+        show={sessionToDelete !== null}
+        title="Xóa cuộc trò chuyện?"
+        message={`Bạn có chắc muốn xóa cuộc trò chuyện "${sessionToDelete?.title}"? Toàn bộ tin nhắn liên quan sẽ bị xóa vĩnh viễn.`}
+        confirmLabel={del.isPending ? 'Đang xóa…' : 'Xóa'}
         danger
         loading={del.isPending}
         onConfirm={handleDeleteSession}
-        onCancel={() => setConfirmDelete(false)}
+        onCancel={() => setSessionToDelete(null)}
       />
     </div>
   );
