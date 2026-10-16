@@ -17,6 +17,9 @@ import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
 
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const HomePage = lazy(() => import('@/features/home/pages/HomePage'));
+const RecipeList = lazy(() => import('@/features/recipes/pages/RecipeList'));
+const RecipeDetail = lazy(() => import('@/features/recipes/pages/RecipeDetail'));
+const RecipeEditor = lazy(() => import('@/features/recipes/pages/RecipeEditor'));
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
@@ -44,6 +47,12 @@ const router = createBrowserRouter([
 
           // Trang chủ (SCR-10)
           { path: PATHS.HOME, element: <HomePage /> },
+
+          // Công thức (SCR-11 → SCR-13). Trang soạn mở cho cả Khách, guard theo từng nút (SCR-13).
+          // UNSPECIFIED: /recipes/:id/edit và /me/recipes (SCR-14) chờ Leader chốt API lấy công thức của tôi.
+          { path: PATHS.RECIPES.ROOT, element: <RecipeList /> },
+          { path: PATHS.RECIPES.NEW, element: <RecipeEditor /> },
+          { path: PATHS.RECIPES.DETAIL(':id'), element: <RecipeDetail /> },
 
           // Videos (SCR-21)
           { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
