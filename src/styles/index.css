@@ -289,6 +289,11 @@ ol {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   line-height: 1;
   user-select: none;
+  /* Giữ chỗ đúng 1 ô icon trước khi font tải xong: tên icon (chữ) không đẩy bố cục (CLS). */
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
 }
 
 /* Nút và liên kết dạng nút giữ một dòng từ 768px. */
