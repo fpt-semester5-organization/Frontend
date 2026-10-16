@@ -24,19 +24,53 @@ export const UserBubble: React.FC<{ m: ChatMessage }> = ({ m }) => {
   );
 };
 
+/** Chuyển đổi cú pháp markdown inline (**in đậm**, *in nghiêng*) thành JSX */
+function parseInlineMarkdown(text: string): React.ReactNode[] {
+  const tokens: React.ReactNode[] = [];
+  const regex = /(\*\*([^*\n]+?)\*\*|(?<!\*)\*(?!\s|\*)([^*\n]+?)(?<!\s|\*)\*(?!\*))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push(text.slice(lastIndex, match.index));
+    }
+    if (match[2]) {
+      tokens.push(
+        <strong key={`b-${match.index}`} className="font-semibold text-on-surface">
+          {match[2]}
+        </strong>
+      );
+    } else if (match[3]) {
+      tokens.push(
+        <em key={`i-${match.index}`} className="italic text-on-surface-variant">
+          {match[3]}
+        </em>
+      );
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    tokens.push(text.slice(lastIndex));
+  }
+
+  return tokens.length > 0 ? tokens : [text];
+}
+
 export const AssistantBubble: React.FC<{
   m: ChatMessage;
   sessionId: number;
   question: string;
 }> = ({ m, sessionId, question }) => {
   const sources = m.sources ?? [];
-  const segs = splitCitations(m.content, sources);
+  const lines = m.content.split('\n');
 
   return (
     <div className="flex max-w-[96%] items-start gap-3 self-start sm:max-w-[90%]">
       <div className="flex w-full flex-col gap-2">
         <div className="flex flex-col gap-4 rounded-2xl rounded-tl-none bg-surface-container-low p-5 text-on-surface shadow-sm">
-          {/* Header với trạng thái RAG */}
+          {/* Header */}
           <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2.5">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -45,45 +79,67 @@ export const AssistantBubble: React.FC<{
               <span className="font-label-md text-label-md font-bold text-on-surface">
                 Cố vấn Dinh dưỡng VeggieLife
               </span>
-              {m.ragUsed && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 font-label-sm text-[11px] font-semibold text-primary">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-                  </span>
-                  Đã kiểm chứng
-                </span>
-              )}
             </div>
             <span className="font-label-sm text-xs text-on-surface-variant font-mono">
               {formatDateTime(m.createdAt)}
             </span>
           </div>
 
-          {/* Nội dung tin nhắn có trích dẫn [S1]...[Sn] */}
-          <p className="whitespace-pre-wrap break-words font-body-md text-body-md leading-relaxed text-on-surface">
-            {segs.map((s, i) =>
-              s.kind === 'text' ? (
-                <span key={i}>{s.text}</span>
-              ) : s.source ? (
-                <a
-                  key={i}
-                  href={`#src-${m.messageId}-${s.index}`}
-                  title={s.source.title}
-                  className="mx-0.5 align-super font-label-sm text-xs font-bold text-secondary hover:underline"
+          {/* Nội dung tin nhắn có phân đoạn & trích dẫn [S1]...[Sn] */}
+          <div className="flex flex-col gap-2 font-body-md text-body-md leading-relaxed text-on-surface">
+            {lines.map((line, lineIdx) => {
+              if (!line.trim()) {
+                return <div key={lineIdx} className="h-1.5" />;
+              }
+
+              const isListItem = /^\s*(\d+\.|\*|-|•)\s/.test(line);
+              const unorderedBulletMatch = line.match(/^\s*(\*|-|•)\s+/);
+              // Lược bỏ ký tự bullet trần (*, -, •) ở đầu dòng để tránh nhiễu và hiển thị chấm tròn tinh gọn
+              const processedLine = unorderedBulletMatch ? line.slice(unorderedBulletMatch[0].length) : line;
+              const lineSegs = splitCitations(processedLine, sources);
+
+              return (
+                <div
+                  key={lineIdx}
+                  className={
+                    isListItem
+                      ? 'flex items-start gap-2 pl-3 py-1.5 my-1 rounded-r-lg border-l-2 border-primary/40 bg-surface-container-lowest/60'
+                      : 'leading-relaxed'
+                  }
                 >
-                  [S{s.index}]
-                </a>
-              ) : (
-                <span
-                  key={i}
-                  className="mx-0.5 align-super font-label-sm text-xs text-on-surface-variant"
-                >
-                  [S{s.index}]
-                </span>
-              )
-            )}
-          </p>
+                  {unorderedBulletMatch && (
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  )}
+                  <div className="flex-1">
+                    {lineSegs.map((s, i) =>
+                      s.kind === 'text' ? (
+                        <React.Fragment key={i}>
+                          {parseInlineMarkdown(s.text)}
+                        </React.Fragment>
+                      ) : s.source ? (
+                        <a
+                          key={i}
+                          href={`#src-${m.messageId}-${s.index}`}
+                          title={s.source.title}
+                          className="mx-0.5 inline-block align-super font-label-sm text-[11px] font-bold text-secondary hover:underline cursor-pointer"
+                        >
+                          [S{s.index}]
+                        </a>
+                      ) : (
+                        <span
+                          key={i}
+                          className="mx-0.5 inline-block align-super font-label-sm text-[11px] text-on-surface-variant"
+                        >
+                          [S{s.index}]
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
 
           {/* Gợi ý món ăn tương thích */}
           {m.recommendedRecipes && m.recommendedRecipes.length > 0 && (
