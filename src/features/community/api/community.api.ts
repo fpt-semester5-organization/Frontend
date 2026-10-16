@@ -1,6 +1,7 @@
 import http from '@/api/http';
 import type { ApiEnvelope, PageMeta } from '@/api/types';
 import type {
+  ContentRef,
   CreateCommentBody,
   CreatePostBody,
   CreateReportBody,
@@ -67,15 +68,17 @@ export async function uploadPostMedia(input: { file: File; postId: number; title
   return res.data;
 }
 
-/** GET /posts/{id}/comments — FN-COMM-01 Bình luận dạng cây, phân trang theo bình luận gốc. */
-export async function listPostComments(postId: number, params: { page: number; size: number }) {
-  const res = await http.get<ApiEnvelope<PostComment[]>>(`/posts/${postId}/comments`, { params });
+/** GET /posts/{id}/comments | /recipes/{id}/comments — FN-COMM-01 Bình luận dạng cây, phân trang theo bình luận gốc. */
+export async function listComments(target: ContentRef, params: { page: number; size: number }) {
+  const res = await http.get<ApiEnvelope<PostComment[]>>(`/${target.resource}/${target.id}/comments`, { params });
   return toPaged(res.data, params.size);
 }
 
-/** POST /posts/{id}/comments — FN-COMM-02 Bình luận / trả lời. */
-export async function createPostComment(postId: number, body: CreateCommentBody) {
-  const res = await http.post<ApiEnvelope<PostComment>>(`/posts/${postId}/comments`, body);
+/** POST /posts/{id}/comments | /recipes/{id}/comments — FN-COMM-02 Bình luận / trả lời. */
+export async function createComment(target: ContentRef, body: CreateCommentBody) {
+  // Bình luận gốc không gửi parentCommentId: phía công thức chỉ nhận số (không nhận null).
+  const payload = body.parentCommentId == null ? { content: body.content } : body;
+  const res = await http.post<ApiEnvelope<PostComment>>(`/${target.resource}/${target.id}/comments`, payload);
   return res.data;
 }
 
@@ -91,9 +94,9 @@ export async function deleteComment(commentId: number) {
   return res.data;
 }
 
-/** POST /posts/{id}/votes — FN-COMM-04 Thả tim / bỏ tim (gọi lần hai là bỏ tim). */
-export async function togglePostVote(postId: number) {
-  const res = await http.post<ApiEnvelope<VoteResult>>(`/posts/${postId}/votes`);
+/** POST /posts/{id}/votes | /recipes/{id}/votes — FN-COMM-04 Thả tim / bỏ tim (gọi lần hai là bỏ tim). */
+export async function toggleVote(target: ContentRef) {
+  const res = await http.post<ApiEnvelope<VoteResult>>(`/${target.resource}/${target.id}/votes`);
   return res.data;
 }
 

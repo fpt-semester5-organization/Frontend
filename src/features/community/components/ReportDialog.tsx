@@ -16,11 +16,12 @@ import {
   reportFormSchema,
   type ReportFormValues,
 } from '../types/community.schemas';
-import type { ReportTargetType } from '../types/community.types';
+import type { ContentRef, ReportTargetType } from '../types/community.types';
 
 interface ReportDialogProps {
   show: boolean;
-  postId: number;
+  /** Bài viết/công thức đang xem (để làm mới đúng dữ liệu sau khi báo cáo). */
+  content: ContentRef;
   target: { type: ReportTargetType; id: number } | null;
   onClose: () => void;
   /** Gọi sau khi báo cáo thành công: nội dung đích đã bị ẩn (BR-INT-REPORT-01). */
@@ -35,8 +36,8 @@ const TARGET_LABEL: Record<ReportTargetType, string> = {
 };
 
 /** Báo cáo vi phạm (FN-COMM-05): loại vi phạm + mô tả 10–500 ký tự. */
-export const ReportDialog: React.FC<ReportDialogProps> = ({ show, postId, target, onClose, onReported }) => {
-  const report = useCreateReport(postId);
+export const ReportDialog: React.FC<ReportDialogProps> = ({ show, content, target, onClose, onReported }) => {
+  const report = useCreateReport(content);
   const {
     register,
     handleSubmit,

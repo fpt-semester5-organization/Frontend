@@ -10,26 +10,29 @@ import { formatNumber } from '@/lib/format';
 import { notifyInfo, notifySuccess } from '@/lib/notify';
 import { useAuthStore } from '@/stores/auth.store';
 import { useCreateComment } from '../hooks/useCommentMutations';
-import { usePostComments } from '../hooks/usePostComments';
+import { useComments } from '../hooks/useComments';
 import { COMMENT_COOLDOWN_SECONDS } from '../types/community.schemas';
+import type { ContentRef } from '../types/community.types';
 import { CommentForm } from './CommentForm';
 import { CommentItem, type CommentThreadContext } from './CommentItem';
 import { ReportDialog } from './ReportDialog';
 
 interface CommentSectionProps {
-  postId: number;
-  postAuthorId: number;
+  /** Bài viết (/posts/{id}/comments) hoặc công thức (/recipes/{id}/comments). */
+  target: ContentRef;
+  /** Tác giả nội dung (nhãn "Tác giả" trên bình luận); null khi API không trả tác giả. */
+  authorId: number | null;
   commentCount: number;
-  /** memberActions.canComment của GET /posts/{id}. */
+  /** memberActions.canComment của GET /posts/{id} hoặc GET /recipes/{id}. */
   canComment: boolean;
 }
 
-/** Bình luận nhiều tầng của bài viết (FN-COMM-01, 02, 03) và báo cáo bình luận (FN-COMM-05). */
-export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuthorId, commentCount, canComment }) => {
+/** Bình luận nhiều tầng của bài viết/công thức (FN-COMM-01, 02, 03) và báo cáo bình luận (FN-COMM-05). */
+export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId, commentCount, canComment }) => {
   const { isMember, requireMember } = useRequireMember();
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
-  const comments = usePostComments(postId);
-  const createComment = useCreateComment(postId);
+  const comments = useComments(target);
+  const createComment = useCreateComment(target);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const cooldownSeconds = useCountdown(cooldownUntil);
   const [reportCommentId, setReportCommentId] = useState<number | null>(null);
@@ -56,8 +59,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuth
 
   const context: CommentThreadContext = useMemo(
     () => ({
-      postId,
-      postAuthorId,
+      target,
+      authorId,
       currentUserId,
       canComment,
       cooldownSeconds,
@@ -65,7 +68,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuth
       requireMember,
       onReport: setReportCommentId,
     }),
-    [postId, postAuthorId, currentUserId, canComment, cooldownSeconds, submitComment, requireMember]
+    [target, authorId, currentUserId, canComment, cooldownSeconds, submitComment, requireMember]
   );
 
   const items = comments.data?.pages.flatMap((page) => page.items) ?? [];
@@ -94,7 +97,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuth
         )}
         {isMember && !canComment && (
           <p className="py-space-xs text-center font-body-md text-body-md text-on-surface-variant">
-            Bài viết này hiện chưa nhận bình luận.
+            {target.resource === 'recipes' ? 'Công thức' : 'Bài viết'} này hiện chưa nhận bình luận.
           </p>
         )}
         {!isMember && (
@@ -168,7 +171,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, postAuth
 
       <ReportDialog
         show={reportCommentId !== null}
-        postId={postId}
+        content={target}
         target={reportCommentId !== null ? { type: 'COMMENT', id: reportCommentId } : null}
         onClose={() => setReportCommentId(null)}
       />

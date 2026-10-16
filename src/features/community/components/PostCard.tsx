@@ -69,7 +69,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(({ post, cl
         </Link>
       </div>
       <div className="mx-3 mb-3 flex items-center gap-1 border-t border-outline-variant/40 pt-1.5">
-        <VoteButton postId={post.postId} voteCount={post.voteCount} className="flex-1 justify-center bg-transparent" />
+        <VoteButton target={{ resource: 'posts', id: post.postId }} voteCount={post.voteCount} className="flex-1 justify-center bg-transparent" />
         <Link to={to} className={cn(ACTION, 'text-on-surface-variant')}>
           <Icon name="chat_bubble" className="text-[20px]" />
           Xem & bình luận
