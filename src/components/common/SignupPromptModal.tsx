@@ -10,21 +10,24 @@ import { useUiStore } from '@/stores/ui.store';
  * hoặc hết hạn mức dùng thử; giữ returnUrl để quay lại sau khi xác thực (BR-GUEST-AUTH-01, UI-5).
  */
 export const SignupPromptModal: React.FC = () => {
-  const { open, returnUrl } = useUiStore((state) => state.signupPrompt);
+  const { open, returnUrl, reason } = useUiStore((state) => state.signupPrompt);
   const close = useUiStore((state) => state.closeSignupPrompt);
+  // Khách đang xem bảng tin (BR-GUEST-01): chỉ là lời mời, vẫn xem tiếp được.
+  const browsing = reason === 'browse';
 
   return (
     <Modal show={open} onHide={close} bare size="sm" labelledBy="signup-prompt-title">
       <div className="flex flex-col items-center gap-space-md p-space-lg text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container text-on-primary">
-          <Icon name="lock_open" />
+          <Icon name={browsing ? 'favorite' : 'lock_open'} />
         </span>
         <h2 id="signup-prompt-title" className="font-headline-sm text-headline-sm text-primary">
-          Đăng ký để tiếp tục
+          {browsing ? 'Lưu lại những món bạn thích' : 'Đăng ký để tiếp tục'}
         </h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Tính năng này dành cho thành viên. Tạo tài khoản miễn phí để thả tim, bình luận, đăng bài và dùng các tính năng
-          dinh dưỡng cá nhân.
+          {browsing
+            ? 'Tạo tài khoản miễn phí để thả tim, bình luận và nhận thực đơn tuần hợp với thể trạng. Bạn vẫn có thể xem tiếp mà không cần đăng ký.'
+            : 'Tính năng này dành cho thành viên. Tạo tài khoản miễn phí để thả tim, bình luận, đăng bài và dùng các tính năng dinh dưỡng cá nhân.'}
         </p>
         <div className="flex w-full flex-col gap-space-sm">
           <Link
@@ -41,13 +44,23 @@ export const SignupPromptModal: React.FC = () => {
           >
             Tôi đã có tài khoản
           </Link>
-          <Link
-            to={PATHS.SUBSCRIPTION.PRICING}
-            onClick={close}
-            className="font-label-sm text-label-sm text-secondary no-underline hover:underline"
-          >
-            Xem quyền lợi gói VIP
-          </Link>
+          {browsing ? (
+            <button
+              type="button"
+              onClick={close}
+              className="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface hover:underline"
+            >
+              Để sau, tôi xem tiếp
+            </button>
+          ) : (
+            <Link
+              to={PATHS.SUBSCRIPTION.PRICING}
+              onClick={close}
+              className="font-label-sm text-label-sm text-secondary no-underline hover:underline"
+            >
+              Xem quyền lợi gói VIP
+            </Link>
+          )}
         </div>
       </div>
     </Modal>
