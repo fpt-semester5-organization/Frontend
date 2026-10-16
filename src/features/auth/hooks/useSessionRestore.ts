@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { refreshAccessToken } from '@/api/http';
+import { bootstrapGuestSession } from '@/api/session';
 import { useAuthStore } from '@/stores/auth.store';
 import { getCurrentUser } from '../api/auth.api';
 
@@ -24,7 +25,9 @@ export function useSessionRestore() {
       } catch {
         // Không có phiên (hoặc lấy hồ sơ lỗi): xóa token dở dang, coi là Khách.
         logout();
+        void bootstrapGuestSession();
       }
     })();
   }, []);
 }
+

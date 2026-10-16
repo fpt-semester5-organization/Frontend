@@ -50,6 +50,7 @@ export function useChatMessages(sessionId: number | null) {
     getNextPageParam: (last) => (last?.hasMore && last.oldestId ? last.oldestId : undefined),
     enabled: !!sessionId,
     retry: false,
+    staleTime: 60_000,
   });
 }
 
@@ -126,7 +127,11 @@ export function useDeleteSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteChatSession,
-    onSuccess: () => qc.invalidateQueries({ queryKey: chatKeys.sessions }),
+    onSuccess: (_data, sessionId) => {
+      qc.cancelQueries({ queryKey: chatKeys.messages(sessionId) });
+      qc.removeQueries({ queryKey: chatKeys.messages(sessionId) });
+      void qc.invalidateQueries({ queryKey: chatKeys.sessions });
+    },
   });
 }
 
