@@ -19,7 +19,8 @@ export interface ToastItem {
 
 export type Toast = ToastItem;
 
-export type SignupPromptReason = 'guest' | 'quota' | 'personalization';
+/** browse: Khách lướt tới mục thứ N của bảng tin (BR-GUEST-01), không phải bị chặn thao tác. */
+export type SignupPromptReason = 'guest' | 'quota' | 'personalization' | 'browse';
 
 interface UiState {
   toasts: ToastItem[];
