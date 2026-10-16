@@ -18,6 +18,7 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 window.scrollTo = () => {};
+window.HTMLElement.prototype.scrollIntoView = () => {};
 
 afterEach(() => {
   cleanup();
