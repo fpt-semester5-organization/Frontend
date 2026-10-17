@@ -16,6 +16,9 @@ import { api, currentUser, fail, isFlaggedByAi, isPositiveInt, latency, ok, unau
 import { isVisibleComment, toCommentDto } from './community.handlers';
 
 // Mô phỏng FN-POST-01..04, FN-POST-11, FN-COMM-01/02/04 cho công thức và FN-PROF-08 (docs/09. Task Cards).
+// UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt):
+//   GET /recipes?authorId=<người gọi>&status= trả mọi trạng thái trừ DELETED, mỗi mục kèm status (SCR-14);
+//   GET /recipes/{id} cho tác giả xem bản chưa duyệt, kèm authorId, status, categoryId, dietarySchoolId, difficultyLevel, isOptional.
 // Thử trạng thái lỗi khi dev:
 //   GET /recipes keyword "#loi-he-thong" → 500, "#redis-down" → 503; GET /recipes/5000 → 500.
 //   Gửi duyệt có tên món chứa "#ai-down" → 503 ERR_AI_CIRCUIT_OPEN; chứa "thịt bò"/"thịt heo" → 422 ERR_CONTENT_VIOLATION_VEGAN.
@@ -181,6 +184,9 @@ const applyBody = (recipe: MockRecipe, body: RecipeBody) => {
   }
 };
 
+/** Trạng thái lọc được ở Công thức của tôi (không có DELETED). */
+const OWN_STATUSES: MockRecipe['status'][] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED_ACTIVE', 'REJECTED', 'QUARANTINED_HIDDEN', 'ARCHIVED'];
+
 const savedMessage = (status: MockRecipe['status']) =>
   status === 'DRAFT' ? 'Đã lưu nháp.' : status === 'APPROVED_ACTIVE' ? 'Đã đăng công thức.' : 'Công thức đang chờ quản trị viên duyệt.';
 
@@ -224,6 +230,10 @@ export const recipesHandlers = [
     const sort = q.get('sort') ?? 'POPULAR';
     const page = Number(q.get('page') ?? 1);
     const size = Number(q.get('size') ?? 10);
+    const authorId = q.get('authorId');
+    const status = q.get('status');
+    const me = currentUser(request);
+    const ownList = me !== null && authorId !== null && Number(authorId) === me.userId;
 
     if (keyword === '#loi-he-thong') return fail(500, 'ERR_SYS_DATABASE_UNAVAILABLE', 'Không kết nối được cơ sở dữ liệu.');
     if (keyword === '#redis-down') return fail(503, 'ERR_SYS_REDIS_UNAVAILABLE', 'Dịch vụ tạm gián đoạn, vui lòng thử lại sau.');
@@ -239,9 +249,16 @@ export const recipesHandlers = [
     if (!['POPULAR', 'NEWEST'].includes(sort)) details.push({ field: 'sort', message: 'sort không hợp lệ.' });
     if (!isPositiveInt(page)) details.push({ field: 'page', message: 'page phải ≥ 1.' });
     if (!isPositiveInt(size) || size > 20) details.push({ field: 'size', message: 'size trong khoảng 1–20.' });
+    if (authorId !== null && !isPositiveInt(Number(authorId))) details.push({ field: 'authorId', message: 'authorId phải > 0.' });
+    if (status !== null && !OWN_STATUSES.includes(status as MockRecipe['status']))
+      details.push({ field: 'status', message: 'status không hợp lệ.' });
     if (details.length) return validationError(details);
 
-    let list = recipes.filter((recipe) => recipe.status === 'APPROVED_ACTIVE');
+    let list = ownList
+      ? recipes.filter((recipe) => recipe.authorId === me.userId && recipe.status !== 'DELETED')
+      : recipes.filter((recipe) => recipe.status === 'APPROVED_ACTIVE');
+    if (authorId !== null) list = list.filter((r) => r.authorId === Number(authorId));
+    if (status !== null) list = list.filter((r) => r.status === status);
     if (keyword) {
       const k = fold(keyword);
       list = list.filter((r) => fold(`${r.title} ${ingredientNames(r).join(' ')}`).includes(k));
@@ -258,9 +275,10 @@ export const recipesHandlers = [
       size,
       total: list.length,
       // BR-GUEST-01: chỉ Khách nhận vị trí mời đăng ký.
-      ...(currentUser(request) ? {} : { signUpPromptAtItem: 5 }),
+      ...(me ? {} : { signUpPromptAtItem: 5 }),
     };
-    return ok(list.slice((page - 1) * size, page * size).map(toListItem), 'OK', 200, meta);
+    const items = list.slice((page - 1) * size, page * size).map((r) => (ownList ? { ...toListItem(r), status: r.status } : toListItem(r)));
+    return ok(items, 'OK', 200, meta);
   }),
 
   // GET /recipes/{id} — FN-POST-02 (chỉ APPROVED_ACTIVE)
@@ -269,10 +287,17 @@ export const recipesHandlers = [
     if (params.id === '5000') return fail(500, 'ERR_SYS_DATABASE_UNAVAILABLE', 'Không kết nối được cơ sở dữ liệu.');
     if (!isPositiveInt(Number(params.id))) return validationError([{ field: 'id', message: 'id phải > 0.' }]);
     const recipe = findRecipe(params.id);
-    if (!isPublic(recipe)) return notFound();
-    const member = currentUser(request) !== null;
+    const me = currentUser(request);
+    const ownDraft = recipe !== undefined && me?.userId === recipe.authorId && recipe.status !== 'DELETED';
+    if (!recipe || (!isPublic(recipe) && !ownDraft)) return notFound();
+    const member = me !== null && isPublic(recipe);
     return ok({
       ...toListItem(recipe),
+      authorId: recipe.authorId,
+      status: recipe.status,
+      categoryId: recipe.categoryId,
+      dietarySchoolId: recipe.dietarySchoolId,
+      difficultyLevel: recipe.difficultyLevel,
       description: recipe.description,
       servings: recipe.servings,
       prepTimeMinutes: recipe.prepTimeMinutes,
@@ -282,6 +307,7 @@ export const recipesHandlers = [
         name: findIngredient(line.ingredientId)?.name ?? '',
         quantity: line.quantity,
         unit: line.unit,
+        isOptional: line.isOptional,
       })),
       hasTranscript: recipe.hasTranscript,
       commentCount: commentCount(recipe.recipeId),
@@ -439,6 +465,24 @@ export const recipesHandlers = [
     comments.push(comment);
     lastCommentAt.set(me.userId, Date.now());
     return ok(toCommentDto(comment, false), 'Đã bình luận.', 201);
+  }),
+
+  // DELETE /recipes/{id}?mode= — FN-POST-04: archive (chỉ bản đang công khai) = gỡ khỏi trang cá nhân; all = xóa mềm
+  http.delete(api('/recipes/:id'), async ({ request, params }) => {
+    await latency();
+    const me = currentUser(request);
+    if (!me) return unauthorized();
+    const mode = new URL(request.url).searchParams.get('mode');
+    if (mode !== 'archive' && mode !== 'all') return validationError([{ field: 'mode', message: 'mode là archive hoặc all.' }]);
+    const recipe = findRecipe(params.id);
+    if (!recipe || recipe.status === 'DELETED') return notFound();
+    if (recipe.authorId !== me.userId) return notOwner();
+    if (mode === 'archive' && recipe.status !== 'APPROVED_ACTIVE') return notFound();
+    recipe.status = mode === 'archive' ? 'ARCHIVED' : 'DELETED';
+    return ok(
+      { recipeId: recipe.recipeId, status: recipe.status },
+      mode === 'archive' ? 'Đã gỡ công thức khỏi trang cá nhân.' : 'Đã xóa công thức.'
+    );
   }),
 
   // POST /recipes/{id}/votes — FN-COMM-04 (bấm lần hai là bỏ tim)

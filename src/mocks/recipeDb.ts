@@ -182,7 +182,7 @@ const SEEDS: Seed[] = [
     ],
   },
   {
-    id: 516, title: 'Salad đậu hũ ngũ sắc', image: '2b6936ec9e', school: 'VEGAN', category: 5, times: [10, 15], servings: 2, level: 'EASY', kcal: 290, votes: 51, verified: true, days: 5,
+    id: 516, title: 'Salad đậu hũ ngũ sắc', image: '2b6936ec9e', school: 'VEGAN', category: 5, times: [10, 15], servings: 2, level: 'EASY', kcal: 290, votes: 51, verified: true, author: 1024, days: 5,
     description: 'Salad nhiều màu sắc, giàu đạm thực vật, sốt chanh mè nhẹ nhàng.',
     items: [['Đậu phụ', 200], ['Xà lách', 150], ['Cà chua', 150], ['Bắp cải tím', 100], ['Mè rang', 10], ['Chanh', 1, 'quả']],
     steps: ['Áp chảo đậu phụ, cắt khối nhỏ.', 'Rửa sạch rau, cắt vừa ăn; trộn với đậu phụ.', 'Vắt chanh, rắc mè rang và trộn đều trước khi ăn.'],
@@ -258,7 +258,7 @@ const SEEDS: Seed[] = [
     steps: ['Luộc chín tới bông cải, cà rốt, đậu bắp.', 'Đun nước tương, đường, tiêu lửa nhỏ đến khi sệt làm kho quẹt.', 'Chấm rau củ với kho quẹt khi còn ấm.'],
   },
   {
-    id: 527, title: 'Đậu hũ kho tiêu', image: '605416fa38', school: 'VEGAN', category: 2, times: [5, 30], servings: 2, level: 'EASY', kcal: 320, votes: 66, verified: true, days: 16,
+    id: 527, title: 'Đậu hũ kho tiêu', image: '605416fa38', school: 'VEGAN', category: 2, times: [5, 30], servings: 2, level: 'EASY', kcal: 320, votes: 66, verified: true, author: 1024, days: 16,
     description: 'Đậu hũ kho tiêu cay ấm, hợp với cơm trắng ngày mưa.',
     items: [['Đậu phụ', 300], ['Tiêu đen', 5], ['Nước tương', 30], ['Đường', 10]],
     steps: ['Chiên đậu phụ vàng.', 'Thắng đường thành màu cánh gián, thêm nước tương và chút nước.', 'Cho đậu vào kho lửa nhỏ 15 phút, rắc nhiều tiêu.'],
@@ -327,10 +327,23 @@ export const recipes: MockRecipe[] = SEEDS.map((seed) => ({
   createdAt: daysAgo(seed.days),
 }));
 
-// Công thức không công khai: GET /recipes/{id} trả 404 (chỉ APPROVED_ACTIVE).
+// Công thức chưa công khai của Nguyễn An (1024) để thử SCR-14 "Công thức của tôi" và trang sửa.
+// Người khác gọi GET /recipes/{id} nhận 404 (chỉ APPROVED_ACTIVE); tác giả xem được (giả định, xem recipes.handlers).
+const own = (base: MockRecipe, patch: Partial<MockRecipe>): MockRecipe => ({
+  ...base,
+  ingredients: base.ingredients.map((line) => ({ ...line })),
+  instructions: [...base.instructions],
+  authorId: 1024,
+  baseVotes: 0,
+  isVerified: false,
+  ...patch,
+});
 recipes.push(
-  { ...recipes[0], recipeId: 540, authorId: 1024, title: 'Bản nháp: cháo đậu xanh hạt sen', status: 'DRAFT', baseVotes: 0, createdAt: daysAgo(0.2) },
-  { ...recipes[1], recipeId: 541, authorId: 1024, title: 'Lẩu nấm bị báo cáo', status: 'QUARANTINED_HIDDEN', baseVotes: 0, createdAt: daysAgo(0.5) }
+  own(recipes[0], { recipeId: 540, title: 'Cháo đậu xanh hạt sen', status: 'DRAFT', imageUrl: null, createdAt: daysAgo(0.2), description: 'Đang viết dở, còn thiếu bước nấu.' }),
+  own(recipes[1], { recipeId: 541, title: 'Lẩu nấm thập cẩm', status: 'QUARANTINED_HIDDEN', createdAt: daysAgo(0.5) }),
+  own(recipes[2], { recipeId: 542, title: 'Bánh xèo chay nhân nấm', status: 'PENDING_REVIEW', createdAt: daysAgo(0.8) }),
+  own(recipes[3], { recipeId: 543, title: 'Chả lụa chay trứng muối', status: 'REJECTED', createdAt: daysAgo(1.5), description: 'Bị từ chối vì có trứng nhưng gắn nhãn Thuần chay.' }),
+  own(recipes[5], { recipeId: 544, title: 'Bún riêu chay nấm rơm', status: 'ARCHIVED', baseVotes: 12, createdAt: daysAgo(9) })
 );
 
 /** `${userId}:${recipeId}` của các lượt thả tim công thức trong phiên. */
