@@ -62,9 +62,11 @@ export interface MockPost {
   recipes: { recipeId: number; title: string }[];
 }
 
+/** Bình luận thuộc đúng một bài viết (postId) hoặc một công thức (recipeId). */
 export interface MockComment {
   commentId: number;
-  postId: number;
+  postId?: number;
+  recipeId?: number;
   authorId: number;
   parentCommentId: number | null;
   content: string;
@@ -223,6 +225,9 @@ export const comments: MockComment[] = [
   { commentId: 303, postId: 77, authorId: 3072, parentCommentId: 302, content: 'Mình góp thêm: nên ăn thêm đậu lăng để đủ sắt.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(3) },
   { commentId: 304, postId: 77, authorId: 3072, parentCommentId: null, content: 'Canh nấm đậu phụ rong biển là món mình nấu mỗi tuần.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(2) },
   { commentId: 305, postId: 78, authorId: 3072, parentCommentId: null, content: 'Thêm vài lát lê vào nồi nước dùng cũng rất ngọt.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(10) },
+  { commentId: 306, recipeId: 512, authorId: 1024, parentCommentId: null, content: 'Món này rất thanh đạm, cả nhà mình đều thích!', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(8) },
+  { commentId: 307, recipeId: 512, authorId: 3072, parentCommentId: 306, content: 'Thêm chút gừng đập dập lúc nấu nấm cũng rất thơm.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(6) },
+  { commentId: 308, recipeId: 513, authorId: 2048, parentCommentId: null, content: 'Kho niêu đất đúng là đậm vị hơn hẳn.', status: 'ACTIVE', isSoftDeleted: false, createdAt: hoursAgo(12) },
 ];
 
 // --- Video & bản phiên âm (SCR-21) ---
