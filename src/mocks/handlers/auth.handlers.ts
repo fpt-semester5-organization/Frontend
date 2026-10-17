@@ -1,5 +1,6 @@
 import { http } from 'msw';
 import { MOCK_PASSWORD, users } from '../db';
+import { meDto } from '../profileDb';
 import { api, currentUser, fail, latency, mockSession, ok, tokenFor, unauthorized } from '../utils';
 
 // Tối thiểu để thử luồng phiên đăng nhập: FN-AUTH-08, 09, 10 và FN-PROF-01.
@@ -48,17 +49,7 @@ export const authHandlers = [
     await latency();
     const user = currentUser(request);
     if (!user) return unauthorized();
-    return ok({
-      userId: user.userId,
-      fullName: user.fullName,
-      email: user.email,
-      phoneNumber: null,
-      avatarUrl: null,
-      role: user.role,
-      isVip: user.isVip,
-      health: null,
-      allergens: [],
-      restoreDeadline: null,
-    });
+    // Hồ sơ sức khỏe, dị ứng, SĐT, ảnh đại diện lấy từ profileDb (SCR-07..09).
+    return ok(meDto(user), 'Lấy hồ sơ thành công.');
   }),
 ];
