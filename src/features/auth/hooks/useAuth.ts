@@ -35,6 +35,18 @@ export const useLogin = () => {
   const after = useAfterLogin();
   return useMutation({ mutationFn: api.login, onSuccess: (r) => { toast.success('Đăng nhập thành công'); after(r); } });
 };
+
+export const useLoginWithGoogle = () => {
+  const after = useAfterLogin();
+  return useMutation({
+    mutationFn: api.loginWithGoogle,
+    onSuccess: (r) => {
+      toast.success(r.isNewAccount ? 'Đăng ký thành công bằng Google!' : 'Đăng nhập Google thành công!');
+      after(r);
+    },
+  });
+};
+
 export const useRegister = () => useMutation({ mutationFn: api.register });
 export const useVerifyOtp = () => {
   const after = useAfterLogin();

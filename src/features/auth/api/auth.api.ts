@@ -34,6 +34,21 @@ const mock = {
 export const login = (f: LoginForm) =>
   IS_MOCK ? mock.login(f) : unwrap<LoginResult>(http.post('/auth/login', f));
 
+export interface LoginWithGoogleRequest {
+  idToken: string;
+  currentPassword?: string;
+  guestUuid?: string;
+}
+
+export interface LoginWithGoogleResult extends LoginResult {
+  isNewAccount: boolean;
+}
+
+/** FN-AUTH-07: Đăng nhập hoặc đăng ký nhanh bằng Google OAuth */
+export const loginWithGoogle = (data: LoginWithGoogleRequest) =>
+  unwrap<LoginWithGoogleResult>(http.post('/auth/google', data));
+
+
 /** FN-AUTH-04 */
 export const register = async (f: RegisterForm): Promise<RegisterResult> => {
   if (IS_MOCK) {
