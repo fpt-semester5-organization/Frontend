@@ -1,4 +1,5 @@
-import type { HomeFilters, RecipeContentType, RecipeListParams, RecipeSort } from '../types/home.types';
+import type { RecipeContentType, RecipeListParams, RecipeSort } from '@/features/recipes/types/recipe.types';
+import type { HomeFilters } from '../types/home.types';
 
 /** Giới hạn của FN-POST-01: keyword 1–100 ký tự, maxCookTime 1–600 phút, size 1–20. */
 export const KEYWORD_MAX = 100;

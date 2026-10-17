@@ -5,7 +5,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { DIETARY_SCHOOL_LABEL, type DietarySchoolCode } from '@/constants/dietarySchools';
 import { cn } from '@/lib/cn';
 import { KEYWORD_MAX, QUICK_COOK_MINUTES } from '../lib/homeFilters';
-import type { DietarySchool, HomeFilters } from '../types/home.types';
+import type { DietarySchool } from '@/features/recipes/types/recipe.types';
+import type { HomeFilters } from '../types/home.types';
 
 /** Ba trường phái hiện sẵn thành chip (theo mockup SCR-10); trường phái khác chỉ hiện khi đang được chọn. */
 const FEATURED_SCHOOLS: DietarySchoolCode[] = ['VEGAN', 'LACTO_OVO', 'BUDDHIST'];

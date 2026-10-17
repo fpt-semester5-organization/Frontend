@@ -1,17 +1,13 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { toApiError } from '@/lib/apiError';
-import { listDietarySchools, listRecipes } from '../api/home.api';
-import type { RecipeListParams } from '../types/home.types';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { listRecipes } from '@/features/recipes/api/recipes.api';
+import { recipeKeys } from '@/features/recipes/hooks/recipeKeys';
+import { retryServerErrorsOnce } from '@/features/recipes/hooks/useRecipes';
+import type { RecipeListParams } from '@/features/recipes/types/recipe.types';
 
 export const homeKeys = {
-  all: ['home'] as const,
-  recipeFeed: (params: Omit<RecipeListParams, 'page'>) => [...homeKeys.all, 'recipes', params] as const,
-  dietarySchools: () => ['master', 'dietary-schools'] as const,
+  /** Nằm dưới recipeKeys.lists() để thả tim, đăng công thức cũng làm mới bảng tin. */
+  recipeFeed: (params: Omit<RecipeListParams, 'page'>) => [...recipeKeys.lists(), 'home-feed', params] as const,
 };
-
-/** Không thử lại lỗi 4xx; 5xx thử lại 1 lần. */
-const retryServerErrorsOnce = (failureCount: number, error: unknown) =>
-  failureCount < 1 && toApiError(error).status >= 500;
 
 /** Bảng tin công thức & video, tải thêm theo trang (FN-POST-01). */
 export function useRecipeFeed(params: Omit<RecipeListParams, 'page'>) {
@@ -24,16 +20,6 @@ export function useRecipeFeed(params: Omit<RecipeListParams, 'page'>) {
       return page * size < total ? page + 1 : undefined;
     },
     staleTime: 60 * 1000,
-    retry: retryServerErrorsOnce,
-  });
-}
-
-/** 07 trường phái cho chip lọc; danh mục ít đổi nên giữ lâu (server cache 1 giờ). */
-export function useDietarySchools() {
-  return useQuery({
-    queryKey: homeKeys.dietarySchools(),
-    queryFn: listDietarySchools,
-    staleTime: 60 * 60 * 1000,
     retry: retryServerErrorsOnce,
   });
 }

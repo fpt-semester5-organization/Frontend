@@ -10,17 +10,19 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { usePostList } from '@/features/community/hooks/usePosts';
+import { RecipeCard, RecipeCardSkeleton } from '@/features/recipes/components/RecipeCard';
+import { useBrowsePrompt } from '@/features/recipes/hooks/useBrowsePrompt';
+import { useDietarySchools } from '@/features/recipes/hooks/useRecipes';
+import type { RecipeContentType, RecipeSort } from '@/features/recipes/types/recipe.types';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { PATHS } from '@/routes/paths';
 import { HomeHero } from '../components/HomeHero';
 import { HomePostCard, HomePostSkeleton } from '../components/HomePostCard';
-import { RecipeFeedCard, RecipeFeedSkeleton } from '../components/RecipeFeedCard';
 import { TrialCards } from '../components/TrialCards';
-import { useBrowsePrompt } from '../hooks/useBrowsePrompt';
-import { useDietarySchools, useRecipeFeed } from '../hooks/useHomeFeed';
+import { useRecipeFeed } from '../hooks/useHomeFeed';
 import { DEFAULT_FILTERS, hasActiveFilters, parseFilters, serializeFilters, toRecipeParams } from '../lib/homeFilters';
-import type { HomeFilters, RecipeContentType, RecipeSort } from '../types/home.types';
+import type { HomeFilters } from '../types/home.types';
 
 const CONTENT_TABS: { value: RecipeContentType; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' },
@@ -118,7 +120,7 @@ const HomePage: React.FC = () => {
 
           {feed.isPending ? (
             <div className="grid gap-space-md sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label="Đang tải công thức">
-              <RecipeFeedSkeleton count={6} />
+              <RecipeCardSkeleton count={6} />
             </div>
           ) : feed.isError && items.length === 0 ? (
             <ErrorState error={feed.error} onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
@@ -150,13 +152,13 @@ const HomePage: React.FC = () => {
                 aria-busy={refreshing || undefined}
               >
                 {items.map((item, index) => (
-                  <RecipeFeedCard
+                  <RecipeCard
                     key={`${item.type}-${item.recipeId}`}
                     item={item}
                     ref={index === promptIndex ? promptRef : undefined}
                   />
                 ))}
-                {feed.isFetchingNextPage && <RecipeFeedSkeleton count={3} />}
+                {feed.isFetchingNextPage && <RecipeCardSkeleton count={3} />}
               </div>
               {feed.isFetchNextPageError && (
                 <p role="alert" className="flex flex-wrap items-center justify-center gap-2 font-body-sm text-body-sm text-error">
