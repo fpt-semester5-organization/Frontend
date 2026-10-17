@@ -91,34 +91,11 @@ describe('Profile (SCR-07)', () => {
     expect(await screen.findByText('Tệp > 5 MB.')).toBeInTheDocument();
   });
 
-  it('vô hiệu hóa tài khoản: thiếu hoặc sai mật khẩu báo tại ô; đúng thì về trang chủ và đăng xuất', async () => {
-    let attempts = 0;
-    const calls = mockProfileApi((req) => {
-      if (req.method !== 'DELETE') return undefined;
-      attempts++;
-      return attempts === 1
-        ? { status: 401, errorCode: 'ERR_AUTH_INVALID_CREDENTIALS', message: 'Mật khẩu xác nhận không đúng.' }
-        : { message: 'Tài khoản đã được vô hiệu hóa. Bạn có 30 ngày để khôi phục.', data: { restoreDeadline: '2026-11-16T16:59:59Z' } };
-    });
+  it('Backend chưa có DELETE /users/me: nút vô hiệu hóa bị khóa, kèm ghi chú', async () => {
+    mockProfileApi();
     renderProfile();
-    await userEvent.click(await screen.findByRole('button', { name: 'Vô hiệu hóa tài khoản' }));
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Vô hiệu hóa' }));
-    expect(within(dialog).getByText('Nhập mật khẩu để xác nhận.')).toBeInTheDocument();
-    expect(writes(calls)).toHaveLength(0);
-
-    await userEvent.type(within(dialog).getByLabelText(/Mật khẩu/), 'sai');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Vô hiệu hóa' }));
-    expect(await within(dialog).findByText('Mật khẩu xác nhận không đúng.')).toBeInTheDocument();
-    expect(useAuthStore.getState().isAuthenticated).toBe(true);
-
-    await userEvent.clear(within(dialog).getByLabelText(/Mật khẩu/));
-    await userEvent.type(within(dialog).getByLabelText(/Mật khẩu/), 'dung-mat-khau');
-    await userEvent.type(within(dialog).getByLabelText(/Lý do/), 'Tạm nghỉ');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Vô hiệu hóa' }));
-    expect(await screen.findByText('Trang chủ')).toBeInTheDocument();
-    await waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false));
-    expect(writes(calls)[1]).toMatchObject({ method: 'DELETE', url: '/users/me', body: { confirmPassword: 'dung-mat-khau', reason: 'Tạm nghỉ' } });
-    expect(toastMessages().at(-1)).toMatch(/Hạn khôi phục: 16\/11\/2026/);
+    const button = await screen.findByRole('button', { name: 'Vô hiệu hóa tài khoản' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('Chức năng đang được phát triển, bạn chưa thể vô hiệu hóa tài khoản lúc này.');
   });
 });

@@ -5,11 +5,10 @@ import {
   listCategories,
   listDietarySchools,
   listIngredients,
-  listMyRecipes,
   listRecipes,
   listRelatedRecipes,
 } from '../api/recipes.api';
-import type { Ingredient, MyRecipeListParams, RecipeIngredientLine, RecipeListParams } from '../types/recipe.types';
+import type { Ingredient, RecipeIngredientLine, RecipeListParams } from '../types/recipe.types';
 import { masterKeys, recipeKeys } from './recipeKeys';
 
 /** Không thử lại lỗi 4xx; 5xx thử lại 1 lần. */
@@ -23,18 +22,6 @@ export function useRecipeList(params: RecipeListParams) {
     queryFn: () => listRecipes(params),
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
-    retry: retryServerErrorsOnce,
-  });
-}
-
-/** Công thức của tôi (SCR-14): chỉ gọi khi đã đăng nhập. */
-export function useMyRecipes(params: MyRecipeListParams, enabled: boolean) {
-  return useQuery({
-    queryKey: recipeKeys.mine(params),
-    queryFn: () => listMyRecipes(params),
-    enabled: enabled && params.authorId > 0,
-    placeholderData: keepPreviousData,
-    staleTime: 15 * 1000,
     retry: retryServerErrorsOnce,
   });
 }

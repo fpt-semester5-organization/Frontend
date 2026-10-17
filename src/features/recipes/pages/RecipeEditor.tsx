@@ -238,8 +238,8 @@ const RecipeEditor: React.FC = () => {
         </Link>
         <span className="text-outline-variant">/</span>
         {isEdit ? (
-          <Link to={PATHS.ME.RECIPES} className="text-on-surface-variant no-underline hover:text-primary">
-            Công thức của tôi
+          <Link to={PATHS.ME.CONTENT('recipes')} className="text-on-surface-variant no-underline hover:text-primary">
+            Nội dung của tôi
           </Link>
         ) : (
           <Link to={PATHS.RECIPES.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
@@ -273,8 +273,8 @@ const RecipeEditor: React.FC = () => {
         className="rounded-2xl bg-surface-container-lowest shadow-card"
         action={
           <>
-            <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
-              Xem công thức của tôi
+            <Link to={PATHS.ME.CONTENT('recipes')} className={PRIMARY_LINK}>
+              Xem nội dung của tôi
             </Link>
             <Button variant="outline" onClick={startOver}>
               Soạn công thức khác
@@ -312,8 +312,8 @@ const RecipeEditor: React.FC = () => {
             title="Không tìm thấy công thức"
             description="Công thức không tồn tại hoặc đã bị xóa."
             action={
-              <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
-                Về công thức của tôi
+              <Link to={PATHS.ME.CONTENT('recipes')} className={PRIMARY_LINK}>
+                Về nội dung của tôi
               </Link>
             }
           />
@@ -339,8 +339,8 @@ const RecipeEditor: React.FC = () => {
           title={editStatus === 'ARCHIVED' ? 'Công thức đã gỡ' : 'Công thức đang bị khóa'}
           description={RECIPE_STATUS_META[editStatus].hint}
           action={
-            <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
-              Về công thức của tôi
+            <Link to={PATHS.ME.CONTENT('recipes')} className={PRIMARY_LINK}>
+              Về nội dung của tôi
             </Link>
           }
         />
@@ -360,8 +360,8 @@ const RecipeEditor: React.FC = () => {
         <p role="status" className="flex flex-wrap items-center gap-1.5 rounded-lg bg-surface-container px-3 py-2 font-label-md text-label-md text-on-surface">
           <Icon name="draft" className="text-[18px] text-outline" />
           Bản nháp · đã lưu lúc {timeFormatter.format(savedAt)}
-          <Link to={PATHS.ME.RECIPES} className="ml-auto font-label-sm text-label-sm text-primary">
-            Công thức của tôi
+          <Link to={PATHS.ME.CONTENT('recipes')} className="ml-auto font-label-sm text-label-sm text-primary">
+            Nội dung của tôi
           </Link>
         </p>
       )}
@@ -376,7 +376,7 @@ const RecipeEditor: React.FC = () => {
         defaultValues={isEdit && editDefaults ? editDefaults : EMPTY_RECIPE_FORM}
         submitting={submitting}
         lockedSeconds={lockedSeconds}
-        cancelTo={isEdit ? PATHS.ME.RECIPES : PATHS.RECIPES.ROOT}
+        cancelTo={isEdit ? PATHS.ME.CONTENT('recipes') : PATHS.RECIPES.ROOT}
         onSubmit={handleSubmit}
         statusNote={statusNote}
         alert={

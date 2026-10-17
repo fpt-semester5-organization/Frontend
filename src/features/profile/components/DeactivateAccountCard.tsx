@@ -17,11 +17,17 @@ import { useDeleteAccount } from '../hooks/useProfile';
 import { REASON_MAX, deleteAccountSchema, type DeleteAccountValues } from '../types/profile.schemas';
 
 /**
+ * Backend (develop, 17/10/2026) chưa có DELETE /users/me (trả 405) nên thẻ hiện nhưng khóa nút.
+ * Đổi thành true khi Backend làm xong FN-PROF-07.
+ */
+const DEACTIVATION_AVAILABLE = false;
+
+/**
  * Vô hiệu hóa tài khoản (SCR-07, FN-PROF-07): SOFT_DELETED, có 30 ngày để khôi phục bằng cách đăng nhập lại.
  * UNSPECIFIED: tài khoản chỉ dùng Google cần googleIdToken thay mật khẩu, nhưng GET /users/me không cho biết cách đăng nhập
  * của tài khoản; hiện chỉ hỗ trợ xác nhận bằng mật khẩu (người dùng chọn 17/10/2026).
  */
-export const DeactivateAccountCard: React.FC = () => {
+export const DeactivateAccountCard: React.FC<{ available?: boolean }> = ({ available = DEACTIVATION_AVAILABLE }) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -83,9 +89,20 @@ export const DeactivateAccountCard: React.FC = () => {
       <p className="font-body-sm text-body-sm text-on-surface-variant">
         Tài khoản bị khóa ngay và mọi phiên đăng nhập kết thúc. Trong 30 ngày, đăng nhập lại để khôi phục; quá hạn dữ liệu cá nhân sẽ bị ẩn danh hóa.
       </p>
-      <Button variant="secondary" className="w-fit text-error" onClick={() => setOpen(true)}>
+      <Button
+        variant="secondary"
+        className="w-fit text-error"
+        disabled={!available}
+        aria-describedby={available ? undefined : 'deactivate-unavailable'}
+        onClick={() => setOpen(true)}
+      >
         Vô hiệu hóa tài khoản
       </Button>
+      {!available && (
+        <p id="deactivate-unavailable" className="font-label-sm text-label-sm text-outline">
+          Chức năng đang được phát triển, bạn chưa thể vô hiệu hóa tài khoản lúc này.
+        </p>
+      )}
 
       <Modal show={open} onHide={close} title="Vô hiệu hóa tài khoản?" size="sm" locked={remove.isPending}>
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-space-md p-space-lg">

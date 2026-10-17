@@ -51,7 +51,7 @@ const ScanHistory: React.FC = () => {
     }
     if (history.isError) return <ErrorState error={history.error} onRetry={() => history.refetch()} retrying={history.isRefetching} />;
 
-    const items = history.data.data;
+    const { items, meta } = history.data;
     if (items.length === 0) {
       return filtered ? (
         <EmptyState
@@ -126,7 +126,7 @@ const ScanHistory: React.FC = () => {
           className="mt-space-lg"
           page={page}
           size={PAGE_SIZE}
-          total={history.data.meta?.total ?? items.length}
+          total={meta.total}
           onPageChange={(next) => updateParams({ page: String(next) })}
         />
       </>

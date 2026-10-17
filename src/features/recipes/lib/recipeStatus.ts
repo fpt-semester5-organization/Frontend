@@ -1,6 +1,6 @@
 import type { MyRecipeStatus, RecipeStatus } from '../types/recipe.types';
 
-/** Nhãn hiển thị cho vòng đời công thức (BR-ADM-CNT-001), dùng ở Công thức của tôi, trang chi tiết và trang sửa. */
+/** Nhãn hiển thị cho vòng đời công thức (BR-ADM-CNT-001), dùng ở trang chi tiết và trang sửa. */
 export const RECIPE_STATUS_META: Record<MyRecipeStatus, { label: string; icon: string; className: string; hint: string }> = {
   APPROVED_ACTIVE: {
     label: 'Đã đăng',
@@ -39,12 +39,6 @@ export const RECIPE_STATUS_META: Record<MyRecipeStatus, { label: string; icon: s
     hint: 'Đã gỡ khỏi trang cá nhân và kho công thức.',
   },
 };
-
-/** Thứ tự tab lọc trên trang Công thức của tôi. */
-export const MY_RECIPE_STATUSES: MyRecipeStatus[] = ['APPROVED_ACTIVE', 'DRAFT', 'PENDING_REVIEW', 'REJECTED', 'QUARANTINED_HIDDEN', 'ARCHIVED'];
-
-export const isMyRecipeStatus = (value: string | null | undefined): value is MyRecipeStatus =>
-  !!value && (MY_RECIPE_STATUSES as string[]).includes(value);
 
 /** QUARANTINED_HIDDEN trả 409 ERR_RECIPE_LOCKED; ARCHIVED/DELETED trả 404 khi PUT (FN-POST-04). */
 export const canEditRecipe = (status: RecipeStatus | undefined) =>

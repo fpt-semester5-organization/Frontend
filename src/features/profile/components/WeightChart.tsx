@@ -18,7 +18,8 @@ const shortDate = (iso: string) => {
 
 /** Biểu đồ đường cân nặng theo ngày (SVG, không cần thư viện); đường gạch là cân nặng mục tiêu. */
 export const WeightChart: React.FC<WeightChartProps> = ({ entries, targetWeightKg }) => {
-  const points = [...entries].sort((a, b) => a.loggedDate.localeCompare(b.loggedDate));
+  // Backend trả mới nhất trước; nhiều mốc cùng ngày thì logId lớn hơn là mốc ghi sau.
+  const points = [...entries].sort((a, b) => a.loggedDate.localeCompare(b.loggedDate) || a.logId - b.logId);
   if (points.length < 2) return null;
 
   const values = points.map((p) => p.weightKg).concat(targetWeightKg !== null ? [targetWeightKg] : []);

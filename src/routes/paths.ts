@@ -16,6 +16,12 @@ export const PATHS = {
     PROFILE: '/me',
     HEALTH: '/me/health',
     DIETARY_PREFERENCES: '/me/dietary-preferences',
+    /**
+     * "Nội dung của tôi": gộp SCR-14 (Công thức của tôi) và SCR-28 (Bài viết của tôi) theo thống nhất với Leader 17/10/2026.
+     * Tab mặc định là bài viết.
+     */
+    CONTENT: (tab?: 'posts' | 'recipes') => (tab === 'recipes' ? '/me/content?tab=recipes' : '/me/content'),
+    /** Route cũ của SCR-14 và SCR-28, nay chuyển hướng về CONTENT. */
     RECIPES: '/me/recipes',
     POSTS: '/me/posts',
     SUBSCRIPTION: '/me/subscription',

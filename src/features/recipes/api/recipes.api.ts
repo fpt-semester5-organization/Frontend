@@ -8,8 +8,6 @@ import type {
   FoodCategory,
   Ingredient,
   IngredientListParams,
-  MyRecipeItem,
-  MyRecipeListParams,
   RecipeDetail,
   RecipeListItem,
   RecipeListParams,
@@ -28,15 +26,6 @@ const toPaged = <T>(envelope: ApiEnvelope<T[]>, fallback: { page?: number; size?
 /** GET /recipes — FN-POST-01 Tìm kiếm & lọc công thức, video công khai. Khách có thêm meta.signUpPromptAtItem. */
 export async function listRecipes(params: RecipeListParams): Promise<Paged<RecipeListItem>> {
   const res = await http.get<ApiEnvelope<RecipeListItem[]>>('/recipes', { params });
-  return toPaged(res.data, params);
-}
-
-/**
- * GET /recipes?authorId=<tôi> — SCR-14 Công thức của tôi.
- * UNSPECIFIED: authorId/status và trường status trong từng mục là giả định chờ Leader chốt (xem recipe.types).
- */
-export async function listMyRecipes(params: MyRecipeListParams): Promise<Paged<MyRecipeItem>> {
-  const res = await http.get<ApiEnvelope<MyRecipeItem[]>>('/recipes', { params });
   return toPaged(res.data, params);
 }
 
