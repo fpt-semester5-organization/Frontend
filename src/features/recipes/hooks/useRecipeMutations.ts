@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createRecipe, updateRecipe, uploadRecipeMedia } from '../api/recipes.api';
-import type { CreateRecipeBody, UpdateRecipeBody } from '../types/recipe.types';
+import { createRecipe, deleteRecipe, updateRecipe, uploadRecipeMedia } from '../api/recipes.api';
+import type { CreateRecipeBody, DeleteRecipeMode, UpdateRecipeBody } from '../types/recipe.types';
 import { recipeKeys } from './recipeKeys';
 
 export function useCreateRecipe() {
@@ -28,6 +28,18 @@ export function useUploadRecipeMedia() {
     mutationFn: uploadRecipeMedia,
     onSuccess: (_res, { recipeId }) => {
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
+    },
+  });
+}
+
+/** Gỡ khỏi trang cá nhân (archive) hoặc xóa mềm với tất cả (all) — FN-POST-04. */
+export function useDeleteRecipe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipeId, mode }: { recipeId: number; mode: DeleteRecipeMode }) => deleteRecipe(recipeId, mode),
+    onSuccess: (_res, { recipeId }) => {
+      queryClient.removeQueries({ queryKey: recipeKeys.detail(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
     },
   });

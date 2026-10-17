@@ -2,10 +2,14 @@ import http from '@/api/http';
 import type { ApiEnvelope, Paged } from '@/api/types';
 import type {
   CreateRecipeBody,
+  DeleteRecipeMode,
+  DeleteRecipeResult,
   DietarySchool,
   FoodCategory,
   Ingredient,
   IngredientListParams,
+  MyRecipeItem,
+  MyRecipeListParams,
   RecipeDetail,
   RecipeListItem,
   RecipeListParams,
@@ -24,6 +28,15 @@ const toPaged = <T>(envelope: ApiEnvelope<T[]>, fallback: { page?: number; size?
 /** GET /recipes — FN-POST-01 Tìm kiếm & lọc công thức, video công khai. Khách có thêm meta.signUpPromptAtItem. */
 export async function listRecipes(params: RecipeListParams): Promise<Paged<RecipeListItem>> {
   const res = await http.get<ApiEnvelope<RecipeListItem[]>>('/recipes', { params });
+  return toPaged(res.data, params);
+}
+
+/**
+ * GET /recipes?authorId=<tôi> — SCR-14 Công thức của tôi.
+ * UNSPECIFIED: authorId/status và trường status trong từng mục là giả định chờ Leader chốt (xem recipe.types).
+ */
+export async function listMyRecipes(params: MyRecipeListParams): Promise<Paged<MyRecipeItem>> {
+  const res = await http.get<ApiEnvelope<MyRecipeItem[]>>('/recipes', { params });
   return toPaged(res.data, params);
 }
 
@@ -85,5 +98,11 @@ export async function uploadRecipeMedia(input: { file: File; recipeId: number })
   form.append('file', input.file);
   form.append('recipeId', String(input.recipeId));
   const res = await http.post<ApiEnvelope<UploadMediaResult>>('/videos', form, { timeout: 120000 });
+  return res.data;
+}
+
+/** DELETE /recipes/{id}?mode= — FN-POST-04: archive = gỡ khỏi trang cá nhân; all = xóa mềm với tất cả. */
+export async function deleteRecipe(id: number, mode: DeleteRecipeMode) {
+  const res = await http.delete<ApiEnvelope<DeleteRecipeResult>>(`/recipes/${id}`, { params: { mode } });
   return res.data;
 }

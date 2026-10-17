@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
+import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { dietarySchoolLabel } from '@/constants/dietarySchools';
@@ -18,9 +19,11 @@ import { useRequireMember } from '@/hooks/useRequireMember';
 import { toApiError } from '@/lib/apiError';
 import { formatNumber } from '@/lib/format';
 import { PATHS } from '@/routes/paths';
+import { useAuthStore } from '@/stores/auth.store';
 import { RelatedRecipes } from '../components/RelatedRecipes';
+import { RECIPE_STATUS_META, canEditRecipe } from '../lib/recipeStatus';
 import { useRecipe } from '../hooks/useRecipes';
-import type { RecipeDetail as RecipeDetailData } from '../types/recipe.types';
+import type { MyRecipeStatus, RecipeDetail as RecipeDetailData } from '../types/recipe.types';
 
 const PAGE = 'mx-auto flex w-full max-w-[1100px] flex-col gap-space-xl px-margin-mobile py-space-lg sm:px-margin';
 const CARD = 'rounded-2xl bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl';
@@ -62,6 +65,7 @@ const RecipeDetail: React.FC = () => {
   const validId = Number.isInteger(recipeId) && recipeId > 0;
   const navigate = useNavigate();
   const { isMember, requireMember } = useRequireMember();
+  const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
   const recipe = useRecipe(recipeId);
   const target = useMemo<ContentRef>(() => ({ resource: 'recipes', id: recipeId }), [recipeId]);
   const [reportOpen, setReportOpen] = useState(false);
@@ -95,7 +99,11 @@ const RecipeDetail: React.FC = () => {
   const school = dietarySchoolLabel(data.dietarySchool);
   const kcal = Number.isFinite(data.caloriesKcal) && data.caloriesKcal > 0 ? `${formatNumber(Math.round(data.caloriesKcal))} kcal` : null;
   const minutes = (value: number | null) => (value !== null && value >= 0 ? `${value} phút` : null);
-  const canReport = !isMember || data.memberActions.canReport;
+  // UNSPECIFIED (giả định 17/10/2026): authorId/status chỉ có khi API trả thêm trường cho tác giả (RecipeOwnerFields).
+  const isOwner = data.authorId !== undefined && data.authorId === currentUserId;
+  const status = (data.status ?? 'APPROVED_ACTIVE') as MyRecipeStatus;
+  const isPublic = status === 'APPROVED_ACTIVE';
+  const canReport = isPublic && !isOwner && (!isMember || data.memberActions.canReport);
 
   return (
     <div className={PAGE}>
@@ -113,6 +121,17 @@ const RecipeDetail: React.FC = () => {
           {data.title}
         </span>
       </nav>
+
+      {!isPublic && (
+        <FormAlert tone="info" title={`${RECIPE_STATUS_META[status].label} · chỉ bạn xem được`}>
+          {RECIPE_STATUS_META[status].hint}{' '}
+          {isOwner && canEditRecipe(status) && (
+            <Link to={PATHS.RECIPES.EDIT(recipeId)} className="font-label-md text-label-md text-primary">
+              {status === 'DRAFT' ? 'Tiếp tục chỉnh sửa' : 'Sửa công thức'}
+            </Link>
+          )}
+        </FormAlert>
+      )}
 
       <article className="flex flex-col gap-space-xl">
         <header className="grid items-start gap-space-lg lg:grid-cols-2 lg:gap-space-xl">
@@ -168,11 +187,21 @@ const RecipeDetail: React.FC = () => {
             </dl>
 
             <div className="flex flex-wrap items-center gap-space-sm">
-              <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
-              <a href="#comments" className={ACTION}>
-                <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
-                {formatNumber(data.commentCount)} bình luận
-              </a>
+              {isPublic && (
+                <>
+                  <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
+                  <a href="#comments" className={ACTION}>
+                    <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
+                    {formatNumber(data.commentCount)} bình luận
+                  </a>
+                </>
+              )}
+              {isOwner && canEditRecipe(status) && (
+                <Link to={PATHS.RECIPES.EDIT(recipeId)} className={`${ACTION} text-primary`}>
+                  <Icon name="edit" className="text-[20px]" />
+                  Sửa công thức
+                </Link>
+              )}
               {canReport && (
                 <button
                   type="button"
@@ -239,10 +268,18 @@ const RecipeDetail: React.FC = () => {
         </div>
       </article>
 
-      <RelatedRecipes recipeId={recipeId} />
-
-      {/* UNSPECIFIED: GET /recipes/{id} không trả tác giả nên chưa gắn nhãn "Tác giả" cho bình luận của người đăng. */}
-      <CommentSection target={target} authorId={null} commentCount={data.commentCount} canComment={data.memberActions.canComment} />
+      {/* Bản chưa công khai (tác giả tự xem) không có gợi ý liên quan, bình luận, thả tim (chỉ cho APPROVED_ACTIVE). */}
+      {isPublic && (
+        <>
+          <RelatedRecipes recipeId={recipeId} />
+          <CommentSection
+            target={target}
+            authorId={data.authorId ?? null}
+            commentCount={data.commentCount}
+            canComment={data.memberActions.canComment}
+          />
+        </>
+      )}
 
       <ReportDialog
         show={reportOpen}

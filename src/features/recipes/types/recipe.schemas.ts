@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CreateRecipeBody, DietarySchool, DifficultyLevel, Ingredient } from './recipe.types';
+import type { CreateRecipeBody, DietarySchool, DifficultyLevel, Ingredient, RecipeDetail, UpdateRecipeBody } from './recipe.types';
 
 // Luật validate lấy đúng cột "Validate" của SCR-13 (UI Screen Specification) và cấu trúc bắt buộc BR-USR-05.
 
@@ -109,6 +109,58 @@ export function toRecipeBody(values: RecipeFormValues, submit: boolean): CreateR
       ...(row.isOptional ? { isOptional: true } : {}),
     })),
     submit,
+  };
+}
+
+/**
+ * PUT /recipes/{id}: chỉ gửi trường đã sửa (đổi trường phái/nguyên liệu mới phải kiểm duyệt lại, FN-POST-04).
+ * `submit` chỉ dùng cho bản DRAFT/REJECTED. Ô số tùy chọn bị xóa trống thì không gửi (OpenAPI không nhận null).
+ */
+export function toUpdateBody(
+  values: RecipeFormValues,
+  dirty: Partial<Record<keyof RecipeFormValues, unknown>>,
+  submit?: boolean
+): UpdateRecipeBody {
+  const full = toRecipeBody(values, false);
+  const body: UpdateRecipeBody = {};
+  if (dirty.title) body.title = full.title;
+  if (dirty.categoryId) body.categoryId = full.categoryId;
+  if (dirty.dietarySchoolId) body.dietarySchoolId = full.dietarySchoolId;
+  if (dirty.description) body.description = values.description.trim();
+  if (dirty.instructions) body.instructions = full.instructions;
+  if (dirty.prepTimeMinutes && full.prepTimeMinutes !== undefined) body.prepTimeMinutes = full.prepTimeMinutes;
+  if (dirty.cookTimeMinutes) body.cookTimeMinutes = full.cookTimeMinutes;
+  if (dirty.servings && full.servings !== undefined) body.servings = full.servings;
+  if (dirty.difficultyLevel && full.difficultyLevel) body.difficultyLevel = full.difficultyLevel;
+  if (dirty.ingredients) body.ingredients = full.ingredients;
+  if (submit !== undefined) body.submit = submit;
+  return body;
+}
+
+/** GET /recipes/{id} (kèm các trường giả định cho tác giả) → giá trị form sửa; `infos` là bản ghi danh mục nguyên liệu. */
+export function toFormValues(recipe: RecipeDetail, infos: Map<number, Ingredient>): RecipeFormValues {
+  const steps = recipe.instructions.map((text) => ({ text }));
+  while (steps.length < RECIPE_STEPS_MIN) steps.push({ text: '' });
+  return {
+    title: recipe.title,
+    dietarySchoolId: recipe.dietarySchoolId ? String(recipe.dietarySchoolId) : '',
+    categoryId: recipe.categoryId ? String(recipe.categoryId) : '',
+    description: recipe.description ?? '',
+    prepTimeMinutes: recipe.prepTimeMinutes !== null ? String(recipe.prepTimeMinutes) : '',
+    cookTimeMinutes: recipe.cookTimeMinutes > 0 ? String(recipe.cookTimeMinutes) : '',
+    servings: recipe.servings !== null ? String(recipe.servings) : '',
+    difficultyLevel: recipe.difficultyLevel ?? '',
+    ingredients: recipe.ingredients.length
+      ? recipe.ingredients.map((line) => ({
+          ingredientId: line.ingredientId,
+          name: line.name,
+          info: infos.get(line.ingredientId) ?? null,
+          quantity: String(line.quantity),
+          unit: line.unit,
+          isOptional: line.isOptional === true,
+        }))
+      : [emptyIngredientRow()],
+    instructions: steps,
   };
 }
 

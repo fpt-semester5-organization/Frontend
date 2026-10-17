@@ -16,14 +16,41 @@ export type RecipeItemType = 'RECIPE' | 'VIDEO';
 
 type RecipeDetailRaw = DeepRequired<Schemas['GetRecipeResponse']['data']>;
 
+/**
+ * UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt): GET /recipes/{id} trả cả bản chưa duyệt cho chính tác giả
+ * và có thêm các trường dưới đây để trang sửa điền sẵn form và nhận ra tác giả. Công thức công khai có thể không có.
+ */
+export interface RecipeOwnerFields {
+  authorId?: number;
+  status?: RecipeStatus;
+  categoryId?: number;
+  dietarySchoolId?: number;
+  difficultyLevel?: DifficultyLevel | null;
+}
+
 /** GET /recipes/{id} (FN-POST-02). Các trường không bắt buộc của công thức có thể rỗng. */
-export type RecipeDetail = Omit<RecipeDetailRaw, 'imageUrl' | 'description' | 'servings' | 'prepTimeMinutes'> & {
-  imageUrl: string | null;
-  description: string | null;
-  servings: number | null;
-  prepTimeMinutes: number | null;
-};
+export type RecipeDetail = Omit<RecipeDetailRaw, 'imageUrl' | 'description' | 'servings' | 'prepTimeMinutes' | 'ingredients'> &
+  RecipeOwnerFields & {
+    imageUrl: string | null;
+    description: string | null;
+    servings: number | null;
+    prepTimeMinutes: number | null;
+    /** isOptional: UNSPECIFIED, cùng giả định ở trên. */
+    ingredients: (RecipeDetailRaw['ingredients'][number] & { isOptional?: boolean })[];
+  };
 export type RecipeIngredientLine = RecipeDetail['ingredients'][number];
+
+/**
+ * SCR-14 "Công thức của tôi". UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt): GET /recipes nhận thêm
+ * authorId (như GET /posts) và status; khi authorId là người gọi thì trả mọi trạng thái trừ DELETED, mỗi mục kèm status.
+ */
+export type MyRecipeStatus = Exclude<RecipeStatus, 'DELETED'>;
+export type MyRecipeListParams = Omit<RecipeListParams, 'contentType'> & { authorId: number; status?: MyRecipeStatus };
+export type MyRecipeItem = RecipeListItem & { status: MyRecipeStatus };
+
+/** DELETE /recipes/{id}?mode= (FN-POST-04): archive = gỡ khỏi trang cá nhân; all = xóa mềm với tất cả. */
+export type DeleteRecipeMode = ApiOperations['deleteRecipe']['parameters']['query']['mode'];
+export type DeleteRecipeResult = DeepRequired<Schemas['DeleteRecipeResponse']['data']>;
 
 /**
  * GET /recipes/{id}/related (FN-POST-11).

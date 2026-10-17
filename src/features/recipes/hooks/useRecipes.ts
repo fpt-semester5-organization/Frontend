@@ -1,14 +1,15 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { toApiError } from '@/lib/apiError';
 import {
   getRecipe,
   listCategories,
   listDietarySchools,
   listIngredients,
+  listMyRecipes,
   listRecipes,
   listRelatedRecipes,
 } from '../api/recipes.api';
-import type { RecipeListParams } from '../types/recipe.types';
+import type { Ingredient, MyRecipeListParams, RecipeIngredientLine, RecipeListParams } from '../types/recipe.types';
 import { masterKeys, recipeKeys } from './recipeKeys';
 
 /** Không thử lại lỗi 4xx; 5xx thử lại 1 lần. */
@@ -22,6 +23,18 @@ export function useRecipeList(params: RecipeListParams) {
     queryFn: () => listRecipes(params),
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
+    retry: retryServerErrorsOnce,
+  });
+}
+
+/** Công thức của tôi (SCR-14): chỉ gọi khi đã đăng nhập. */
+export function useMyRecipes(params: MyRecipeListParams, enabled: boolean) {
+  return useQuery({
+    queryKey: recipeKeys.mine(params),
+    queryFn: () => listMyRecipes(params),
+    enabled: enabled && params.authorId > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 15 * 1000,
     retry: retryServerErrorsOnce,
   });
 }
@@ -75,5 +88,27 @@ export function useIngredientSearch(keyword: string) {
     staleTime: 10 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: retryServerErrorsOnce,
+  });
+}
+
+/**
+ * Bản ghi danh mục của các nguyên liệu trong công thức đang sửa (nhóm thực phẩm, ngũ vị tân, calo/100g),
+ * tra bằng GET /ingredients?keyword=<tên> vì GET /recipes/{id} chỉ trả mã, tên, lượng, đơn vị.
+ * Lỗi tra cứu không chặn trang sửa: dòng đó chỉ thiếu cảnh báo trường phái và ước tính calo.
+ */
+export function useIngredientInfos(lines: RecipeIngredientLine[] | undefined) {
+  const names = [...new Set((lines ?? []).map((line) => line.name.trim()).filter(Boolean))];
+  return useQueries({
+    queries: names.map((name) => ({
+      queryKey: masterKeys.ingredients(name.slice(0, 100)),
+      queryFn: () => listIngredients({ keyword: name.slice(0, 100), page: 1, size: 8 }),
+      staleTime: 10 * 60 * 1000,
+      retry: false,
+    })),
+    combine: (results) => {
+      const infos = new Map<number, Ingredient>();
+      for (const result of results) for (const item of result.data?.items ?? []) infos.set(item.ingredientId, item);
+      return { infos, ready: results.every((result) => !result.isPending) };
+    },
   });
 }

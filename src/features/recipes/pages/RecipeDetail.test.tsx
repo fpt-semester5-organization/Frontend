@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { MockRequest, MockResponse } from '@/test/mockApi';
 import { renderPage } from '@/test/utils';
+import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import { detail, listItem, mockRecipesApi, signInAsGuest, signInAsMember } from '../test/recipeFixtures';
 import RecipeDetail from './RecipeDetail';
@@ -42,6 +43,10 @@ const renderDetail = (route = '/recipes/512') =>
   );
 
 beforeEach(() => signInAsGuest());
+
+/** Đổi người đăng nhập sang tài khoản `userId` (tác giả công thức trong ca kiểm thử). */
+const switchUser = (userId: number) =>
+  useAuthStore.setState((state) => ({ user: state.user && { ...state.user, userId, fullName: 'Lê Minh Chi' } }));
 
 describe('RecipeDetail (SCR-12)', () => {
   it('hiện skeleton rồi đủ thông tin, nguyên liệu có định lượng, các bước, món tương tự và bình luận', async () => {
@@ -129,6 +134,27 @@ describe('RecipeDetail (SCR-12)', () => {
         expect(calls.find((c) => c.method === 'POST')).toMatchObject({ url: '/recipes/512/comments', body: { content: 'Ngon và dễ làm!' } })
       );
       expect(await screen.findByText('Ngon và dễ làm!')).toBeInTheDocument();
+    });
+
+    it('tác giả thấy nút Sửa công thức, không thấy nút Báo cáo, bình luận của mình có nhãn Tác giả', async () => {
+      mockDetail((req) => (req.url === '/recipes/512' ? { data: detail(512, { authorId: 3072, status: 'APPROVED_ACTIVE' }) } : undefined));
+      signInAsMember();
+      switchUser(3072);
+      renderDetail();
+      expect(await screen.findByRole('link', { name: 'Sửa công thức' })).toHaveAttribute('href', '/recipes/512/edit');
+      expect(screen.queryByRole('button', { name: 'Báo cáo công thức' })).not.toBeInTheDocument();
+      expect(await screen.findByText('Tác giả')).toBeInTheDocument();
+    });
+
+    it('tác giả xem bản nháp của mình: có khung trạng thái, không tải bình luận và món tương tự', async () => {
+      const calls = mockDetail((req) =>
+        req.url === '/recipes/512' ? { data: detail(512, { authorId: 1024, status: 'DRAFT', voteCount: 0, commentCount: 0 }) } : undefined
+      );
+      renderDetail();
+      expect(await screen.findByText('Bản nháp · chỉ bạn xem được')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Tiếp tục chỉnh sửa' })).toHaveAttribute('href', '/recipes/512/edit');
+      expect(screen.queryByRole('button', { name: /Yêu thích/ })).not.toBeInTheDocument();
+      expect(calls.some((c) => c.url.endsWith('/comments') || c.url.endsWith('/related'))).toBe(false);
     });
 
     it('báo cáo công thức gửi targetType RECIPE rồi về kho công thức', async () => {

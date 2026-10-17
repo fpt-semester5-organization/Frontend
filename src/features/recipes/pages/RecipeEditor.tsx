@@ -1,29 +1,42 @@
 /**
- * SCR-13 · recipes/RecipeEditor · `/recipes/new`
+ * SCR-13 · recipes/RecipeEditor · `/recipes/new` · `/recipes/:id/edit`
  * FN: FN-POST-03, FN-POST-04, FN-POST-08, FN-PROF-08 · Huỳnh Việt Phát · Sprint 5
- * Khách xem được form; Lưu nháp / Gửi duyệt cần Thành viên (guard theo từng nút).
- * Ảnh/video tải lên sau khi có recipeId vì POST /videos yêu cầu recipeId; các lần lưu sau trong phiên dùng PUT.
+ * Khách xem được form soạn mới; Lưu nháp / Gửi duyệt cần Thành viên (guard theo từng nút).
+ * Ảnh/video tải lên sau khi có recipeId vì POST /videos yêu cầu recipeId.
  *
- * UNSPECIFIED: chế độ sửa `/recipes/:id/edit` chưa làm vì GET /recipes/{id} chỉ trả bản đã duyệt và thiếu categoryId,
- * dietarySchoolId, difficultyLevel, tác giả (đang hỏi Leader).
+ * UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt): trang sửa đọc GET /recipes/{id} với các trường dành cho tác giả
+ * (authorId, status, categoryId, dietarySchoolId, difficultyLevel, isOptional) — xem RecipeOwnerFields trong recipe.types.
  */
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { UseFormSetError } from 'react-hook-form';
 import { EmptyState } from '@/components/common/EmptyState';
+import { ErrorState } from '@/components/common/ErrorState';
+import { PageLoader } from '@/components/common/PageLoader';
 import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { getAttachmentKind } from '@/features/community/types/community.schemas';
 import { useCountdown } from '@/hooks/useCountdown';
 import { toApiError } from '@/lib/apiError';
 import { getErrorMessage, notifyApiError, notifyInfo, notifySuccess } from '@/lib/notify';
-import { PATHS } from '@/routes/paths';
-import { getAttachmentKind } from '@/features/community/types/community.schemas';
-import { RecipeForm, type RecipeFormHelpers, type RecipeFormSubmission, type RecipeSubmitIntent } from '../components/RecipeForm';
+import { PATHS, withReturnUrl } from '@/routes/paths';
+import { useAuthStore } from '@/stores/auth.store';
+import {
+  RecipeForm,
+  type RecipeFormHelpers,
+  type RecipeFormSubmission,
+  type RecipeFormVariant,
+  type RecipeSubmitIntent,
+} from '../components/RecipeForm';
+import { RecipeStatusBadge } from '../components/RecipeStatusBadge';
 import { useCreateRecipe, useUpdateRecipe, useUploadRecipeMedia } from '../hooks/useRecipeMutations';
-import { EMPTY_RECIPE_FORM, toRecipeBody, type RecipeFormValues } from '../types/recipe.schemas';
-import type { RecipeStatus } from '../types/recipe.types';
+import { useIngredientInfos, useRecipe } from '../hooks/useRecipes';
+import { RECIPE_STATUS_META, canEditRecipe, isDraftLike } from '../lib/recipeStatus';
+import { EMPTY_RECIPE_FORM, toFormValues, toRecipeBody, toUpdateBody, type RecipeFormValues } from '../types/recipe.schemas';
+import type { MyRecipeStatus, RecipeStatus, UpdateRecipeBody } from '../types/recipe.types';
 
 /** Khóa nút gửi tạm thời sau 429 (UI Spec 1.1). */
 const RATE_LIMIT_LOCK_MS = 30 * 1000;
@@ -69,18 +82,30 @@ const isFileError = (error: unknown) => [400, 413, 422].includes(toApiError(erro
 
 const timeFormatter = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
 
+const PAGE = 'mx-auto w-full max-w-[1200px] px-margin-mobile pb-space-xl sm:px-margin';
+const PRIMARY_LINK =
+  'inline-flex rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary';
+
 interface PendingOutcome {
   status: RecipeStatus;
   message: string;
 }
 
 const RecipeEditor: React.FC = () => {
+  const { id } = useParams();
+  const editId = id === undefined ? null : Number(id);
+  const isEdit = editId !== null;
+  const validEditId = isEdit && Number.isInteger(editId) && editId > 0;
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const sessionStatus = useAuthStore((state) => state.sessionStatus);
+  const recipe = useRecipe(validEditId ? editId : 0);
+  const { infos, ready: infosReady } = useIngredientInfos(validEditId ? recipe.data?.ingredients : undefined);
   const createRecipe = useCreateRecipe();
   const updateRecipe = useUpdateRecipe();
   const uploadMedia = useUploadRecipeMedia();
   const [formKey, setFormKey] = useState(0);
-  const [recipeId, setRecipeId] = useState<number | null>(null);
+  const [createdId, setCreatedId] = useState<number | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState<RecipeSubmitIntent | null>(null);
   const [serverAlert, setServerAlert] = useState<{ tone: 'error' | 'warning'; title: string; message: string } | null>(null);
@@ -89,12 +114,23 @@ const RecipeEditor: React.FC = () => {
   const [outcome, setOutcome] = useState<PendingOutcome | null>(null);
   const lockedSeconds = useCountdown(lockedUntil);
 
+  // Trang sửa: công thức từ API không có status nghĩa là bản công khai (GET chỉ trả APPROVED_ACTIVE cho người khác).
+  const editStatus: MyRecipeStatus = (recipe.data?.status as MyRecipeStatus | undefined) ?? 'APPROVED_ACTIVE';
+  const variant: RecipeFormVariant = !isEdit ? 'create' : isDraftLike(editStatus) ? 'draft' : 'published';
+  // Giá trị ban đầu của form sửa: dựng đúng một lần khi đã có công thức và bản ghi nguyên liệu. Các lần tải lại sau khi lưu
+  // không dựng lại, để form không bị gỡ ra giữa chừng (form chỉ đọc defaultValues lúc mount).
+  const [editDefaults, setEditDefaults] = useState<RecipeFormValues | null>(null);
+  useEffect(() => {
+    if (!editDefaults && recipe.data && infosReady) setEditDefaults(toFormValues(recipe.data, infos));
+  }, [editDefaults, recipe.data, infosReady, infos]);
+
   const startOver = () => {
-    setRecipeId(null);
+    setCreatedId(null);
     setSavedAt(null);
     setServerAlert(null);
     setOutcome(null);
     setFormKey((key) => key + 1);
+    if (isEdit) navigate(PATHS.RECIPES.NEW);
   };
 
   /** Lỗi khi lưu/gửi: hành vi theo bảng mã lỗi của SCR-13; luôn giữ nguyên dữ liệu đã nhập. */
@@ -117,42 +153,60 @@ const RecipeEditor: React.FC = () => {
     }
   };
 
-  const handleSubmit = async ({ values, file, intent }: RecipeFormSubmission, { setError, setFileError, clearFile }: RecipeFormHelpers) => {
-    setSubmitting(intent);
+  /** Tạo mới: lần đầu POST đủ trường, các lần lưu sau trong phiên PUT đủ trường. Sửa: PUT trường đã đổi. */
+  const save = async ({ values, dirty, intent }: RecipeFormSubmission): Promise<{ id: number; status: RecipeStatus; message: string } | 'unchanged'> => {
+    if (!isEdit && createdId === null) {
+      const res = await createRecipe.mutateAsync(toRecipeBody(values, intent === 'submit'));
+      setCreatedId(res.data.recipeId);
+      return { id: res.data.recipeId, status: res.data.status as RecipeStatus, message: res.message };
+    }
+    const recipeId = isEdit ? (editId as number) : (createdId as number);
+    let body: UpdateRecipeBody;
+    if (isEdit) {
+      body = toUpdateBody(values, dirty, variant === 'draft' ? intent === 'submit' : undefined);
+      const changed = Object.keys(body).some((key) => key !== 'submit');
+      if (!changed && intent !== 'submit') return 'unchanged';
+    } else {
+      body = toRecipeBody(values, intent === 'submit');
+    }
+    const res = await updateRecipe.mutateAsync({ recipeId, body });
+    return { id: recipeId, status: res.data.status as RecipeStatus, message: res.message };
+  };
+
+  const handleSubmit = async (submission: RecipeFormSubmission, { setError, setFileError, clearFile, markSaved }: RecipeFormHelpers) => {
+    const { file } = submission;
+    setSubmitting(submission.intent);
     setServerAlert(null);
     try {
-      const body = toRecipeBody(values, intent === 'submit');
-      let id = recipeId;
-      let status: RecipeStatus;
-      let message: string;
+      let result: Awaited<ReturnType<typeof save>>;
       try {
-        if (id === null) {
-          const res = await createRecipe.mutateAsync(body);
-          id = res.data.recipeId;
-          status = res.data.status as RecipeStatus;
-          message = res.message;
-          setRecipeId(id);
-        } else {
-          const res = await updateRecipe.mutateAsync({ recipeId: id, body });
-          status = res.data.status as RecipeStatus;
-          message = res.message;
-        }
+        result = await save(submission);
       } catch (error) {
         handleSaveError(error, setError);
         return;
       }
+      if (result === 'unchanged') {
+        if (!file) {
+          notifyInfo('Bạn chưa thay đổi nội dung nào.');
+          return;
+        }
+        result = { id: editId as number, status: editStatus, message: '' };
+      }
+      const { id: recipeId, status, message } = result;
 
       if (file) {
         try {
-          const res = await uploadMedia.mutateAsync({ file, recipeId: id });
+          const res = await uploadMedia.mutateAsync({ file, recipeId });
           clearFile();
           if (getAttachmentKind(file) === 'video') notifyInfo(res.message || 'Đã nhận video, đang xử lý.');
+          else if (!message) notifySuccess(res.message || 'Đã tải ảnh lên.');
         } catch (uploadError) {
           if (isFileError(uploadError)) setFileError(getErrorMessage(uploadError));
           else notifyApiError(uploadError);
           // Công thức đã lưu: giữ trên trang để thử tải lại tệp ở lần lưu sau.
           if (status === 'DRAFT') {
             setSavedAt(new Date());
+            markSaved();
             notifyInfo('Đã lưu nháp nhưng chưa tải được tệp. Bạn có thể chọn lại tệp và lưu tiếp.');
             return;
           }
@@ -162,10 +216,11 @@ const RecipeEditor: React.FC = () => {
 
       if (status === 'DRAFT') {
         setSavedAt(new Date());
-        notifySuccess(message || 'Đã lưu nháp.');
+        markSaved();
+        if (message) notifySuccess(message);
       } else if (status === 'APPROVED_ACTIVE') {
-        notifySuccess(message || 'Đã đăng công thức.');
-        navigate(PATHS.RECIPES.DETAIL(id), { replace: true });
+        notifySuccess(message || 'Đã lưu công thức.');
+        navigate(PATHS.RECIPES.DETAIL(recipeId), { replace: true });
       } else {
         // Điểm vi phạm ≥ 85% hoặc chờ duyệt (BR-ADM-CNT-002): chưa hiển thị công khai.
         setOutcome({ status, message });
@@ -182,63 +237,148 @@ const RecipeEditor: React.FC = () => {
           Trang chủ
         </Link>
         <span className="text-outline-variant">/</span>
-        <Link to={PATHS.RECIPES.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
-          Kho công thức
-        </Link>
+        {isEdit ? (
+          <Link to={PATHS.ME.RECIPES} className="text-on-surface-variant no-underline hover:text-primary">
+            Công thức của tôi
+          </Link>
+        ) : (
+          <Link to={PATHS.RECIPES.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
+            Kho công thức
+          </Link>
+        )}
         <span className="text-outline-variant">/</span>
         <span aria-current="page" className="text-primary">
-          Đăng công thức
+          {isEdit ? 'Sửa công thức' : 'Đăng công thức'}
         </span>
       </nav>
-      <h1 className="font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">Soạn công thức chay</h1>
+      <h1 className="font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">
+        {isEdit ? 'Sửa công thức' : 'Soạn công thức chay'}
+      </h1>
+    </div>
+  );
+
+  const shell = (body: React.ReactNode) => (
+    <div className={PAGE}>
+      {header}
+      {body}
     </div>
   );
 
   if (outcome) {
-    return (
-      <div className="mx-auto w-full max-w-[1200px] px-margin-mobile pb-space-xl sm:px-margin">
-        {header}
-        <EmptyState
-          icon="hourglass_top"
-          title="Công thức đang chờ kiểm duyệt"
-          description={`${outcome.message ? `${outcome.message} ` : ''}Công thức chưa hiển thị công khai cho tới khi quản trị viên duyệt xong.`}
-          className="rounded-2xl bg-surface-container-lowest shadow-card"
-          action={
-            <>
-              <Link
-                to={PATHS.RECIPES.ROOT}
-                className="inline-flex rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary"
-              >
-                Về kho công thức
-              </Link>
-              <Button variant="outline" onClick={startOver}>
-                Soạn công thức khác
-              </Button>
-            </>
-          }
-        />
-      </div>
+    return shell(
+      <EmptyState
+        icon="hourglass_top"
+        title="Công thức đang chờ kiểm duyệt"
+        description={`${outcome.message ? `${outcome.message} ` : ''}Công thức chưa hiển thị công khai cho tới khi quản trị viên duyệt xong.`}
+        className="rounded-2xl bg-surface-container-lowest shadow-card"
+        action={
+          <>
+            <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
+              Xem công thức của tôi
+            </Link>
+            <Button variant="outline" onClick={startOver}>
+              Soạn công thức khác
+            </Button>
+          </>
+        }
+      />
     );
   }
 
-  return (
-    <div className="mx-auto w-full max-w-[1200px] px-margin-mobile pb-space-xl sm:px-margin">
-      {header}
+  if (isEdit) {
+    if (!validEditId) {
+      return shell(<EmptyState icon="search_off" title="Không tìm thấy công thức" description="Đường dẫn sửa công thức không hợp lệ." />);
+    }
+    if (sessionStatus === 'restoring') return <PageLoader />;
+    if (!user) {
+      return shell(
+        <EmptyState
+          icon="lock"
+          title="Đăng nhập để sửa công thức"
+          description="Chỉ tác giả mới sửa được công thức của mình."
+          action={
+            <Link to={withReturnUrl(PATHS.AUTH.LOGIN, PATHS.RECIPES.EDIT(editId))} className={PRIMARY_LINK}>
+              Đăng nhập
+            </Link>
+          }
+        />
+      );
+    }
+    if (recipe.isError) {
+      if (toApiError(recipe.error).status === 404) {
+        return shell(
+          <EmptyState
+            icon="search_off"
+            title="Không tìm thấy công thức"
+            description="Công thức không tồn tại hoặc đã bị xóa."
+            action={
+              <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
+                Về công thức của tôi
+              </Link>
+            }
+          />
+        );
+      }
+      return shell(<ErrorState error={recipe.error} onRetry={() => recipe.refetch()} retrying={recipe.isRefetching} />);
+    }
+    if (recipe.isPending || !editDefaults) {
+      return shell(
+        <div className="grid gap-space-lg lg:grid-cols-12" role="status" aria-label="Đang tải công thức">
+          <Skeleton className="h-[520px] rounded-2xl lg:col-span-8" />
+          <Skeleton className="h-64 rounded-2xl lg:col-span-4" />
+        </div>
+      );
+    }
+    if (recipe.data.authorId !== user.userId) {
+      return shell(<EmptyState icon="lock" title="Bạn không thể sửa công thức này" description="Chỉ tác giả mới sửa được công thức." />);
+    }
+    if (!canEditRecipe(editStatus)) {
+      return shell(
+        <EmptyState
+          icon={RECIPE_STATUS_META[editStatus].icon}
+          title={editStatus === 'ARCHIVED' ? 'Công thức đã gỡ' : 'Công thức đang bị khóa'}
+          description={RECIPE_STATUS_META[editStatus].hint}
+          action={
+            <Link to={PATHS.ME.RECIPES} className={PRIMARY_LINK}>
+              Về công thức của tôi
+            </Link>
+          }
+        />
+      );
+    }
+  }
+
+  const statusNote = (
+    <>
+      {isEdit && (
+        <div className="flex flex-col gap-1 rounded-lg bg-surface-container-low px-3 py-2">
+          <RecipeStatusBadge status={editStatus} className="w-fit" />
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{RECIPE_STATUS_META[editStatus].hint}</p>
+        </div>
+      )}
+      {savedAt && (
+        <p role="status" className="flex flex-wrap items-center gap-1.5 rounded-lg bg-surface-container px-3 py-2 font-label-md text-label-md text-on-surface">
+          <Icon name="draft" className="text-[18px] text-outline" />
+          Bản nháp · đã lưu lúc {timeFormatter.format(savedAt)}
+          <Link to={PATHS.ME.RECIPES} className="ml-auto font-label-sm text-label-sm text-primary">
+            Công thức của tôi
+          </Link>
+        </p>
+      )}
+    </>
+  );
+
+  return shell(
+    <>
       <RecipeForm
-        key={formKey}
-        defaultValues={EMPTY_RECIPE_FORM}
+        key={`${editId ?? 'new'}-${formKey}`}
+        variant={variant}
+        defaultValues={isEdit && editDefaults ? editDefaults : EMPTY_RECIPE_FORM}
         submitting={submitting}
         lockedSeconds={lockedSeconds}
-        cancelTo={PATHS.RECIPES.ROOT}
+        cancelTo={isEdit ? PATHS.ME.RECIPES : PATHS.RECIPES.ROOT}
         onSubmit={handleSubmit}
-        statusNote={
-          savedAt && (
-            <p role="status" className="flex items-center gap-1.5 rounded-lg bg-surface-container px-3 py-2 font-label-md text-label-md text-on-surface">
-              <Icon name="draft" className="text-[18px] text-outline" />
-              Bản nháp · đã lưu lúc {timeFormatter.format(savedAt)}
-            </p>
-          )
-        }
+        statusNote={statusNote}
         alert={
           serverAlert && (
             <FormAlert tone={serverAlert.tone} title={serverAlert.title}>
@@ -256,7 +396,7 @@ const RecipeEditor: React.FC = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 };
 

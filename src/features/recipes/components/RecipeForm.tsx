@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FormProvider, useForm, useWatch, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,10 +21,19 @@ import {
 import { RecipeIngredientFields } from './RecipeIngredientFields';
 import { RecipeStepFields } from './RecipeStepFields';
 
-export type RecipeSubmitIntent = 'draft' | 'submit';
+/** draft = lưu nháp, submit = gửi duyệt (POST/PUT submit), save = lưu thay đổi bản đã gửi (kiểm duyệt lại). */
+export type RecipeSubmitIntent = 'draft' | 'submit' | 'save';
+
+/**
+ * create: soạn mới; draft: sửa bản nháp/bị từ chối (còn bước gửi duyệt);
+ * published: sửa bản đã gửi — chỉ có "Lưu thay đổi", server kiểm duyệt lại (D107).
+ */
+export type RecipeFormVariant = 'create' | 'draft' | 'published';
 
 export interface RecipeFormSubmission {
   values: RecipeFormValues;
+  /** Trường người dùng đã sửa so với giá trị ban đầu (khi sửa chỉ gửi các trường này). */
+  dirty: Partial<Record<keyof RecipeFormValues, unknown>>;
   file: File | null;
   intent: RecipeSubmitIntent;
 }
@@ -33,9 +42,12 @@ export interface RecipeFormHelpers {
   setError: UseFormSetError<RecipeFormValues>;
   setFileError: (message: string) => void;
   clearFile: () => void;
+  /** Lưu thành công: lấy giá trị hiện tại làm mốc so sánh mới để lần lưu sau chỉ gửi phần đổi tiếp. */
+  markSaved: () => void;
 }
 
 interface RecipeFormProps {
+  variant: RecipeFormVariant;
   defaultValues: RecipeFormValues;
   submitting: RecipeSubmitIntent | null;
   /** Còn bao nhiêu giây bị khóa nút gửi sau 429 (UI Spec 1.1). */
@@ -77,6 +89,7 @@ const LookupError: React.FC<{ onRetry: () => void; label: string }> = ({ onRetry
 
 /** Form soạn công thức (SCR-13): thông tin cơ bản, nguyên liệu có định lượng, các bước, ảnh/video (BR-USR-05). */
 export const RecipeForm: React.FC<RecipeFormProps> = ({
+  variant,
   defaultValues,
   submitting,
   lockedSeconds,
@@ -96,8 +109,20 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     control,
     handleSubmit,
     setError,
-    formState: { errors },
+    reset,
+    getValues,
+    setValue,
+    formState: { errors, dirtyFields },
   } = form;
+
+  // Danh sách trường phái/danh mục về sau khi form đã mount (trang sửa) thì ô chọn chưa có option để chọn sẵn:
+  // gán lại giá trị hiện tại khi option đã có, không tính là người dùng sửa.
+  useEffect(() => {
+    if (schools.data) setValue('dietarySchoolId', getValues('dietarySchoolId'));
+  }, [schools.data, setValue, getValues]);
+  useEffect(() => {
+    if (categories.data) setValue('categoryId', getValues('categoryId'));
+  }, [categories.data, setValue, getValues]);
 
   const [title, description, schoolId, servings, ingredients] = useWatch({
     control,
@@ -115,7 +140,10 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     requireMember(() => {
       void handleSubmit((values) => {
         setFileError(undefined);
-        onSubmit({ values, file, intent }, { setError, setFileError, clearFile: () => setFile(null) });
+        onSubmit(
+          { values, dirty: dirtyFields, file, intent },
+          { setError, setFileError, clearFile: () => setFile(null), markSaved: () => reset(getValues()) }
+        );
       })();
     });
 
@@ -315,24 +343,40 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
           <div className={cn(CARD, 'flex flex-col gap-space-sm shadow-card-hover')}>
             {statusNote}
             {alert}
-            <Button size="lg" className="w-full" onClick={submitWith('submit')} loading={submitting === 'submit'} disabled={blocked}>
-              {submitting !== 'submit' && <Icon name="send" className="text-[18px]" />}
-              Gửi duyệt & đăng
-            </Button>
-            <Button variant="outline" className="w-full" onClick={submitWith('draft')} loading={submitting === 'draft'} disabled={blocked}>
-              {submitting !== 'draft' && <Icon name="save" className="text-[18px] text-outline" />}
-              Lưu nháp
-            </Button>
+            {variant === 'published' ? (
+              <Button size="lg" className="w-full" onClick={submitWith('save')} loading={submitting === 'save'} disabled={blocked}>
+                {submitting !== 'save' && <Icon name="save" className="text-[18px]" />}
+                Lưu thay đổi
+              </Button>
+            ) : (
+              <>
+                <Button size="lg" className="w-full" onClick={submitWith('submit')} loading={submitting === 'submit'} disabled={blocked}>
+                  {submitting !== 'submit' && <Icon name="send" className="text-[18px]" />}
+                  Gửi duyệt & đăng
+                </Button>
+                <Button variant="outline" className="w-full" onClick={submitWith('draft')} loading={submitting === 'draft'} disabled={blocked}>
+                  {submitting !== 'draft' && <Icon name="save" className="text-[18px] text-outline" />}
+                  Lưu nháp
+                </Button>
+              </>
+            )}
             {lockedSeconds > 0 && (
               <p role="status" className="font-label-sm text-label-sm text-warning">
                 Thao tác quá nhanh, thử lại sau {lockedSeconds} giây.
               </p>
             )}
-            <p className="font-label-sm text-label-sm text-on-surface-variant">
-              AI kiểm duyệt công thức trước khi đăng: điểm vi phạm dưới 85% được đăng ngay, từ 85% trở lên chờ quản trị viên duyệt;
-              nguyên liệu trái trường phái bị gỡ ngay (Red Alert). Giới hạn 02 bài/ngày với tài khoản dưới 3 ngày, sau đó 10
-              bài/ngày (không tính nháp).
-            </p>
+            {variant === 'published' ? (
+              <p className="font-label-sm text-label-sm text-on-surface-variant">
+                Bản sửa được AI kiểm duyệt lại trước khi ghi; nếu chưa đạt, bản đang công khai được giữ nguyên. Đổi trường phái hoặc
+                nguyên liệu cũng cần kiểm duyệt lại.
+              </p>
+            ) : (
+              <p className="font-label-sm text-label-sm text-on-surface-variant">
+                AI kiểm duyệt công thức trước khi đăng: điểm vi phạm dưới 85% được đăng ngay, từ 85% trở lên chờ quản trị viên duyệt;
+                nguyên liệu trái trường phái bị gỡ ngay (Red Alert). Giới hạn 02 bài/ngày với tài khoản dưới 3 ngày, sau đó 10
+                bài/ngày (không tính nháp).
+              </p>
+            )}
             <Link
               to={cancelTo}
               className="block w-full rounded-lg py-2 text-center font-label-sm text-label-sm text-outline no-underline hover:text-on-surface"
