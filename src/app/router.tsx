@@ -17,6 +17,10 @@ import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
 
 // Tải trang theo route (code splitting); Suspense nằm trong MainLayout.
 const HomePage = lazy(() => import('@/features/home/pages/HomePage'));
+const RecipeList = lazy(() => import('@/features/recipes/pages/RecipeList'));
+const RecipeDetail = lazy(() => import('@/features/recipes/pages/RecipeDetail'));
+const RecipeEditor = lazy(() => import('@/features/recipes/pages/RecipeEditor'));
+const MyRecipes = lazy(() => import('@/features/recipes/pages/MyRecipes'));
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
@@ -44,6 +48,14 @@ const router = createBrowserRouter([
 
           // Trang chủ (SCR-10)
           { path: PATHS.HOME, element: <HomePage /> },
+
+          // Công thức (SCR-11 → SCR-14). Trang soạn mở cho cả Khách, guard theo từng nút (SCR-13);
+          // trang sửa và Công thức của tôi tự mời đăng nhập. key riêng để đổi qua lại giữa soạn mới và sửa không giữ state cũ.
+          { path: PATHS.RECIPES.ROOT, element: <RecipeList /> },
+          { path: PATHS.RECIPES.NEW, element: <RecipeEditor key="new" /> },
+          { path: PATHS.RECIPES.EDIT(':id'), element: <RecipeEditor key="edit" /> },
+          { path: PATHS.RECIPES.DETAIL(':id'), element: <RecipeDetail /> },
+          { path: PATHS.ME.RECIPES, element: <MyRecipes /> },
 
           // Videos (SCR-21)
           { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },

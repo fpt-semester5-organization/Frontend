@@ -2,6 +2,15 @@ import type { ApiOperations, DeepRequired, Schemas } from '@/api/types';
 
 // Mọi type lấy từ src/api/generated (sinh từ docs/08. OpenAPI); chỉ bổ sung chỗ OpenAPI bỏ trống.
 
+/**
+ * Nội dung nhận bình luận, thả tim, báo cáo (FN-COMM-01..05): bài viết (/posts/{id}/…) hoặc công thức (/recipes/{id}/…).
+ * Hai nhóm endpoint có cùng cấu trúc request/response.
+ */
+export interface ContentRef {
+  resource: 'posts' | 'recipes';
+  id: number;
+}
+
 /** GET /posts (FN-POST-05). */
 export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][number]>;
 export type PostListParams = NonNullable<ApiOperations['listPosts']['parameters']['query']>;

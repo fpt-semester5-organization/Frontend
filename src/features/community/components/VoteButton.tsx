@@ -4,12 +4,14 @@ import { useRequireMember } from '@/hooks/useRequireMember';
 import { formatNumber } from '@/lib/format';
 import { notifyApiError } from '@/lib/notify';
 import { cn } from '@/lib/cn';
-import { useVotePost } from '../hooks/useVotePost';
+import { useVote } from '../hooks/useVote';
+import type { ContentRef } from '../types/community.types';
 
 interface VoteButtonProps {
-  postId: number;
+  /** Bài viết hoặc công thức được thả tim. */
+  target: ContentRef;
   voteCount: number;
-  /** memberActions.canVote của GET /posts/{id}; danh sách không có trường này nên mặc định cho phép. */
+  /** memberActions.canVote của trang chi tiết; danh sách không có trường này nên mặc định cho phép. */
   canVote?: boolean;
   className?: string;
 }
@@ -18,10 +20,10 @@ interface VoteButtonProps {
  * Thả tim / bỏ tim (FN-COMM-04, BR-INT-LIKE-01). Khách bấm thì mở SignupPromptModal.
  * UNSPECIFIED: API không trả "đã thả tim chưa", nên trạng thái tim chỉ biết sau lần bấm đầu.
  */
-export const VoteButton: React.FC<VoteButtonProps> = ({ postId, voteCount, canVote = true, className }) => {
+export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVote = true, className }) => {
   const [state, setState] = useState<{ voted: boolean; count: number } | null>(null);
   const { isMember, requireMember } = useRequireMember();
-  const vote = useVotePost(postId);
+  const vote = useVote(target);
 
   // Số tim mới từ server (sau khi danh sách tải lại) thay cho số đã lưu tạm.
   useEffect(() => setState((current) => (current ? { ...current, count: voteCount } : current)), [voteCount]);
@@ -44,7 +46,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({ postId, voteCount, canVo
       onClick={handleClick}
       disabled={disabled || vote.isPending}
       aria-pressed={voted}
-      title={disabled ? 'Bài viết này chưa thể thả tim' : undefined}
+      title={disabled ? `${target.resource === 'recipes' ? 'Công thức' : 'Bài viết'} này chưa thể thả tim` : undefined}
       className={cn(
         'inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60',
         className

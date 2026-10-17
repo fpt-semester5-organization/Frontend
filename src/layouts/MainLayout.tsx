@@ -21,7 +21,14 @@ export const MainLayout: React.FC = () => (
     </a>
     <MainHeader />
     <main id="main-content" className="w-full flex-1">
-      <Suspense fallback={<PageLoader />}>
+      {/* Khung chờ cao bằng một màn hình để footer không lộ ra rồi bị đẩy đi khi trang tải xong (CLS). */}
+      <Suspense
+        fallback={
+          <div className="min-h-[100svh]">
+            <PageLoader />
+          </div>
+        }
+      >
         <Outlet />
       </Suspense>
     </main>

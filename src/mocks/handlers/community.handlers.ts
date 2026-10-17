@@ -13,6 +13,7 @@ import {
   type MockPost,
   type MockUser,
 } from '../db';
+import { recipes } from '../recipeDb';
 import { api, currentUser, fail, isFlaggedByAi, isPositiveInt, latency, ok, unauthorized, validationError } from '../utils';
 
 // Mô phỏng luồng xử lý của FN-POST-05/06/07/08 và FN-COMM-01..05 (docs/09. Task Cards).
@@ -20,10 +21,10 @@ import { api, currentUser, fail, isFlaggedByAi, isPositiveInt, latency, ok, unau
 const notFound = () => fail(404, 'ERR_CONTENT_NOT_FOUND', 'Nội dung không tồn tại hoặc chưa được hiển thị.');
 const notOwner = () => fail(403, 'ERR_CONTENT_NOT_OWNER', 'Bạn không phải tác giả của nội dung này.');
 
-const authorName = (userId: number) => users.find((user) => user.userId === userId)?.fullName ?? 'Thành viên';
+export const authorName = (userId: number) => users.find((user) => user.userId === userId)?.fullName ?? 'Thành viên';
 const voteCount = (post: MockPost) =>
   post.baseVotes + [...votes].filter((key) => key.endsWith(`:${post.postId}`)).length;
-const isVisibleComment = (comment: MockComment) => comment.status === 'ACTIVE' && !comment.isSoftDeleted;
+export const isVisibleComment = (comment: MockComment) => comment.status === 'ACTIVE' && !comment.isSoftDeleted;
 const commentCount = (postId: number) =>
   comments.filter((comment) => comment.postId === postId && isVisibleComment(comment)).length;
 
@@ -42,7 +43,7 @@ const toListItem = (post: MockPost) => ({
   createdAt: post.createdAt,
 });
 
-type CommentDto = {
+export type CommentDto = {
   commentId: number;
   author: { userId: number; fullName: string };
   content: string;
@@ -52,7 +53,7 @@ type CommentDto = {
   replies: CommentDto[];
 };
 
-const toCommentDto = (comment: MockComment, withReplies = true): CommentDto => ({
+export const toCommentDto = (comment: MockComment, withReplies = true): CommentDto => ({
   commentId: comment.commentId,
   author: { userId: comment.authorId, fullName: authorName(comment.authorId) },
   content: comment.content,
@@ -82,6 +83,34 @@ const validatePostFields = (body: { title?: unknown; content?: unknown; visibili
   }
   return details;
 };
+
+const isImageFile = (file: File) => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+const isVideoFile = (file: File) => ['video/mp4', 'video/quicktime'].includes(file.type) || /\.(mp4|mov)$/i.test(file.name);
+
+/** POST /videos với recipeId: chỉ tác giả công thức; ảnh thành ảnh bìa, video bật bóc tách ngầm (FN-POST-10). */
+function attachToRecipe(userId: number, recipeId: number, file: File) {
+  const recipe = recipes.find((item) => item.recipeId === recipeId);
+  if (!isPositiveInt(recipeId)) return validationError([{ field: 'recipeId', message: 'recipeId phải > 0.' }]);
+  if (!recipe || recipe.status === 'DELETED' || recipe.status === 'ARCHIVED') return notFound();
+  if (recipe.authorId !== userId) return notOwner();
+  if (!isImageFile(file) && !isVideoFile(file)) {
+    return validationError([{ field: 'file', message: 'Chỉ nhận ảnh JPG, PNG, WEBP hoặc video MP4, MOV.' }]);
+  }
+  if ((isImageFile(file) && file.size > 5 * 1024 * 1024) || (isVideoFile(file) && file.size > 100 * 1024 * 1024)) {
+    return fail(413, 'ERR_MEDIA_FILE_TOO_LARGE', isImageFile(file) ? 'Ảnh vượt quá 5 MB.' : 'Video vượt quá 100 MB.');
+  }
+  const videoId = nextId('video');
+  if (isImageFile(file)) {
+    recipe.imageUrl = URL.createObjectURL(file);
+    return ok({ videoId, status: 'READY' }, 'Đã tải ảnh lên.', 202);
+  }
+  recipe.type = 'VIDEO';
+  transcripts.push({ videoId, status: 'PENDING', readyAt: Date.now() + 40 * 1000, recipeApproved: false, ...UPLOADED_VIDEO_TRANSCRIPT });
+  setTimeout(() => {
+    recipe.hasTranscript = true;
+  }, 40 * 1000);
+  return ok({ videoId, status: 'PROCESSING' }, 'Đã nhận video, đang xử lý.', 202);
+}
 
 export const communityHandlers = [
   // GET /posts — FN-POST-05
@@ -235,15 +264,17 @@ export const communityHandlers = [
     return ok(null, 'Đã xóa bài viết.');
   }),
 
-  // POST /videos — FN-POST-08 (ảnh/video gắn vào bài viết)
+  // POST /videos — FN-POST-08 (ảnh/video gắn vào bài viết hoặc công thức: đúng 1 trong postId/recipeId)
   http.post(api('/videos'), async ({ request }) => {
     await latency();
     const me = currentUser(request);
     if (!me) return unauthorized();
     const form = await request.formData();
     const file = form.get('file');
-    const post = findPost(String(form.get('postId') ?? ''));
     if (!(file instanceof File)) return validationError([{ field: 'file', message: 'Vui lòng chọn tệp.' }]);
+    const recipeId = form.get('recipeId');
+    if (recipeId !== null) return attachToRecipe(me.userId, Number(recipeId), file);
+    const post = findPost(String(form.get('postId') ?? ''));
     if (!post || post.status === 'DELETED') return notFound();
     if (post.authorId !== me.userId) return notOwner();
 
@@ -438,6 +469,10 @@ export const communityHandlers = [
       const post = findPost(String(body.targetId));
       if (!post || !canView(post, me)) return notFound();
       post.status = 'QUARANTINED_HIDDEN';
+    } else if (body.targetType === 'RECIPE') {
+      const recipe = recipes.find((item) => item.recipeId === body.targetId);
+      if (!recipe || recipe.status !== 'APPROVED_ACTIVE') return notFound();
+      recipe.status = 'QUARANTINED_HIDDEN';
     } else {
       return notFound();
     }
@@ -445,7 +480,7 @@ export const communityHandlers = [
     const report = {
       reportId: nextId('report'),
       reporterId: me.userId,
-      targetType: body.targetType as 'POST' | 'COMMENT',
+      targetType: body.targetType as 'POST' | 'RECIPE' | 'COMMENT',
       targetId: body.targetId!,
       createdAt: new Date().toISOString(),
     };

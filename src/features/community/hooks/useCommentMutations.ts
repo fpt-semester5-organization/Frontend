@@ -1,15 +1,18 @@
 import { type InfiniteData, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createPostComment, deleteComment, updateComment, type Paged } from '../api/community.api';
-import type { CreateCommentBody, PostComment, PostDetail } from '../types/community.types';
+import { createComment, deleteComment, updateComment, type Paged } from '../api/community.api';
+import type { ContentRef, CreateCommentBody, PostComment } from '../types/community.types';
 import { useAuthStore } from '@/stores/auth.store';
 import { communityKeys } from './communityKeys';
 
-/** Sau mỗi thay đổi: tải lại cây bình luận và commentCount của bài để đồng bộ với server. */
-function useInvalidateComments(postId: number) {
+/** Chi tiết bài viết/công thức: chỉ cần commentCount để cập nhật ngay số bình luận. */
+type CommentCounted = { commentCount: number };
+
+/** Sau mỗi thay đổi: tải lại cây bình luận và commentCount của nội dung để đồng bộ với server. */
+function useInvalidateComments(target: ContentRef) {
   const queryClient = useQueryClient();
   return () => {
-    queryClient.invalidateQueries({ queryKey: communityKeys.comments(postId) });
-    queryClient.invalidateQueries({ queryKey: communityKeys.post(postId) });
+    queryClient.invalidateQueries({ queryKey: communityKeys.comments(target) });
+    queryClient.invalidateQueries({ queryKey: communityKeys.content(target) });
   };
 }
 
@@ -85,21 +88,21 @@ function replaceCommentNode(list: PostComment[], targetId: number, realComment: 
 /**
  * Gửi bình luận với cập nhật tức thì (Optimistic Update) giúp bình luận hiện ngay sau khi gửi (0ms).
  */
-export function useCreateComment(postId: number) {
+export function useCreateComment(target: ContentRef) {
   const queryClient = useQueryClient();
-  const invalidate = useInvalidateComments(postId);
+  const invalidate = useInvalidateComments(target);
 
   return useMutation({
-    mutationFn: (body: CreateCommentBody) => createPostComment(postId, body),
+    mutationFn: (body: CreateCommentBody) => createComment(target, body),
 
     onMutate: async (body) => {
       // 1. Dừng các truy vấn đang chạy để tránh đè dữ liệu
-      await queryClient.cancelQueries({ queryKey: communityKeys.comments(postId) });
-      await queryClient.cancelQueries({ queryKey: communityKeys.post(postId) });
+      await queryClient.cancelQueries({ queryKey: communityKeys.comments(target) });
+      await queryClient.cancelQueries({ queryKey: communityKeys.content(target) });
 
       // 2. Lưu trạng thái trước đó để khôi phục nếu thất bại
-      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(postId));
-      const previousPost = queryClient.getQueryData<PostDetail>(communityKeys.post(postId));
+      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(target));
+      const previousPost = queryClient.getQueryData<CommentCounted>(communityKeys.content(target));
 
       const currentUser = useAuthStore.getState().user;
       const tempId = -Date.now();
@@ -119,7 +122,7 @@ export function useCreateComment(postId: number) {
 
       // 3. Cập nhật ngay vào cache bình luận
       queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
-        communityKeys.comments(postId),
+        communityKeys.comments(target),
         (old) => {
           if (!old || old.pages.length === 0) {
             return {
@@ -161,9 +164,9 @@ export function useCreateComment(postId: number) {
         }
       );
 
-      // 4. Tăng ngay số lượng commentCount của bài viết
-      queryClient.setQueryData<PostDetail>(
-        communityKeys.post(postId),
+      // 4. Tăng ngay commentCount của bài viết/công thức
+      queryClient.setQueryData<CommentCounted>(
+        communityKeys.content(target),
         (old) => (old ? { ...old, commentCount: old.commentCount + 1 } : old)
       );
 
@@ -173,10 +176,10 @@ export function useCreateComment(postId: number) {
     onError: (_error, _variables, context) => {
       // Khôi phục cache nếu có lỗi
       if (context?.previousComments) {
-        queryClient.setQueryData(communityKeys.comments(postId), context.previousComments);
+        queryClient.setQueryData(communityKeys.comments(target), context.previousComments);
       }
       if (context?.previousPost) {
-        queryClient.setQueryData(communityKeys.post(postId), context.previousPost);
+        queryClient.setQueryData(communityKeys.content(target), context.previousPost);
       }
     },
 
@@ -186,7 +189,7 @@ export function useCreateComment(postId: number) {
         if (realComment.status === 'ACTIVE') {
           // Thay thế tempId bằng real ID từ server
           queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
-            communityKeys.comments(postId),
+            communityKeys.comments(target),
             (old) => {
               if (!old) return old;
               return {
@@ -201,7 +204,7 @@ export function useCreateComment(postId: number) {
         } else {
           // Bị AI gắn cờ kiểm duyệt: gỡ bỏ khỏi giao diện người dùng
           queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
-            communityKeys.comments(postId),
+            communityKeys.comments(target),
             (old) => {
               if (!old) return old;
               return {
@@ -220,20 +223,20 @@ export function useCreateComment(postId: number) {
   });
 }
 
-export function useUpdateComment(postId: number) {
+export function useUpdateComment(target: ContentRef) {
   const queryClient = useQueryClient();
-  const invalidate = useInvalidateComments(postId);
+  const invalidate = useInvalidateComments(target);
 
   return useMutation({
     mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
       updateComment(commentId, { content }),
 
     onMutate: async ({ commentId, content }) => {
-      await queryClient.cancelQueries({ queryKey: communityKeys.comments(postId) });
-      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(postId));
+      await queryClient.cancelQueries({ queryKey: communityKeys.comments(target) });
+      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(target));
 
       queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
-        communityKeys.comments(postId),
+        communityKeys.comments(target),
         (old) => {
           if (!old) return old;
           return {
@@ -251,7 +254,7 @@ export function useUpdateComment(postId: number) {
 
     onError: (_error, _variables, context) => {
       if (context?.previousComments) {
-        queryClient.setQueryData(communityKeys.comments(postId), context.previousComments);
+        queryClient.setQueryData(communityKeys.comments(target), context.previousComments);
       }
     },
 
@@ -259,22 +262,22 @@ export function useUpdateComment(postId: number) {
   });
 }
 
-export function useDeleteComment(postId: number) {
+export function useDeleteComment(target: ContentRef) {
   const queryClient = useQueryClient();
-  const invalidate = useInvalidateComments(postId);
+  const invalidate = useInvalidateComments(target);
 
   return useMutation({
     mutationFn: (commentId: number) => deleteComment(commentId),
 
     onMutate: async (commentId) => {
-      await queryClient.cancelQueries({ queryKey: communityKeys.comments(postId) });
-      await queryClient.cancelQueries({ queryKey: communityKeys.post(postId) });
+      await queryClient.cancelQueries({ queryKey: communityKeys.comments(target) });
+      await queryClient.cancelQueries({ queryKey: communityKeys.content(target) });
 
-      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(postId));
-      const previousPost = queryClient.getQueryData<PostDetail>(communityKeys.post(postId));
+      const previousComments = queryClient.getQueryData<InfiniteData<Paged<PostComment>>>(communityKeys.comments(target));
+      const previousPost = queryClient.getQueryData<CommentCounted>(communityKeys.content(target));
 
       queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
-        communityKeys.comments(postId),
+        communityKeys.comments(target),
         (old) => {
           if (!old) return old;
           return {
@@ -288,8 +291,8 @@ export function useDeleteComment(postId: number) {
         }
       );
 
-      queryClient.setQueryData<PostDetail>(
-        communityKeys.post(postId),
+      queryClient.setQueryData<CommentCounted>(
+        communityKeys.content(target),
         (old) => (old ? { ...old, commentCount: Math.max(0, old.commentCount - 1) } : old)
       );
 
@@ -298,10 +301,10 @@ export function useDeleteComment(postId: number) {
 
     onError: (_error, _variables, context) => {
       if (context?.previousComments) {
-        queryClient.setQueryData(communityKeys.comments(postId), context.previousComments);
+        queryClient.setQueryData(communityKeys.comments(target), context.previousComments);
       }
       if (context?.previousPost) {
-        queryClient.setQueryData(communityKeys.post(postId), context.previousPost);
+        queryClient.setQueryData(communityKeys.content(target), context.previousPost);
       }
     },
 

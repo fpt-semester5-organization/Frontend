@@ -25,7 +25,8 @@ function snooze(): void {
 }
 
 /**
- * BR-GUEST-01: Khách lướt tới mục thứ N của bảng tin (N = meta.signUpPromptAtItem, mặc định 5) thì mở hộp mời đăng ký.
+ * BR-GUEST-01: Khách lướt tới mục thứ N của danh sách GET /recipes (trang chủ, kho công thức; N = meta.signUpPromptAtItem,
+ * mặc định 5) thì mở hộp mời đăng ký.
  * Trả về vị trí (0-based) của mục cần theo dõi và ref gắn vào mục đó; Thành viên nhận -1.
  */
 export function useBrowsePrompt(promptAt: number | undefined) {

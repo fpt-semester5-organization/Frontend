@@ -6,15 +6,17 @@ import { dietarySchoolLabel } from '@/constants/dietarySchools';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
-import type { RecipeFeedItem } from '../types/home.types';
+import type { RecipeListItem } from '../types/recipe.types';
 
-interface RecipeFeedCardProps {
-  item: RecipeFeedItem;
+interface RecipeCardProps {
+  item: RecipeListItem;
+  /** Ảnh nằm trong màn hình đầu (ứng viên LCP): tải ngay thay vì lazy. */
+  eager?: boolean;
   className?: string;
 }
 
-/** Thẻ công thức/video của bảng tin trang chủ: chỉ dùng các trường GET /recipes trả về. */
-export const RecipeFeedCard = React.forwardRef<HTMLElement, RecipeFeedCardProps>(({ item, className }, ref) => {
+/** Thẻ công thức/video (trang chủ, kho công thức, gợi ý liên quan): chỉ dùng các trường GET /recipes trả về. */
+export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item, eager = false, className }, ref) => {
   const isVideo = item.type === 'VIDEO';
   const school = dietarySchoolLabel(item.dietarySchool);
   const kcal = Number.isFinite(item.caloriesKcal) ? Math.round(item.caloriesKcal) : null;
@@ -34,7 +36,9 @@ export const RecipeFeedCard = React.forwardRef<HTMLElement, RecipeFeedCardProps>
             alt=""
             width={480}
             height={360}
-            loading="lazy"
+            loading={eager ? 'eager' : 'lazy'}
+            // React 18 chưa nhận prop fetchPriority nên ghi thẳng thuộc tính HTML.
+            {...(eager ? { fetchpriority: 'high' } : {})}
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
           />
@@ -106,9 +110,9 @@ export const RecipeFeedCard = React.forwardRef<HTMLElement, RecipeFeedCardProps>
     </article>
   );
 });
-RecipeFeedCard.displayName = 'RecipeFeedCard';
+RecipeCard.displayName = 'RecipeCard';
 
-export const RecipeFeedSkeleton: React.FC<{ count?: number }> = ({ count = 6 }) => (
+export const RecipeCardSkeleton: React.FC<{ count?: number }> = ({ count = 6 }) => (
   <>
     {Array.from({ length: count }, (_, i) => (
       <div key={i} className="flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-card" aria-hidden="true">

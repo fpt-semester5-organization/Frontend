@@ -6,15 +6,16 @@ import { formatDateTime } from '@/lib/format';
 import { notifyApiError, notifySuccess } from '@/lib/notify';
 import { cn } from '@/lib/cn';
 import { useDeleteComment, useUpdateComment } from '../hooks/useCommentMutations';
-import type { PostComment } from '../types/community.types';
+import type { ContentRef, PostComment } from '../types/community.types';
 import { CommentForm } from './CommentForm';
 
 export interface CommentThreadContext {
-  postId: number;
-  /** Tác giả bài viết: bình luận của họ có nhãn "Tác giả". */
-  postAuthorId: number;
+  /** Bài viết hoặc công thức chứa bình luận. */
+  target: ContentRef;
+  /** Tác giả bài viết/công thức: bình luận của họ có nhãn "Tác giả"; null khi API không trả tác giả. */
+  authorId: number | null;
   currentUserId: number | null;
-  /** Thành viên được bình luận trên bài này (memberActions.canComment). */
+  /** Thành viên được bình luận trên nội dung này (memberActions.canComment). */
   canComment: boolean;
   cooldownSeconds: number;
   submitReply: (parentCommentId: number, content: string) => Promise<unknown>;
@@ -40,11 +41,11 @@ const ACTION = 'font-label-sm text-label-sm transition-colors';
 export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, replyToName, isReply = false }) => {
   const [mode, setMode] = useState<'view' | 'edit' | 'reply'>('view');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const updateComment = useUpdateComment(context.postId);
-  const deleteComment = useDeleteComment(context.postId);
+  const updateComment = useUpdateComment(context.target);
+  const deleteComment = useDeleteComment(context.target);
 
   const isOwner = context.currentUserId !== null && comment.author.userId === context.currentUserId;
-  const isPostAuthor = comment.author.userId === context.postAuthorId;
+  const isContentAuthor = context.authorId !== null && comment.author.userId === context.authorId;
   const replies = isReply ? [] : flattenReplies(comment);
 
   const handleDelete = () =>
@@ -68,7 +69,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
           <div className="mb-1 flex items-start justify-between gap-space-xs">
             <div className="flex min-w-0 flex-wrap items-center gap-space-xs">
               <span className="font-headline-sm text-body-lg font-bold text-on-surface">{comment.author.fullName}</span>
-              {isPostAuthor && (
+              {isContentAuthor && (
                 <span className="rounded bg-primary px-1.5 py-0.5 font-label-sm text-label-sm text-on-primary">Tác giả</span>
               )}
               {replyToName && (

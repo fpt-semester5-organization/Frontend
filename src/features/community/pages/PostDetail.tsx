@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -49,6 +49,7 @@ const PostDetail: React.FC = () => {
   const { requireMember } = useRequireMember();
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
   const post = usePost(postId);
+  const target = useMemo(() => ({ resource: 'posts' as const, id: postId }), [postId]);
   const deletePost = useDeletePost();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -147,7 +148,7 @@ const PostDetail: React.FC = () => {
         </div>
 
         <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">
-          <VoteButton postId={postId} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
+          <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
           <a
             href="#comments"
             className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface no-underline transition-all hover:bg-surface-container"
@@ -161,8 +162,8 @@ const PostDetail: React.FC = () => {
       <RelatedPosts currentPostId={postId} />
 
       <CommentSection
-        postId={postId}
-        postAuthorId={data.author.userId}
+        target={target}
+        authorId={data.author.userId}
         commentCount={data.commentCount}
         canComment={data.memberActions.canComment}
       />
@@ -180,7 +181,7 @@ const PostDetail: React.FC = () => {
 
       <ReportDialog
         show={reportOpen}
-        postId={postId}
+        content={target}
         target={{ type: 'POST', id: postId }}
         onClose={() => setReportOpen(false)}
         onReported={() => navigate(PATHS.COMMUNITY.ROOT, { replace: true })}
