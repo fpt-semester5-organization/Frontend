@@ -55,3 +55,62 @@ export const PROVINCES: Province[] = [
 ];
 
 export const findProvince = (name: string) => PROVINCES.find((item) => item.name === name);
+
+/** Danh sách các quận/huyện phổ biến theo từng tỉnh/thành để hỗ trợ lọc */
+export const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
+  'Hồ Chí Minh': [
+    'Quận 1',
+    'Quận 3',
+    'Quận 4',
+    'Quận 5',
+    'Quận 6',
+    'Quận 7',
+    'Quận 8',
+    'Quận 10',
+    'Quận 11',
+    'Quận 12',
+    'Bình Thạnh',
+    'Phú Nhuận',
+    'Gò Vấp',
+    'Tân Bình',
+    'Tân Phú',
+    'Bình Tân',
+    'TP. Thủ Đức',
+    'Hóc Môn',
+    'Bình Chánh',
+    'Củ Chi',
+    'Nhà Bè',
+    'Cần Giờ',
+  ],
+  'Hà Nội': [
+    'Ba Đình',
+    'Hoàn Kiếm',
+    'Đống Đa',
+    'Hai Bà Trưng',
+    'Cầu Giấy',
+    'Tây Hồ',
+    'Thanh Xuân',
+    'Hoàng Mai',
+    'Long Biên',
+    'Nam Từ Liêm',
+    'Bắc Từ Liêm',
+    'Hà Đông',
+    'Sơn Tây',
+    'Gia Lâm',
+    'Đông Anh',
+    'Sóc Sơn',
+    'Thanh Trì',
+  ],
+  'Đà Nẵng': ['Hải Châu', 'Thanh Khê', 'Sơn Trà', 'Ngũ Hành Sơn', 'Liên Chiểu', 'Cẩm Lệ', 'Hòa Vang'],
+  'Hải Phòng': ['Hồng Bàng', 'Ngô Quyền', 'Lê Chân', 'Hải An', 'Kiến An', 'Đồ Sơn', 'Dương Kinh', 'Thủy Nguyên'],
+  'Cần Thơ': ['Ninh Kiều', 'Bình Thủy', 'Cái Răng', 'Ô Môn', 'Thốt Nốt', 'Phong Điền'],
+  'Huế': ['TP. Huế', 'Hương Thủy', 'Hương Trà', 'Phú Vang', 'Quảng Điền', 'Phong Điền'],
+  'Lâm Đồng': ['TP. Đà Lạt', 'TP. Bảo Lộc', 'Đức Trọng', 'Đơn Dương', 'Di Linh'],
+  'Khánh Hòa': ['TP. Nha Trang', 'TP. Cam Ranh', 'Ninh Hòa', 'Diên Khánh'],
+  'Đồng Nai': ['TP. Biên Hòa', 'TP. Long Khánh', 'Long Thành', 'Nhơn Trạch', 'Trảng Bom'],
+};
+
+export const getDistrictsForProvince = (provinceName: string): string[] => {
+  return DISTRICTS_BY_PROVINCE[provinceName] ?? [];
+};
+

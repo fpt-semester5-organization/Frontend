@@ -115,3 +115,28 @@ export function isOutsideVietnam(point: LatLng): boolean {
   }
   return true;
 }
+
+/**
+ * Tính Bounding Box [sw, ne] của vòng tròn bán kính tìm kiếm quanh tâm.
+ * sw = [tây (minLng), nam (minLat)], ne = [đông (maxLng), bắc (maxLat)].
+ */
+export function circleBBox(center: LatLng, radiusKm: number): [[number, number], [number, number]] {
+  const latDelta = radiusKm / 110.574;
+  const lngDelta = radiusKm / (111.32 * Math.cos(toRad(center.lat)));
+  return [
+    [center.lng - lngDelta, center.lat - latDelta],
+    [center.lng + lngDelta, center.lat + latDelta],
+  ];
+}
+
+/** Trích xuất tọa độ {lat, lng} từ link Google Maps directionsUrl (vd. destination=10.77253,106.69124). */
+export function coordsFromDirectionsUrl(url?: string | null): LatLng | null {
+  if (!url) return null;
+  const match = url.match(/destination=([0-9.-]+),([0-9.-]+)/);
+  if (!match) return null;
+  const lat = Number(match[1]);
+  const lng = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+

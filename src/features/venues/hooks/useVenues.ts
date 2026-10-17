@@ -2,13 +2,14 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { toApiError } from '@/lib/apiError';
 import { mergeGuestQuota } from '@/lib/guestQuota';
 import { useAuthStore } from '@/stores/auth.store';
-import { listCategories, listNearbyVenues } from '../api/venues.api';
-import type { NearbyVenuesParams } from '../types/venues.types';
+import { getVenue, listCategories, listNearbyVenues } from '../api/venues.api';
+import type { LatLng, NearbyVenuesParams } from '../types/venues.types';
 
 export const venueKeys = {
   all: ['venues'] as const,
   nearby: (params: NearbyVenuesParams) => [...venueKeys.all, 'nearby', params] as const,
   categories: () => ['categories'] as const,
+  detail: (id: number, coords?: LatLng | null) => [...venueKeys.all, 'detail', id, coords] as const,
 };
 
 /** Không thử lại lỗi 4xx (403 hết lượt/ngoài lãnh thổ, 400, 429): mỗi lần gọi của Khách có thể bị tính lượt. */
@@ -47,3 +48,18 @@ export function useFoodCategories() {
     retry: retryServerErrorsOnce,
   });
 }
+
+/**
+ * GET /venues/{id} — FN-MAP-02 Chi tiết một quán chay.
+ * Hỗ trợ truyền tọa độ người dùng để server tính distanceKm.
+ */
+export function useVenue(id: number, coords?: LatLng | null) {
+  return useQuery({
+    queryKey: venueKeys.detail(id, coords),
+    queryFn: () => getVenue(id, coords),
+    enabled: Number.isInteger(id) && id > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: retryServerErrorsOnce,
+  });
+}
+

@@ -6,13 +6,37 @@ type NearbyResponse = DeepRequired<Schemas['ListNearbyVenuesResponse']>;
 
 /**
  * Một quán trong GET /venues/nearby (FN-MAP-01).
- * Chưa có tọa độ quán nên bản đồ chưa cắm marker: chờ Leader bổ sung latitude/longitude (cột VeganVenues).
  */
 export type NearbyVenue = Omit<NearbyResponse['data'][number], 'thumbnailUrl' | 'distanceKm'> & {
   thumbnailUrl: string | null;
   /** Tìm theo tỉnh/thành thì không có vị trí gốc nên có thể không có khoảng cách. */
   distanceKm: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  lat?: number | null;
+  lng?: number | null;
+  rating?: number | null;
+  isFullyVegan?: boolean;
 };
+
+/** GET /venues/{id} (FN-MAP-02): Chi tiết quán chay. */
+export interface VenueDetail {
+  venueId: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  lat: number;
+  lng: number;
+  distanceKm?: number | null;
+  rating: number;
+  isFullyVegan: boolean;
+  thumbnailUrl?: string | null;
+  categories: string[];
+  directionsUrl: string;
+  source?: string;
+  lastSyncedAt?: string;
+}
 
 /** meta: phân trang + bán kính đã áp dụng + hạn mức của Khách (chỉ Khách mới có quota). */
 export type NearbyMeta = Omit<NearbyResponse['meta'], 'quota'> & {

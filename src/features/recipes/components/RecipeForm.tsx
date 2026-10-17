@@ -316,7 +316,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
           </section>
 
           <section className={CARD} aria-labelledby="recipe-ingredients">
-            <SectionTitle id="recipe-ingredients" index="02" title="Nguyên liệu" hint="Chọn từ danh mục và ghi rõ định lượng, đơn vị (BR-USR-05)." />
+            <SectionTitle id="recipe-ingredients" index="02" title="Nguyên liệu" hint="Chọn từ danh mục và ghi rõ định lượng, đơn vị." />
             <RecipeIngredientFields school={school} disabled={busy} />
           </section>
 

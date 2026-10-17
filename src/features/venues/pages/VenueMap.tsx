@@ -11,12 +11,13 @@ import { useCountdown } from '@/hooks/useCountdown';
 import { toApiError } from '@/lib/apiError';
 import { mergeGuestQuota } from '@/lib/guestQuota';
 import { notifyApiError } from '@/lib/notify';
+import { bootstrapGuestSession } from '@/api/session';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import { GoongMap, type MapFocus } from '../components/GoongMap';
 import { MapQuotaBadge } from '../components/MapQuotaBadge';
 import { VenueCard, VenueListSkeleton } from '../components/VenueCard';
-import { VenueSearchPanel } from '../components/VenueSearchPanel';
+import { VenueSearchPanel, type SearchMode } from '../components/VenueSearchPanel';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useFoodCategories, useNearbyVenues } from '../hooks/useVenues';
 import { isOutsideVietnam } from '../lib/geo';
@@ -28,14 +29,14 @@ const PROVINCE_ZOOM = 10;
 /** Zoom vừa vòng bán kính quanh người dùng. */
 const zoomForRadius = (radiusKm: number) => (radiusKm <= 1 ? 14 : radiusKm <= 3 ? 13 : radiusKm <= 5 ? 12 : 11);
 
-/** Lần tìm đã gửi: vị trí GPS (chỉ giữ trong bộ nhớ) hoặc tỉnh/thành, kèm bộ lọc lúc bấm tìm. */
+/** Lần tìm đã gửi: vị trí GPS (chỉ giữ trong bộ nhớ) hoặc khu vực (tỉnh/thành + quận/huyện), kèm bộ lọc. */
 type Search =
   | { kind: 'gps'; coords: LatLng; radiusKm: number; categoryId: number | null }
-  | { kind: 'province'; province: Province; categoryId: number | null };
+  | { kind: 'area'; province: Province; district?: string; radiusKm: number; categoryId: number | null };
 
 /**
  * SCR-18 venues/VenueMap — /venues. GET /venues/nearby (FN-MAP-01), GET /categories (FN-PROF-08).
- * Bản đồ Goong; xin GPS khi người dùng bấm, từ chối thì tìm theo tỉnh/thành; ở ngoài Việt Nam thì báo khu vực chưa hỗ trợ.
+ * Bản đồ Goong; xin GPS khi người dùng bấm, từ chối thì tìm theo tỉnh/thành/quận; ở ngoài Việt Nam thì báo khu vực chưa hỗ trợ.
  */
 const VenueMap: React.FC = () => {
   const isMember = useAuthStore((state) => state.isAuthenticated);
@@ -44,11 +45,14 @@ const VenueMap: React.FC = () => {
   const geo = useGeolocation();
   const categories = useFoodCategories();
 
+  const [searchMode, setSearchMode] = useState<SearchMode>('gps');
   const [province, setProvince] = useState('');
+  const [district, setDistrict] = useState('');
   const [provinceError, setProvinceError] = useState<string | null>(null);
   const [radiusKm, setRadiusKm] = useState<number>(QUOTA.guest.mapRadiusKm);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [search, setSearch] = useState<Search | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [waitingForGps, setWaitingForGps] = useState(false);
   const [outsideVietnam, setOutsideVietnam] = useState(false);
@@ -57,6 +61,22 @@ const VenueMap: React.FC = () => {
   const provinceSelectRef = useRef<HTMLSelectElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const mapAreaRef = useRef<HTMLDivElement>(null);
+
+  const handleRadiusChange = (newRadius: number) => {
+    setRadiusKm(newRadius);
+    if (search) {
+      setPage(1);
+      setSearch({ ...search, radiusKm: newRadius });
+    }
+  };
+
+  const handleCategoryChange = (newCatId: number | null) => {
+    setCategoryId(newCatId);
+    if (search) {
+      setPage(1);
+      setSearch({ ...search, categoryId: newCatId });
+    }
+  };
 
   /** Màn hẹp: bảng tìm kiếm chiếm gần hết màn hình, nên cuộn xuống bản đồ + kết quả sau khi tìm. */
   const revealResultsOnMobile = useCallback(() => {
@@ -69,17 +89,21 @@ const VenueMap: React.FC = () => {
 
   const params = useMemo<NearbyVenuesParams | null>(() => {
     if (!search) return null;
-    const base = search.kind === 'gps'
-      ? { lat: search.coords.lat, lng: search.coords.lng, radiusKm: search.radiusKm }
-      : { province: search.province.name };
+    const base =
+      search.kind === 'gps'
+        ? { lat: search.coords.lat, lng: search.coords.lng, radiusKm: search.radiusKm }
+        : {
+            province: search.province.name,
+            ...(search.district ? { district: search.district } : {}),
+            radiusKm: search.radiusKm,
+          };
     return { ...base, ...(search.categoryId ? { categoryId: search.categoryId } : {}), page, size: PAGE_SIZE };
   }, [search, page]);
 
   const nearby = useNearbyVenues(params);
   const error = nearby.error ? toApiError(nearby.error) : null;
 
-  // Bấm tìm lại đúng điều kiện vừa lỗi (vd. vừa tắt giả lập nước ngoài) thì phải gọi lại API;
-  // điều kiện đã có kết quả thì dùng cache, không tốn thêm lượt của Khách.
+  // Bấm tìm lại đúng điều kiện vừa lỗi thì phải gọi lại API
   const latestNearby = useRef(nearby);
   latestNearby.current = nearby;
   useEffect(() => {
@@ -93,13 +117,12 @@ const VenueMap: React.FC = () => {
     requestGeo();
   }, [requestGeo]);
 
-  // Có kết quả GPS: kiểm tra lãnh thổ rồi tìm; không có thì đưa người dùng sang ô chọn tỉnh/thành.
+  // Có kết quả GPS: kiểm tra lãnh thổ rồi tìm; không có thì tự động chuyển tab Tỉnh/Quận
   useEffect(() => {
     if (!waitingForGps || geo.status === 'idle' || geo.status === 'locating') return;
     setWaitingForGps(false);
     if (geo.status === 'ready' && geo.coords) {
       if (isOutsideVietnam(geo.coords)) {
-        // Không gọi API (không tốn lượt) và bỏ kết quả của vị trí trước đó.
         setOutsideVietnam(true);
         setSearch(null);
         return;
@@ -108,6 +131,7 @@ const VenueMap: React.FC = () => {
       setSearch({ kind: 'gps', coords: geo.coords, radiusKm: effectiveRadius, categoryId });
       revealResultsOnMobile();
     } else {
+      setSearchMode('area');
       provinceSelectRef.current?.focus();
     }
   }, [waitingForGps, geo.status, geo.coords, effectiveRadius, categoryId, revealResultsOnMobile]);
@@ -120,6 +144,13 @@ const VenueMap: React.FC = () => {
       locate();
     }
   }, [isMember, geo.permission, locate]);
+
+  // Đảm bảo Khách vãng lai luôn được nạp đầy đủ phiên và hạn mức dùng thử (BR-GUEST-03).
+  useEffect(() => {
+    if (!isMember) {
+      void bootstrapGuestSession();
+    }
+  }, [isMember]);
 
   // Phản hồi lỗi theo bảng mã lỗi của SCR-18.
   useEffect(() => {
@@ -134,18 +165,24 @@ const VenueMap: React.FC = () => {
     }
   }, [error, isMember]);
 
-  const searchByProvince = (event: React.FormEvent) => {
+  const searchByArea = (event: React.FormEvent) => {
     event.preventDefault();
     const selected = findProvince(province);
     if (!selected) {
-      setProvinceError('Hãy chọn tỉnh/thành để tìm quán.');
+      setProvinceError('Hãy chọn tỉnh/thành phố để tìm quán.');
       provinceSelectRef.current?.focus();
       return;
     }
     setProvinceError(null);
     setOutsideVietnam(false);
     setPage(1);
-    setSearch({ kind: 'province', province: selected, categoryId });
+    setSearch({
+      kind: 'area',
+      province: selected,
+      district: district.trim() || undefined,
+      radiusKm: effectiveRadius,
+      categoryId,
+    });
     revealResultsOnMobile();
   };
 
@@ -155,7 +192,7 @@ const VenueMap: React.FC = () => {
   };
 
   const widenRadius = () => {
-    if (search?.kind !== 'gps') return;
+    if (!search) return;
     setRadiusKm(QUOTA.memberMapRadiusKm.max);
     setPage(1);
     setSearch({ ...search, radiusKm: QUOTA.memberMapRadiusKm.max });
@@ -211,13 +248,16 @@ const VenueMap: React.FC = () => {
     const items = nearby.data?.items ?? [];
     const meta = nearby.data?.meta;
     const total = meta?.total ?? items.length;
-    const scope =
+    const locationLabel =
       search.kind === 'gps'
-        ? `trong bán kính ${meta?.radiusKm ?? search.radiusKm} km quanh bạn`
-        : `tại ${search.province.label}`;
+        ? 'quanh bạn'
+        : search.district
+          ? `tại ${search.district}, ${search.province.label}`
+          : `tại ${search.province.label}`;
+    const scope = `trong bán kính ${meta?.radiusKm ?? search.radiusKm} km ${locationLabel}`;
 
     if (items.length === 0) {
-      const canWiden = isMember && search.kind === 'gps' && search.radiusKm < QUOTA.memberMapRadiusKm.max;
+      const canWiden = isMember && search.radiusKm < QUOTA.memberMapRadiusKm.max;
       return (
         <EmptyState
           icon="search_off"
@@ -225,7 +265,7 @@ const VenueMap: React.FC = () => {
           description={
             canWiden
               ? `Không tìm thấy quán ${scope}. Thử mở rộng bán kính tìm kiếm.`
-              : `Không tìm thấy quán ${scope}. Thử chọn tỉnh/thành khác.`
+              : `Không tìm thấy quán ${scope}. Thử chọn khu vực khác.`
           }
           action={canWiden ? <Button onClick={widenRadius}>Mở rộng tới {QUOTA.memberMapRadiusKm.max} km</Button> : undefined}
         />
@@ -240,7 +280,11 @@ const VenueMap: React.FC = () => {
         <ul className="flex flex-col gap-space-sm">
           {items.map((venue) => (
             <li key={venue.venueId}>
-              <VenueCard venue={venue} />
+              <VenueCard
+                venue={venue}
+                isSelected={selectedVenueId === venue.venueId}
+                onSelect={(v) => setSelectedVenueId(v.venueId)}
+              />
             </li>
           ))}
         </ul>
@@ -249,13 +293,15 @@ const VenueMap: React.FC = () => {
     );
   };
 
+  const items = nearby.data?.items ?? [];
+
   return (
     <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin">
       <header className="flex flex-wrap items-end justify-between gap-space-sm">
         <div className="flex flex-col gap-space-xs">
           <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">Quán chay quanh bạn</h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Tìm quán chay gần vị trí hiện tại hoặc theo tỉnh/thành, rồi mở chỉ đường tới quán.
+            Tìm quán chay gần vị trí hiện tại hoặc theo tỉnh/thành/quận, rồi mở chỉ đường tới quán.
           </p>
         </div>
         {!isMember && <MapQuotaBadge />}
@@ -268,21 +314,25 @@ const VenueMap: React.FC = () => {
             geoStatus={geo.status}
             geoBlocked={geo.permission === 'denied'}
             outsideVietnam={outsideVietnam}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
             onLocate={locate}
             province={province}
             onProvinceChange={(value) => {
               setProvince(value);
               setProvinceError(null);
             }}
+            district={district}
+            onDistrictChange={setDistrict}
             provinceError={provinceError ?? fieldError('province')}
             provinceSelectRef={provinceSelectRef}
-            onSearchProvince={searchByProvince}
+            onSearchArea={searchByArea}
             radiusKm={radiusKm}
-            onRadiusChange={setRadiusKm}
+            onRadiusChange={handleRadiusChange}
             radiusError={fieldError('radiusKm')}
             categories={categories.data}
             categoryId={categoryId}
-            onCategoryChange={setCategoryId}
+            onCategoryChange={handleCategoryChange}
             lockSeconds={lockSeconds}
           />
         </div>
@@ -292,6 +342,9 @@ const VenueMap: React.FC = () => {
             focus={focus}
             userLocation={search?.kind === 'gps' ? search.coords : null}
             radiusKm={search?.kind === 'gps' ? search.radiusKm : null}
+            venues={items}
+            selectedVenueId={selectedVenueId}
+            onSelectVenue={(v) => setSelectedVenueId(v.venueId)}
             className="h-[300px] sm:h-[380px] lg:h-[calc(100vh-112px)] lg:min-h-[480px]"
           />
           {search && (

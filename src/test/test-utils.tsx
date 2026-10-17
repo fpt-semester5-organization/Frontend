@@ -30,13 +30,15 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
 
 export function renderWithProviders(
   ui: ReactElement,
-  {
+  options: string | CustomRenderOptions = {}
+) {
+  const opts = typeof options === 'string' ? { route: options } : options;
+  const {
     route = '/',
     routerInitialEntries = [route],
     queryClient = createTestQueryClient(),
     ...renderOptions
-  }: CustomRenderOptions = {}
-) {
+  } = opts;
   function AllTheProviders({ children }: WrapperProps) {
     return (
       <QueryClientProvider client={queryClient}>

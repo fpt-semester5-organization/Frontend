@@ -10,15 +10,31 @@ import type { NearbyVenue } from '../types/venues.types';
 const ACTION =
   'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 font-label-md text-label-md no-underline transition-colors';
 
+interface VenueCardProps {
+  venue: NearbyVenue;
+  isSelected?: boolean;
+  onSelect?: (venue: NearbyVenue) => void;
+}
+
 /** Thẻ quán trong danh sách kết quả (FN-MAP-01): ảnh, tên, địa chỉ, khoảng cách, điểm, loại quán, danh mục. */
-export const VenueCard: React.FC<{ venue: NearbyVenue }> = ({ venue }) => {
+export const VenueCard: React.FC<VenueCardProps> = ({ venue, isSelected, onSelect }) => {
   const distance = formatDistance(venue.distanceKm);
+  const ratingNum = Number(venue.rating);
+  const hasRating = venue.rating !== undefined && venue.rating !== null && !isNaN(ratingNum) && ratingNum > 0;
 
   return (
-    <article className="flex gap-space-md rounded-xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card">
+    <article
+      onClick={() => onSelect?.(venue)}
+      className={cn(
+        'flex gap-space-md rounded-xl border p-space-md shadow-card transition-all cursor-pointer',
+        isSelected
+          ? 'border-primary bg-primary/5 ring-2 ring-primary/40 shadow-md'
+          : 'border-surface-container bg-surface-container-lowest hover:border-outline-variant hover:shadow-md'
+      )}
+    >
       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-linear-to-br from-primary-fixed to-secondary-fixed sm:h-24 sm:w-24">
         {venue.thumbnailUrl ? (
-          <img src={venue.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          <img src={venue.thumbnailUrl} alt={venue.name} loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-primary">
             <Icon name="storefront" className="text-[32px]" />
@@ -37,10 +53,12 @@ export const VenueCard: React.FC<{ venue: NearbyVenue }> = ({ venue }) => {
               {distance}
             </span>
           )}
-          <span className="inline-flex items-center gap-0.5" aria-label={`Đánh giá ${formatNumber(venue.rating)} trên 5`}>
-            <Icon name="star" filled className="text-[14px] text-secondary" />
-            {formatNumber(venue.rating)}
-          </span>
+          {hasRating && (
+            <span className="inline-flex items-center gap-0.5" aria-label={`Đánh giá ${formatNumber(ratingNum)} trên 5`}>
+              <Icon name="star" filled className="text-[14px] text-secondary" />
+              {formatNumber(ratingNum)}
+            </span>
+          )}
           <span
             className={cn(
               'rounded-full px-2 py-0.5',
@@ -51,11 +69,11 @@ export const VenueCard: React.FC<{ venue: NearbyVenue }> = ({ venue }) => {
           </span>
         </div>
 
-        {venue.categories.length > 0 && (
+        {venue.categories && venue.categories.length > 0 && (
           <p className="truncate font-body-sm text-body-sm text-on-surface-variant">{venue.categories.join(' · ')}</p>
         )}
 
-        <div className="mt-1 flex flex-wrap gap-space-xs">
+        <div className="mt-1 flex flex-wrap gap-space-xs" onClick={(e) => e.stopPropagation()}>
           <a
             href={venue.directionsUrl}
             target="_blank"

@@ -22,5 +22,5 @@ export const VIP_PLAN_SEED = [
 export const MEDICAL_DISCLAIMER =
   'Khuyến nghị mang tính chất tham khảo dinh dưỡng, vui lòng tham vấn ý kiến bác sĩ chuyên khoa đối với các bệnh lý nền.';
 
-export const PASSWORD_RULE = 'Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (BR-AUTH-001).';
+export const PASSWORD_RULE = 'Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.';
 export const OTP_TTL_SECONDS = 5 * 60;

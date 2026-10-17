@@ -1,9 +1,13 @@
 /**
- * Khai báo kiểu tối thiểu cho @goongmaps/goong-js (gói không kèm TypeScript).
- * Goong JS là bản fork của mapbox-gl v1: chỉ khai báo phần màn bản đồ đang dùng.
+ * Khai báo kiểu cho @goongmaps/goong-js (gói không kèm TypeScript).
+ * Goong JS là bản fork của mapbox-gl v1: khai báo các phần bản đồ, marker, popup, fitBounds.
  */
 declare module '@goongmaps/goong-js' {
   export type LngLatLike = [number, number] | { lng: number; lat: number };
+  export type LngLatBoundsLike =
+    | [LngLatLike, LngLatLike]
+    | [number, number, number, number]
+    | [[number, number], [number, number]];
 
   export interface MapOptions {
     container: HTMLElement | string;
@@ -23,6 +27,20 @@ declare module '@goongmaps/goong-js' {
     essential?: boolean;
   }
 
+  export interface EaseToOptions {
+    center?: LngLatLike;
+    zoom?: number;
+    duration?: number;
+    offset?: [number, number];
+  }
+
+  export interface FitBoundsOptions {
+    padding?: number | { top?: number; bottom?: number; left?: number; right?: number };
+    maxZoom?: number;
+    duration?: number;
+    offset?: [number, number];
+  }
+
   export interface GeoJSONSourceLike {
     setData(data: object): void;
   }
@@ -33,15 +51,38 @@ declare module '@goongmaps/goong-js' {
     once(type: string, listener: () => void): this;
     addControl(control: unknown, position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'): this;
     flyTo(options: FlyToOptions): this;
+    easeTo(options: EaseToOptions): this;
+    fitBounds(bounds: LngLatBoundsLike, options?: FitBoundsOptions): this;
     jumpTo(options: { center?: LngLatLike; zoom?: number }): this;
     resize(): this;
     remove(): void;
     loaded(): boolean;
     isStyleLoaded(): boolean;
+    getZoom(): number;
+    getCenter(): { lng: number; lat: number };
     addSource(id: string, source: { type: 'geojson'; data: object }): this;
     getSource(id: string): GeoJSONSourceLike | undefined;
     addLayer(layer: Record<string, unknown>): this;
     getLayer(id: string): unknown;
+  }
+
+  export interface PopupOptions {
+    closeButton?: boolean;
+    closeOnClick?: boolean;
+    anchor?: string;
+    offset?: number | [number, number] | Record<string, [number, number]>;
+    className?: string;
+  }
+
+  export class Popup {
+    constructor(options?: PopupOptions);
+    addTo(map: Map): this;
+    remove(): this;
+    isOpen(): boolean;
+    setLngLat(lngLat: LngLatLike): this;
+    setText(text: string): this;
+    setHTML(html: string): this;
+    setDOMContent(htmlNode: Node): this;
   }
 
   export class Marker {
@@ -49,6 +90,9 @@ declare module '@goongmaps/goong-js' {
     setLngLat(lngLat: LngLatLike): this;
     addTo(map: Map): this;
     remove(): this;
+    setPopup(popup?: Popup): this;
+    getPopup(): Popup | undefined;
+    togglePopup(): this;
   }
 
   export class NavigationControl {
@@ -60,6 +104,7 @@ declare module '@goongmaps/goong-js' {
     supported(options?: { failIfMajorPerformanceCaveat?: boolean }): boolean;
     Map: typeof Map;
     Marker: typeof Marker;
+    Popup: typeof Popup;
     NavigationControl: typeof NavigationControl;
   };
   export default goongjs;

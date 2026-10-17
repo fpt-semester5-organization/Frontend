@@ -38,6 +38,10 @@ const MealPlanDetail = lazy(() => import('@/features/meal-plans/pages/MealPlanDe
 const ShoppingList = lazy(() => import('@/features/shopping-lists/pages/ShoppingList'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 const FridgePage = lazy(() => import('@/features/fridge/pages/FridgePage'));
+const PricingPage = lazy(() => import('@/features/subscription/pages/PricingPage'));
+const CheckoutPage = lazy(() => import('@/features/subscription/pages/CheckoutPage'));
+const PaymentResultPage = lazy(() => import('@/features/subscription/pages/PaymentResultPage'));
+const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySubscriptionPage'));
 
 const router = createBrowserRouter([
   {
@@ -105,6 +109,17 @@ const router = createBrowserRouter([
 
           // Fridge Vision (SCR-17)
           { path: PATHS.FRIDGE, element: <FridgePage /> },
+
+          // Gói VIP & Thanh toán (SCR-30: công khai; SCR-31, 32, 33: yêu cầu đăng nhập)
+          { path: PATHS.SUBSCRIPTION.PRICING, element: <PricingPage /> },
+          {
+            element: <RequireAuth />,
+            children: [
+              { path: PATHS.SUBSCRIPTION.CHECKOUT(':planId'), element: <CheckoutPage /> },
+              { path: PATHS.SUBSCRIPTION.RESULT, element: <PaymentResultPage /> },
+              { path: PATHS.ME.SUBSCRIPTION, element: <MySubscriptionPage /> },
+            ],
+          },
 
           { path: '*', element: <NotFoundPage /> },
         ],
