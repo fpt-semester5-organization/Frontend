@@ -1,5 +1,5 @@
 import React, { lazy } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { NotFoundPage } from '@/app/NotFoundPage';
 import { MainLayout } from '@/layouts/MainLayout';
@@ -20,7 +20,6 @@ const HomePage = lazy(() => import('@/features/home/pages/HomePage'));
 const RecipeList = lazy(() => import('@/features/recipes/pages/RecipeList'));
 const RecipeDetail = lazy(() => import('@/features/recipes/pages/RecipeDetail'));
 const RecipeEditor = lazy(() => import('@/features/recipes/pages/RecipeEditor'));
-const MyRecipes = lazy(() => import('@/features/recipes/pages/MyRecipes'));
 const Profile = lazy(() => import('@/features/profile/pages/Profile'));
 const HealthProfile = lazy(() => import('@/features/profile/pages/HealthProfile'));
 const DietaryPreferences = lazy(() => import('@/features/profile/pages/DietaryPreferences'));
@@ -31,7 +30,7 @@ const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
 const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const VenueMap = lazy(() => import('@/features/venues/pages/VenueMap'));
-const MyPosts = lazy(() => import('@/features/community/pages/MyPosts'));
+const MyContent = lazy(() => import('@/features/community/pages/MyContent'));
 const MealPlanList = lazy(() => import('@/features/meal-plans/pages/MealPlanList'));
 const MealPlanGenerate = lazy(() => import('@/features/meal-plans/pages/MealPlanGenerate'));
 const MealPlanDetail = lazy(() => import('@/features/meal-plans/pages/MealPlanDetail'));
@@ -56,13 +55,12 @@ const router = createBrowserRouter([
           // Trang chủ (SCR-10)
           { path: PATHS.HOME, element: <HomePage /> },
 
-          // Công thức (SCR-11 → SCR-14). Trang soạn mở cho cả Khách, guard theo từng nút (SCR-13);
-          // trang sửa và Công thức của tôi tự mời đăng nhập. key riêng để đổi qua lại giữa soạn mới và sửa không giữ state cũ.
+          // Công thức (SCR-11 → SCR-13). Trang soạn mở cho cả Khách, guard theo từng nút (SCR-13);
+          // trang sửa tự mời đăng nhập. key riêng để đổi qua lại giữa soạn mới và sửa không giữ state cũ.
           { path: PATHS.RECIPES.ROOT, element: <RecipeList /> },
           { path: PATHS.RECIPES.NEW, element: <RecipeEditor key="new" /> },
           { path: PATHS.RECIPES.EDIT(':id'), element: <RecipeEditor key="edit" /> },
           { path: PATHS.RECIPES.DETAIL(':id'), element: <RecipeDetail /> },
-          { path: PATHS.ME.RECIPES, element: <MyRecipes /> },
 
           // Videos (SCR-21)
           { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
@@ -72,10 +70,9 @@ const router = createBrowserRouter([
           { path: PATHS.ME.DIETARY_PREFERENCES, element: <DietaryPreferences /> },
           { element: <RequireAuth />, children: [{ path: PATHS.ME.PROFILE, element: <Profile /> }] },
 
-          // Community (SCR-25 → SCR-28)
+          // Community (SCR-25 → SCR-27)
           { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
           { path: PATHS.COMMUNITY.POST_DETAIL(':id'), element: <PostDetail /> },
-          { path: PATHS.ME.POSTS, element: <MyPosts /> },
           {
             element: <RequireAuth />,
             children: [
@@ -84,6 +81,11 @@ const router = createBrowserRouter([
               { path: PATHS.AUTH.CHANGE_PASSWORD, element: <ChangePasswordPage /> },
             ],
           },
+
+          // Nội dung của tôi: gộp SCR-14 và SCR-28, tự mời Khách đăng nhập. Route cũ chuyển về đúng tab.
+          { path: PATHS.ME.CONTENT(), element: <MyContent /> },
+          { path: PATHS.ME.POSTS, element: <Navigate to={PATHS.ME.CONTENT()} replace /> },
+          { path: PATHS.ME.RECIPES, element: <Navigate to={PATHS.ME.CONTENT('recipes')} replace /> },
 
           // Thực đơn tuần & danh sách đi chợ (SCR-22 → SCR-24): chỉ Thành viên/VIP
           {

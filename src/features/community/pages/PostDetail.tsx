@@ -77,7 +77,7 @@ const PostDetail: React.FC = () => {
     deletePost.mutate(postId, {
       onSuccess: (res) => {
         notifySuccess(res.message);
-        navigate(PATHS.ME.POSTS, { replace: true });
+        navigate(PATHS.ME.CONTENT(), { replace: true });
       },
       onError: (error) => {
         setConfirmDelete(false);

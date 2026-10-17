@@ -130,13 +130,13 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
     it('đang bị ẩn chờ Admin thì báo khóa, không hiện form', async () => {
       renderEdit(own('QUARANTINED_HIDDEN'));
       expect(await screen.findByRole('heading', { name: 'Công thức đang bị khóa' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Về công thức của tôi' })).toHaveAttribute('href', '/me/recipes');
+      expect(screen.getByRole('link', { name: 'Về nội dung của tôi' })).toHaveAttribute('href', '/me/content?tab=recipes');
     });
 
     it('404 thì báo không tìm thấy', async () => {
       renderEdit({ status: 404, errorCode: 'ERR_CONTENT_NOT_FOUND', message: 'Không tồn tại.' });
       expect(await screen.findByRole('heading', { name: 'Không tìm thấy công thức' })).toBeInTheDocument();
-      expect(within(screen.getByRole('status')).getByRole('link', { name: 'Về công thức của tôi' })).toBeInTheDocument();
+      expect(within(screen.getByRole('status')).getByRole('link', { name: 'Về nội dung của tôi' })).toBeInTheDocument();
     });
   });
 });

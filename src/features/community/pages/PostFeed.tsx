@@ -61,11 +61,11 @@ const PostFeed: React.FC = () => {
             Viết bài mới
           </Button>
           {isMember ? (
-            <Link to={PATHS.ME.POSTS} className={cn(sideLink, 'flex-1 lg:flex-none')}>
+            <Link to={PATHS.ME.CONTENT()} className={cn(sideLink, 'flex-1 lg:flex-none')}>
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant">
                 <Icon name="article" />
               </span>
-              <span className="font-label-md text-label-md text-on-surface">Bài viết của tôi</span>
+              <span className="font-label-md text-label-md text-on-surface">Nội dung của tôi</span>
               <Icon name="chevron_right" className="ml-auto text-[20px] text-outline" />
             </Link>
           ) : (

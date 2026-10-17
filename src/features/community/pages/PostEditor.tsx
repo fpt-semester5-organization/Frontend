@@ -42,11 +42,11 @@ const PostEditor: React.FC = () => {
   const finish = (targetId: number, status: ModerationStatus | null, message: string) => {
     if (status === 'DRAFT') {
       notifySuccess(message || 'Đã lưu nháp.');
-      navigate(PATHS.ME.POSTS);
+      navigate(PATHS.ME.CONTENT());
     } else if (status === 'QUARANTINED_HIDDEN' || status === 'PENDING_REVIEW' || status === 'REJECTED') {
       // Kiểm duyệt AI ≥ 85% hoặc bài sửa đang chờ duyệt lại (BR-ADM-CNT-002, BR-USR-REC-01).
       notifyInfo('Bài viết đang chờ kiểm duyệt nên chưa hiển thị công khai.');
-      navigate(PATHS.ME.POSTS);
+      navigate(PATHS.ME.CONTENT());
     } else {
       notifySuccess(message || 'Đã lưu bài viết.');
       navigate(PATHS.COMMUNITY.POST_DETAIL(targetId));
