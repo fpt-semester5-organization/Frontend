@@ -34,7 +34,15 @@ let guestBootstrapping: Promise<string | null> | null = null;
 export function bootstrapGuestSession(force = false): Promise<string | null> {
   const auth = useAuthStore.getState();
   if (auth.user) return Promise.resolve(null);
-  if (auth.guestToken && !force) return Promise.resolve(auth.guestToken);
+  if (auth.guestToken && !force) {
+    if (!useGuestStore.getState().quota) {
+      void rawHttp
+        .get<ApiEnvelope<GuestQuota>>('/guest/quota', { headers: { Authorization: `Bearer ${auth.guestToken}` } })
+        .then((q) => useGuestStore.getState().setQuota(q.data.data))
+        .catch(() => {});
+    }
+    return Promise.resolve(auth.guestToken);
+  }
   guestBootstrapping ??= (async () => {
     try {
       const r = await rawHttp.post<ApiEnvelope<{ accessToken: string; guestId: string }>>('/auth/anonymous');

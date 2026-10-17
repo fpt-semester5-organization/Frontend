@@ -24,7 +24,7 @@ export function ForgotPasswordPage() {
     forgot.mutate(v, {
       onSuccess: () => {
         toast.success('Nếu email tồn tại, mã OTP đặt lại mật khẩu đã được gửi');
-        navigate(PATHS.AUTH.RESET_PASSWORD, { state: { email: v.email } });
+        navigate(PATHS.AUTH.VERIFY_OTP, { state: { email: v.email, purpose: 'PASSWORD_RESET', otpExpiresIn: 300 } });
       },
       onError: handle,
     });
