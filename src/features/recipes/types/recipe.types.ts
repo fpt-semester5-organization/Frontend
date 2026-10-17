@@ -40,13 +40,8 @@ export type RecipeDetail = Omit<RecipeDetailRaw, 'imageUrl' | 'description' | 's
   };
 export type RecipeIngredientLine = RecipeDetail['ingredients'][number];
 
-/**
- * SCR-14 "Công thức của tôi". UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt): GET /recipes nhận thêm
- * authorId (như GET /posts) và status; khi authorId là người gọi thì trả mọi trạng thái trừ DELETED, mỗi mục kèm status.
- */
+/** Trạng thái tác giả thấy được trên công thức của mình (mọi trạng thái trừ DELETED). */
 export type MyRecipeStatus = Exclude<RecipeStatus, 'DELETED'>;
-export type MyRecipeListParams = Omit<RecipeListParams, 'contentType'> & { authorId: number; status?: MyRecipeStatus };
-export type MyRecipeItem = RecipeListItem & { status: MyRecipeStatus };
 
 /** DELETE /recipes/{id}?mode= (FN-POST-04): archive = gỡ khỏi trang cá nhân; all = xóa mềm với tất cả. */
 export type DeleteRecipeMode = ApiOperations['deleteRecipe']['parameters']['query']['mode'];
