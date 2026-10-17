@@ -1,11 +1,55 @@
 import { GoogleLogin } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
 import { useLoginWithGoogle } from '@/features/auth/hooks/useAuth';
 import { toast } from '@/stores/ui.store';
-import { apiErrorCode, apiErrorMessage } from '@/api/http';
+import { apiErrorCode, apiErrorData, apiErrorMessage } from '@/api/http';
+import { PATHS } from '@/routes/paths';
+
+/** Giải mã payload JWT Google ID Token để lấy email */
+export function decodeGoogleCredential(token: string): { email?: string; name?: string; picture?: string; sub?: string } | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+export interface GoogleButtonProps {
+  label?: string;
+  onAccountLinkRequired?: (email: string, idToken: string) => void;
+}
 
 /** Đăng nhập/đăng ký bằng Google (FN-AUTH-07, POST /auth/google). */
-export function GoogleButton({ label }: { label?: string }) {
+export function GoogleButton({ label, onAccountLinkRequired }: GoogleButtonProps) {
   const googleLogin = useLoginWithGoogle();
+  const navigate = useNavigate();
+
+  const handleAccountLink = (idToken: string, err: unknown) => {
+    const data = apiErrorData(err) as { email?: string } | undefined;
+    const decoded = decodeGoogleCredential(idToken);
+    const email = data?.email || decoded?.email || '';
+
+    if (onAccountLinkRequired) {
+      onAccountLinkRequired(email, idToken);
+    } else {
+      navigate(PATHS.AUTH.LOGIN, {
+        state: {
+          email,
+          googleIdToken: idToken,
+          accountLinkRequired: true,
+        },
+      });
+    }
+  };
 
   const handleSuccess = (credentialResponse: { credential?: string }) => {
     if (!credentialResponse?.credential) {
@@ -20,12 +64,7 @@ export function GoogleButton({ label }: { label?: string }) {
         onError: (err) => {
           const code = apiErrorCode(err);
           if (code === 'ERR_AUTH_ACCOUNT_LINK_REQUIRED') {
-            const password = window.prompt(
-              'Email này đã có tài khoản mật khẩu. Vui lòng nhập mật khẩu hiện tại để liên kết Google:'
-            );
-            if (password) {
-              googleLogin.mutate({ idToken, currentPassword: password });
-            }
+            handleAccountLink(idToken, err);
             return;
           }
           toast.error(apiErrorMessage(err));
@@ -42,10 +81,18 @@ export function GoogleButton({ label }: { label?: string }) {
       <button
         type="button"
         onClick={() => {
+          const devToken = 'dev-google-token';
           googleLogin.mutate(
-            { idToken: 'dev-google-token' },
+            { idToken: devToken },
             {
-              onError: (err) => toast.error(apiErrorMessage(err)),
+              onError: (err) => {
+                const code = apiErrorCode(err);
+                if (code === 'ERR_AUTH_ACCOUNT_LINK_REQUIRED') {
+                  handleAccountLink(devToken, err);
+                  return;
+                }
+                toast.error(apiErrorMessage(err));
+              },
             }
           );
         }}

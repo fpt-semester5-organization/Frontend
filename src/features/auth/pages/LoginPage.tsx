@@ -4,7 +4,7 @@
  * FN: FN-AUTH-08 · Nguyễn Văn Minh Tâm · Sprint 5
  * Giao diện: Stich-AI-45UI-Screen/SCR-01_auth-Login (viết lại theo design system Linen & Earth để đồng nhất với SCR-02…05).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +17,7 @@ import { toast } from '@/stores/ui.store';
 import { AuthCard } from '../components/AuthCard';
 import { useApiFormErrors } from '../components/useApiFormErrors';
 import { formatMmSs, useCountdown } from '../hooks/useCountdown';
-import { useLogin } from '../hooks/useAuth';
+import { useLogin, useLoginWithGoogle } from '../hooks/useAuth';
 import { loginSchema, type LoginForm } from '../schemas/auth.schemas';
 
 /** Khóa đăng nhập mặc định 15 phút (BR-AUTH-004) khi server không trả `lockedUntil`. */
@@ -25,19 +25,73 @@ const LOCK_MS = 15 * 60_000;
 
 export function LoginPage() {
   const login = useLogin();
+  const googleLogin = useLoginWithGoogle();
   const location = useLocation();
   const navigate = useNavigate();
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [askRestore, setAskRestore] = useState(false);
   const [notVerifiedEmail, setNotVerifiedEmail] = useState<string | null>(null);
+  const [accountLinkState, setAccountLinkState] = useState<{ email: string; idToken: string } | null>(null);
   const form = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '', restoreAccount: false } });
   const { formError, setFormError, handle, clear } = useApiFormErrors(form.setError);
   const lockLeft = useCountdown(lockedUntil);
   const locked = lockLeft > 0;
 
+  useEffect(() => {
+    const state = location.state as {
+      email?: string;
+      googleIdToken?: string;
+      accountLinkRequired?: boolean;
+    } | null;
+
+    if (state?.accountLinkRequired && state.email) {
+      form.setValue('email', state.email);
+      if (state.googleIdToken) {
+        setAccountLinkState({ email: state.email, idToken: state.googleIdToken });
+      }
+      setTimeout(() => form.setFocus('password'), 100);
+    }
+  }, [location.state, form]);
+
+  const handleAccountLinkRequired = (email: string, idToken: string) => {
+    clear();
+    setNotVerifiedEmail(null);
+    if (email) {
+      form.setValue('email', email);
+    }
+    setAccountLinkState({ email, idToken });
+    setTimeout(() => form.setFocus('password'), 100);
+  };
+
   const run = (values: LoginForm, restoreAccount: boolean) => {
     clear();
     setNotVerifiedEmail(null);
+
+    // Nếu email này đã có mật khẩu và người dùng đang xác nhận mật khẩu để liên kết Google (FN-AUTH-07)
+    if (
+      accountLinkState?.idToken &&
+      values.email.trim().toLowerCase() === accountLinkState.email.trim().toLowerCase()
+    ) {
+      googleLogin.mutate(
+        {
+          idToken: accountLinkState.idToken,
+          currentPassword: values.password,
+        },
+        {
+          onError: (err) => {
+            const code = apiErrorCode(err);
+            if (code === 'ERR_AUTH_INVALID_CREDENTIALS') {
+              setFormError('Mật khẩu không chính xác. Vui lòng nhập đúng mật khẩu để liên kết Google và đăng nhập.');
+              form.setFocus('password');
+              return;
+            }
+            handle(err);
+          },
+        }
+      );
+      return;
+    }
+
     login.mutate(
       { ...values, email: values.email.trim(), restoreAccount },
       {
@@ -95,7 +149,7 @@ export function LoginPage() {
         </p>
       }
     >
-      <GoogleButton label="Tiếp tục với Google" />
+      <GoogleButton label="Tiếp tục với Google" onAccountLinkRequired={handleAccountLinkRequired} />
       <div className="relative my-space-md flex items-center justify-center">
         <div className="h-px w-full bg-surface-container-highest" />
         <span className="absolute bg-surface-container-lowest px-3 font-label-sm text-label-sm text-on-surface-variant">hoặc</span>
@@ -111,6 +165,27 @@ export function LoginPage() {
             </button>
           </FormAlert>
         )}
+        {accountLinkState && (
+          <FormAlert tone="warning">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">
+                  Email đã được đăng ký bằng mật khẩu
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAccountLinkState(null)}
+                  className="ml-2 text-label-sm font-normal text-on-surface-variant underline hover:text-on-surface"
+                >
+                  Đóng
+                </button>
+              </div>
+              <p>
+                Email <span className="font-semibold">{accountLinkState.email}</span> đã có tài khoản mật khẩu. Vui lòng nhập mật khẩu bên dưới để đăng nhập và liên kết tài khoản Google.
+              </p>
+            </div>
+          </FormAlert>
+        )}
         <Field label="Email" type="email" autoComplete="email" placeholder="vanan@veggielife.vn" icon="mail" required error={form.formState.errors.email?.message} {...form.register('email')} />
         <div className="flex flex-col gap-1.5">
           <PasswordField label="Mật khẩu" autoComplete="current-password" placeholder="••••••••" required error={form.formState.errors.password?.message} {...form.register('password')} />
@@ -118,7 +193,7 @@ export function LoginPage() {
             Quên mật khẩu?
           </Link>
         </div>
-        <SubmitButton loading={login.isPending} disabled={locked} icon="login">
+        <SubmitButton loading={login.isPending || googleLogin.isPending} disabled={locked} icon="login">
           {locked ? `Tạm khóa, thử lại sau ${formatMmSs(lockLeft)}` : 'Đăng nhập'}
         </SubmitButton>
       </form>
