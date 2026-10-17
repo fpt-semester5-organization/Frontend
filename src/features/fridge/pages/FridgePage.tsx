@@ -334,7 +334,7 @@ export const FridgePage: React.FC = () => {
                 <h2 className="font-headline-sm text-headline-sm text-on-surface">AI Vision Studio</h2>
               </div>
               <span className="font-label-sm text-label-sm text-on-surface-variant">
-                Gemini 2.5 Flash Vision
+                Gemini 3.8 Flash Vision
               </span>
             </div>
 
