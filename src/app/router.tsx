@@ -21,6 +21,9 @@ const RecipeList = lazy(() => import('@/features/recipes/pages/RecipeList'));
 const RecipeDetail = lazy(() => import('@/features/recipes/pages/RecipeDetail'));
 const RecipeEditor = lazy(() => import('@/features/recipes/pages/RecipeEditor'));
 const MyRecipes = lazy(() => import('@/features/recipes/pages/MyRecipes'));
+const Profile = lazy(() => import('@/features/profile/pages/Profile'));
+const HealthProfile = lazy(() => import('@/features/profile/pages/HealthProfile'));
+const DietaryPreferences = lazy(() => import('@/features/profile/pages/DietaryPreferences'));
 const PostFeed = lazy(() => import('@/features/community/pages/PostFeed'));
 const VideoPlayer = lazy(() => import('@/features/videos/pages/VideoPlayer'));
 const PostDetail = lazy(() => import('@/features/community/pages/PostDetail'));
@@ -59,6 +62,11 @@ const router = createBrowserRouter([
 
           // Videos (SCR-21)
           { path: PATHS.VIDEOS.DETAIL(':id'), element: <VideoPlayer /> },
+
+          // Hồ sơ (SCR-07 → SCR-09): /me chỉ Thành viên; sức khỏe và trường phái/dị ứng Khách xem được, guard theo nút.
+          { path: PATHS.ME.HEALTH, element: <HealthProfile /> },
+          { path: PATHS.ME.DIETARY_PREFERENCES, element: <DietaryPreferences /> },
+          { element: <RequireAuth />, children: [{ path: PATHS.ME.PROFILE, element: <Profile /> }] },
 
           // Community (SCR-25 → SCR-28)
           { path: PATHS.COMMUNITY.ROOT, element: <PostFeed /> },
