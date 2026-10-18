@@ -1,4 +1,4 @@
-import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { toApiError } from '@/lib/apiError';
 import {
   getRecipe,
@@ -16,11 +16,26 @@ export const retryServerErrorsOnce = (failureCount: number, error: unknown) =>
   failureCount < 1 && toApiError(error).status >= 500;
 
 /** Danh sách công thức có phân trang (FN-POST-01); giữ trang cũ trên màn hình trong lúc tải trang mới. */
-export function useRecipeList(params: RecipeListParams) {
+export function useRecipeList(params: RecipeListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: recipeKeys.list(params),
     queryFn: () => listRecipes(params),
     placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    retry: retryServerErrorsOnce,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** Cuộn vô hạn công thức (SCR-25): trang kế theo meta của server. */
+export function useInfiniteRecipes(params: Omit<RecipeListParams, 'page'>, options?: { enabled?: boolean }) {
+  return useInfiniteQuery({
+    queryKey: [...recipeKeys.all, 'infinite', params],
+    queryFn: ({ pageParam = 1 }) => listRecipes({ ...params, page: pageParam as number }),
+    initialPageParam: 1,
+    getNextPageParam: (last: { meta: { page: number; size: number; total: number } }) =>
+      last.meta.page * last.meta.size < last.meta.total ? last.meta.page + 1 : undefined,
+    enabled: options?.enabled ?? true,
     staleTime: 60 * 1000,
     retry: retryServerErrorsOnce,
   });
