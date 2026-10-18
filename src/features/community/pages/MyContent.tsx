@@ -48,6 +48,9 @@ const MyContent: React.FC = () => {
             <Link to={withReturnUrl(PATHS.AUTH.REGISTER, returnUrl)} className={SECONDARY_LINK}>
               Đăng ký
             </Link>
+            <Link to={PATHS.COMMUNITY.ROOT} className={SECONDARY_LINK}>
+              Về Cộng đồng
+            </Link>
           </>
         }
       />
@@ -56,6 +59,14 @@ const MyContent: React.FC = () => {
 
   // Đổi tab thì bỏ bộ lọc của tab cũ.
   const selectTab = (next: ContentTab) => setSearchParams(next === 'recipes' ? { tab: 'recipes' } : {});
+
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(PATHS.COMMUNITY.ROOT);
+    }
+  };
 
   const writePost = (
     <Button key="post" size="lg" variant={tab === 'posts' ? 'primary' : 'outline'} onClick={() => navigate(PATHS.COMMUNITY.NEW_POST)}>
@@ -72,6 +83,30 @@ const MyContent: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-margin-mobile py-space-xl sm:px-margin">
+      {/* Thanh điều hướng quay lại & Breadcrumb */}
+      <div className="mb-space-md flex items-center justify-between gap-space-sm pb-1 flex-wrap">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+        >
+          <Icon name="arrow_back" className="text-[18px]" />
+          <span>Quay lại</span>
+        </button>
+
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
+          <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+            Trang chủ
+          </Link>
+          <Icon name="chevron_right" className="text-[14px] text-outline" />
+          <Link to={PATHS.COMMUNITY.ROOT} className="hover:text-primary transition-colors">
+            Cộng đồng
+          </Link>
+          <Icon name="chevron_right" className="text-[14px] text-outline" />
+          <span className="font-semibold text-on-surface">Nội dung của tôi</span>
+        </nav>
+      </div>
+
       <div className="mb-space-lg flex flex-col justify-between gap-space-lg md:flex-row md:items-end">
         <div>
           <h1 className="font-headline-lg text-headline-lg-mobile tracking-tight text-tertiary sm:text-headline-lg">Nội dung của tôi</h1>

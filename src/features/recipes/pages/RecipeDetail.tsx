@@ -105,22 +105,42 @@ const RecipeDetail: React.FC = () => {
   const isPublic = status === 'APPROVED_ACTIVE';
   const canReport = isPublic && !isOwner && (!isMember || data.memberActions.canReport);
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(PATHS.RECIPES.ROOT);
+    }
+  };
+
   return (
     <div className={PAGE}>
-      {/* Luôn một dòng (tên món dài thì cắt bớt) để đổi font không làm khối bên dưới nhảy (CLS). */}
-      <nav aria-label="Đường dẫn" className="flex items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
-        <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
-          Trang chủ
-        </Link>
-        <span className="text-outline-variant">/</span>
-        <Link to={PATHS.RECIPES.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
-          Kho công thức
-        </Link>
-        <span className="text-outline-variant">/</span>
-        <span aria-current="page" className="min-w-0 truncate text-primary">
-          {data.title}
-        </span>
-      </nav>
+      {/* Thanh điều hướng quay lại & Breadcrumb */}
+      <div className="flex items-center justify-between gap-space-sm pb-1 flex-wrap">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+        >
+          <Icon name="arrow_back" className="text-[18px]" />
+          <span>Quay lại</span>
+        </button>
+
+        {/* Luôn một dòng (tên món dài thì cắt bớt) để đổi font không làm khối bên dưới nhảy (CLS). */}
+        <nav aria-label="Đường dẫn" className="flex items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+          <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+            Trang chủ
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <Link to={PATHS.RECIPES.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+            Kho công thức
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <span aria-current="page" className="min-w-0 truncate text-primary max-w-[200px] sm:max-w-[320px]">
+            {data.title}
+          </span>
+        </nav>
+      </div>
 
       {!isPublic && (
         <FormAlert tone="info" title={`${RECIPE_STATUS_META[status].label} · chỉ bạn xem được`}>

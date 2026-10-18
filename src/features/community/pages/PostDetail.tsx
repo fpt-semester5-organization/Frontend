@@ -85,8 +85,42 @@ const PostDetail: React.FC = () => {
       },
     });
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(PATHS.COMMUNITY.ROOT);
+    }
+  };
+
   return (
     <div className={PAGE}>
+      {/* Thanh điều hướng quay lại & Breadcrumb */}
+      <nav aria-label="Điều hướng bài viết" className="flex items-center justify-between gap-space-sm pb-1">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+        >
+          <Icon name="arrow_back" className="text-[18px]" />
+          <span>Quay lại</span>
+        </button>
+
+        <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
+          <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+            Trang chủ
+          </Link>
+          <Icon name="chevron_right" className="text-[14px] text-outline" />
+          <Link to={PATHS.COMMUNITY.ROOT} className="hover:text-primary transition-colors">
+            Cộng đồng
+          </Link>
+          <Icon name="chevron_right" className="text-[14px] text-outline" />
+          <span className="font-semibold text-on-surface truncate max-w-[200px] sm:max-w-[320px]">
+            {data.title}
+          </span>
+        </div>
+      </nav>
+
       <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl">
         <header className="flex flex-wrap items-center justify-between gap-space-md pb-space-lg">
           <div className="flex items-center gap-space-sm">
