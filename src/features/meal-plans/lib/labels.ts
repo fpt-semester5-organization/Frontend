@@ -61,3 +61,16 @@ export const SWAP_REASONS: { value: SwapReason; label: string }[] = [
   { value: 'MISSING_INGREDIENT', label: 'Thiếu nguyên liệu' },
   { value: 'TIME_LIMIT', label: 'Không đủ thời gian nấu' },
 ];
+
+export const SWAP_REASON_LABEL: Record<SwapReason, string> = {
+  TASTE_PREFERENCE: 'Không hợp khẩu vị',
+  MISSING_INGREDIENT: 'Thiếu nguyên liệu',
+  TIME_LIMIT: 'Không đủ thời gian nấu',
+};
+
+export const MEAL_BADGE: Record<MealType, string> = {
+  BREAKFAST: 'bg-primary text-on-primary',
+  LUNCH: 'bg-secondary text-on-secondary',
+  DINNER: 'bg-primary text-on-primary',
+  SNACK: 'bg-outline text-surface-container-lowest',
+};
