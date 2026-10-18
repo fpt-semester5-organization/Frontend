@@ -14,6 +14,8 @@ export interface ContentRef {
 /** GET /posts (FN-POST-05). */
 export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][number]> & {
   authorAvatarUrl?: string | null;
+  moderationStatus?: string | null;
+  visibility?: 'PUBLIC' | 'PRIVATE' | null;
 };
 export type PostListParams = NonNullable<ApiOperations['listPosts']['parameters']['query']>;
 export type PostSort = NonNullable<PostListParams['sort']>;
