@@ -25,7 +25,7 @@ export function useSessionRestore() {
       } catch {
         // Không có phiên (hoặc lấy hồ sơ lỗi): xóa token dở dang, coi là Khách.
         logout();
-        void bootstrapGuestSession();
+        await bootstrapGuestSession();
       }
     })();
   }, []);

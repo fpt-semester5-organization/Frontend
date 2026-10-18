@@ -27,12 +27,27 @@ export const ScanResultCard: React.FC<{ result: ProductScanResult; isMember: boo
       </header>
 
       <div className="flex flex-col gap-space-lg p-space-lg">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-headline-sm text-headline-sm break-words text-on-surface">{result.productName}</h3>
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            {result.brand && <span>{result.brand} · </span>}
-            <span className="font-mono tabular-nums">{result.barcode}</span>
-          </p>
+        <div className="flex items-start gap-space-md">
+          {result.imageUrl && (
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-surface-container bg-surface-container-low p-1 shadow-xs">
+              <img
+                src={result.imageUrl}
+                alt={result.productName}
+                className="h-full w-full object-contain"
+                loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget.parentElement as HTMLElement)?.classList.add('hidden');
+                }}
+              />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h3 className="font-headline-sm text-headline-sm break-words text-on-surface">{result.productName}</h3>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              {result.brand && <span>{result.brand} · </span>}
+              <span className="font-mono tabular-nums">{result.barcode}</span>
+            </p>
+          </div>
         </div>
 
         <section aria-labelledby="scan-additives" className="flex flex-col gap-space-sm">

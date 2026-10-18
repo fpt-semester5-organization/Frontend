@@ -91,9 +91,23 @@ const ScanHistory: React.FC = () => {
                 key={scan.scanId}
                 className="flex flex-wrap items-center gap-space-md rounded-xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card sm:flex-nowrap"
               >
-                <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', info.badge)}>
-                  <Icon name={info.icon} filled className="text-[24px]" />
-                </span>
+                {scan.imageUrl ? (
+                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-surface-container bg-surface-container-low p-0.5 shadow-xs">
+                    <img
+                      src={scan.imageUrl}
+                      alt={scan.productName}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget.parentElement as HTMLElement)?.classList.add('hidden');
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', info.badge)}>
+                    <Icon name={info.icon} filled className="text-[24px]" />
+                  </span>
+                )}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <p className="truncate font-label-lg text-label-lg text-on-surface">{scan.productName}</p>
                   <p className="flex flex-wrap items-center gap-x-space-sm font-body-sm text-body-sm text-on-surface-variant">

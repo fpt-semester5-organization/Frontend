@@ -19,6 +19,7 @@ export type AllergenWarning = string | { allergenId?: number; code?: string; all
 export type ProductScanResult = Omit<ProductData, 'veganVerdict' | 'allergenWarnings' | 'quota' | 'brand'> & {
   veganVerdict: VeganVerdict;
   brand: string | null;
+  imageUrl?: string | null;
   allergenWarnings: AllergenWarning[];
   quota?: ProductData['quota'] | null;
 };
@@ -29,6 +30,7 @@ export type ScanMethod = 'CAMERA_BARCODE' | 'MANUAL_INPUT';
 /** GET /users/me/scans (FN-BAR-02). */
 export type ScanHistoryItem = Omit<DeepRequired<Schemas['ListCurrentUserScansResponse']['data'][number]>, 'veganVerdict'> & {
   veganVerdict: VeganVerdict;
+  imageUrl?: string | null;
 };
 export interface ScanHistoryParams {
   verdict?: VeganVerdict;
