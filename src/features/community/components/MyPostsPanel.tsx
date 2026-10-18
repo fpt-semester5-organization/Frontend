@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatNumber } from '@/lib/format';
@@ -17,28 +18,51 @@ import { PostListToolbar } from './PostListToolbar';
 
 const PAGE_SIZE = 10;
 
+interface StatusTab {
+  id: string;
+  label: string;
+  value?: string;
+  icon: string;
+}
+
+const STATUS_TABS: StatusTab[] = [
+  { id: 'ALL', label: 'Tất cả', icon: 'view_list' },
+  { id: 'APPROVED', label: 'Đã duyệt', value: 'APPROVED_ACTIVE', icon: 'check_circle' },
+  { id: 'PENDING', label: 'Chờ duyệt', value: 'PENDING_REVIEW', icon: 'hourglass_empty' },
+  { id: 'DRAFT', label: 'Bản nháp', value: 'DRAFT', icon: 'edit_note' },
+  { id: 'HIDDEN', label: 'Bị ẩn / Khóa', value: 'QUARANTINED_HIDDEN', icon: 'visibility_off' },
+];
+
 /**
- * Tab "Bài viết" của Nội dung của tôi (SCR-28): GET /posts?authorId=<tôi> (FN-POST-05).
- * Backend trả cả bài nháp và bài riêng tư của chính tác giả, nhưng PostSummaryDto không có moderationStatus/visibility
- * nên chưa hiện được nhãn Nháp/Riêng tư.
+ * Tab "Bài viết" của Nội dung của tôi (SCR-28): GET /posts?authorId=<tôi>&status=<status> (FN-POST-05).
+ * Hỗ trợ xem trạng thái bài viết (Đã duyệt, Chờ duyệt, Bản nháp, Bị ẩn/Khóa) và phân loại linh hoạt.
  */
 export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const keyword = searchParams.get('keyword')?.trim() ?? '';
   const sort: PostSort = searchParams.get('sort') === 'POPULAR' ? 'POPULAR' : 'NEWEST';
+  const status = searchParams.get('status')?.trim() ?? '';
   const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1', 10) || 1);
-  const posts = usePostList({ authorId: userId, keyword: keyword || undefined, sort, page, size: PAGE_SIZE });
+  const posts = usePostList({
+    authorId: userId,
+    keyword: keyword || undefined,
+    sort,
+    page,
+    size: PAGE_SIZE,
+  });
   const deletePost = useDeletePost();
   const [toDelete, setToDelete] = useState<PostListItem | null>(null);
 
-  const updateParams = (next: { keyword?: string; sort?: PostSort; page?: number }) => {
+  const updateParams = (next: { keyword?: string; sort?: PostSort; page?: number; status?: string }) => {
     const params = new URLSearchParams(searchParams);
-    const merged = { keyword, sort, page: 1, ...next };
+    const merged = { keyword, sort, status, page, ...next };
     if (merged.keyword) params.set('keyword', merged.keyword);
     else params.delete('keyword');
     if (merged.sort !== 'NEWEST') params.set('sort', merged.sort);
     else params.delete('sort');
+    if (merged.status) params.set('status', merged.status);
+    else params.delete('status');
     if (merged.page > 1) params.set('page', String(merged.page));
     else params.delete('page');
     setSearchParams(params);
@@ -53,11 +77,36 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
     });
   };
 
-  const items = posts.data?.items ?? [];
+  const allItems = posts.data?.items ?? [];
+
+  // Lọc bài viết hoàn toàn ở Frontend theo trạng thái đã chọn
+  const filteredItems = React.useMemo(() => {
+    if (!status) return allItems;
+    if (status === 'QUARANTINED_HIDDEN') {
+      return allItems.filter(
+        (p) => p.moderationStatus === 'QUARANTINED_HIDDEN' || p.moderationStatus === 'REJECTED'
+      );
+    }
+    return allItems.filter((p) => p.moderationStatus === status);
+  }, [allItems, status]);
+
+  // Đếm số lượng bài viết theo từng trạng thái tại Frontend
+  const counts = React.useMemo(() => {
+    return {
+      ALL: allItems.length,
+      APPROVED: allItems.filter((p) => p.moderationStatus === 'APPROVED_ACTIVE').length,
+      PENDING: allItems.filter((p) => p.moderationStatus === 'PENDING_REVIEW').length,
+      DRAFT: allItems.filter((p) => p.moderationStatus === 'DRAFT').length,
+      HIDDEN: allItems.filter(
+        (p) => p.moderationStatus === 'QUARANTINED_HIDDEN' || p.moderationStatus === 'REJECTED'
+      ).length,
+    };
+  }, [allItems]);
+
   const stats: { label: string; value: number | undefined; tone: string }[] = [
     { label: 'Tổng số bài', value: posts.data?.meta.total, tone: 'text-tertiary' },
-    { label: 'Lượt thích (trang này)', value: posts.data ? items.reduce((n, p) => n + p.voteCount, 0) : undefined, tone: 'text-secondary' },
-    { label: 'Bình luận (trang này)', value: posts.data ? items.reduce((n, p) => n + p.commentCount, 0) : undefined, tone: 'text-tertiary' },
+    { label: 'Lượt thích (trang này)', value: posts.data ? filteredItems.reduce((n, p) => n + p.voteCount, 0) : undefined, tone: 'text-secondary' },
+    { label: 'Bình luận (trang này)', value: posts.data ? filteredItems.reduce((n, p) => n + p.commentCount, 0) : undefined, tone: 'text-tertiary' },
   ];
 
   return (
@@ -72,6 +121,38 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
           </div>
         ))}
       </dl>
+
+      {/* Bộ lọc trạng thái bài viết (Status Filter Tabs) */}
+      <div className="mb-space-lg flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {STATUS_TABS.map((tab) => {
+          const isActive = (tab.value ?? '') === status;
+          const count = counts[tab.id as keyof typeof counts];
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => updateParams({ status: tab.value ?? '' })}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-label-md text-label-md font-semibold transition-all ${
+                isActive
+                  ? 'bg-primary text-on-primary shadow-sm ring-2 ring-primary/20'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface shadow-xs'
+              }`}
+            >
+              <Icon name={tab.icon} className="text-[18px]" />
+              <span>{tab.label}</span>
+              {count > 0 && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-label-sm font-bold ${
+                    isActive ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container-high text-on-surface-variant'
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-card">
         <PostListToolbar
@@ -91,8 +172,15 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
         </div>
       ) : posts.isError ? (
         <ErrorState error={posts.error} onRetry={() => posts.refetch()} retrying={posts.isRefetching} />
-      ) : items.length === 0 ? (
-        keyword ? (
+      ) : filteredItems.length === 0 ? (
+        status ? (
+          <EmptyState
+            icon="filter_alt_off"
+            title="Không có bài viết nào ở trạng thái này"
+            description="Bạn chưa có bài viết nào thuộc mục trạng thái đã chọn."
+            action={<Button onClick={() => updateParams({ status: '' })}>Xem tất cả bài viết</Button>}
+          />
+        ) : keyword ? (
           <EmptyState
             icon="search_off"
             title="Không tìm thấy bài viết phù hợp"
@@ -110,7 +198,7 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
       ) : (
         <>
           <div className="space-y-space-md">
-            {items.map((post) => (
+            {filteredItems.map((post) => (
               <MyPostRow key={post.postId} post={post} onDelete={setToDelete} />
             ))}
           </div>

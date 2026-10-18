@@ -10,6 +10,48 @@ interface MyPostRowProps {
   onDelete: (post: PostListItem) => void;
 }
 
+const renderStatusBadge = (status?: string | null) => {
+  switch (status?.toUpperCase()) {
+    case 'APPROVED_ACTIVE':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-label-sm font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <Icon name="check_circle" className="text-[14px]" />
+          Đã duyệt
+        </span>
+      );
+    case 'PENDING_REVIEW':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-label-sm font-medium text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+          <Icon name="hourglass_empty" className="text-[14px]" />
+          Chờ duyệt
+        </span>
+      );
+    case 'DRAFT':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-100 px-2.5 py-0.5 text-label-sm font-medium text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300">
+          <Icon name="edit_note" className="text-[14px]" />
+          Bản nháp
+        </span>
+      );
+    case 'QUARANTINED_HIDDEN':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-rose-200/80 bg-rose-50 px-2.5 py-0.5 text-label-sm font-medium text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300">
+          <Icon name="visibility_off" className="text-[14px]" />
+          Tạm ẩn / Khóa
+        </span>
+      );
+    case 'REJECTED':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-rose-200/80 bg-rose-50 px-2.5 py-0.5 text-label-sm font-medium text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300">
+          <Icon name="cancel" className="text-[14px]" />
+          Bị từ chối
+        </span>
+      );
+    default:
+      return null;
+  }
+};
+
 /** Một dòng trong "Bài viết của tôi" (SCR-28): ảnh nhỏ, tiêu đề, số liệu và nút Sửa/Xóa. */
 export const MyPostRow: React.FC<MyPostRowProps> = ({ post, onDelete }) => (
   <article className="rounded-xl bg-surface-container-lowest p-space-md shadow-card transition-shadow hover:shadow-card-hover sm:p-space-lg">
@@ -23,14 +65,23 @@ export const MyPostRow: React.FC<MyPostRowProps> = ({ post, onDelete }) => (
           )}
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
-          <h2 className="truncate">
-            <Link
-              to={PATHS.COMMUNITY.POST_DETAIL(post.postId)}
-              className="font-headline-sm text-headline-sm text-tertiary no-underline hover:text-primary"
-            >
-              {post.title}
-            </Link>
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate">
+              <Link
+                to={PATHS.COMMUNITY.POST_DETAIL(post.postId)}
+                className="font-headline-sm text-headline-sm text-tertiary no-underline hover:text-primary"
+              >
+                {post.title}
+              </Link>
+            </h2>
+            {renderStatusBadge(post.moderationStatus)}
+            {post.visibility === 'PRIVATE' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-label-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <Icon name="lock" className="text-[13px]" />
+                Riêng tư
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-body-sm text-body-sm text-outline">
             <span className="flex items-center gap-1 font-medium text-secondary">
               <Icon name="favorite" className="text-[16px]" />

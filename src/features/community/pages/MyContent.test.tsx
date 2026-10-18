@@ -65,5 +65,32 @@ describe('MyContent (Nội dung của tôi)', () => {
       expect(screen.getByRole('tab', { name: 'Công thức' })).toHaveAttribute('aria-selected', 'true');
       expect(calls).toHaveLength(0);
     });
+
+    it('lọc bài viết theo từng tab trạng thái và hiển thị badge tương ứng', async () => {
+      const POSTS_WITH_STATUS = [
+        { postId: 10, title: 'Bài viết đã duyệt', moderationStatus: 'APPROVED_ACTIVE', visibility: 'PUBLIC', authorName: 'Nguyễn An', voteCount: 5, commentCount: 2, createdAt: '2026-10-18T10:00:00Z' },
+        { postId: 11, title: 'Bài viết đang chờ duyệt', moderationStatus: 'PENDING_REVIEW', visibility: 'PUBLIC', authorName: 'Nguyễn An', voteCount: 0, commentCount: 0, createdAt: '2026-10-18T11:00:00Z' },
+      ];
+      const calls = mockApi((req) => (req.url === '/posts' && req.method === 'GET' ? { data: POSTS_WITH_STATUS, meta: { page: 1, size: 10, total: 2 } } : undefined));
+      renderPage(<MyContent />, { route: '/me/content' });
+
+      // Kiểm tra có đầy đủ các tab trạng thái
+      expect(screen.getByRole('button', { name: /Tất cả/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Đã duyệt/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Chờ duyệt/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Bản nháp/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Bị ẩn \/ Khóa/ })).toBeInTheDocument();
+
+      // Kiểm tra nhãn badge xuất hiện trên UI
+      expect(await screen.findByText('Đã duyệt')).toBeInTheDocument();
+      expect(screen.getByText('Chờ duyệt')).toBeInTheDocument();
+
+      // Click vào tab "Chờ duyệt" -> lọc ngay tại FE
+      await userEvent.click(screen.getByRole('button', { name: /Chờ duyệt/ }));
+      expect(screen.getByRole('link', { name: 'Bài viết đang chờ duyệt' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Bài viết đã duyệt' })).not.toBeInTheDocument();
+      // Đảm bảo không gửi status lên backend API
+      expect(calls.every((c) => c.params?.status === undefined)).toBe(true);
+    });
   });
 });
