@@ -26,8 +26,8 @@ export const FreshnessBadge: React.FC<FreshnessBadgeProps> = ({
         'inline-flex items-center gap-1 font-semibold rounded-full tracking-wide transition-colors',
         size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-label-sm',
         isFresh
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-          : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700',
+          ? 'bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]'
+          : 'bg-[#fef6ea] text-[#935216] border border-[#f8dfbe]',
         className,
       )}
       title={isFresh ? 'Nguyên liệu còn tươi ngon' : 'Nguyên liệu cần ưu tiên chế biến sớm'}

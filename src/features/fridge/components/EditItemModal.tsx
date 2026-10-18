@@ -104,7 +104,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onHide }) =>
               onClick={() => setValue('freshnessStatus', 'FRESH')}
               className={`flex items-center justify-center gap-2 rounded-xl border p-3 font-label-md text-label-md transition-all ${
                 freshness === 'FRESH'
-                  ? 'border-emerald-500 bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-sm'
+                  ? 'border-emerald-500 bg-[#eaf3ec] font-bold text-[#2d5a38] shadow-sm'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >
@@ -116,7 +116,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onHide }) =>
               onClick={() => setValue('freshnessStatus', 'NON-FRESH')}
               className={`flex items-center justify-center gap-2 rounded-xl border p-3 font-label-md text-label-md transition-all ${
                 freshness === 'NON-FRESH'
-                  ? 'border-amber-500 bg-amber-50 font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 shadow-sm'
+                  ? 'border-amber-500 bg-[#fef6ea] font-bold text-[#935216] shadow-sm'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >

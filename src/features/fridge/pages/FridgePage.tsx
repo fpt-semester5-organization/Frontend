@@ -15,13 +15,22 @@ import { AddItemModal } from '../components/AddItemModal';
 import { EditItemModal } from '../components/EditItemModal';
 import { EditDetectedItemModal } from '../components/EditDetectedItemModal';
 import { FreshnessBadge } from '../components/FreshnessBadge';
+import { BoundingBoxOverlay } from '../components/BoundingBoxOverlay';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  createFridgeItem,
+  deleteFridgeItem,
+  updateFridgeItem,
+} from '../api/fridge.api';
+import {
+  fridgeKeys,
   useDeleteFridgeItem,
   useFridgeDetection,
   useFridgeItems,
   useRecipeSuggestions,
 } from '../hooks/useFridge';
 import { compressImage } from '../lib/compressImage';
+import { cropAllDetectedThumbnails } from '../lib/cropImage';
 import { readImageSize } from '../lib/readImageSize';
 import { checkImageDimensions, checkImageFile } from '../schemas/fridge.schema';
 import type {
@@ -39,6 +48,30 @@ const FILTERS: { key: Freshness | 'ALL'; label: string }[] = [
   { key: 'NON-FRESH', label: 'NON-FRESH · Dùng sớm' },
 ];
 
+interface IngredientVisual {
+  icon: string;
+  bg: string;
+  text: string;
+}
+
+function getIngredientVisual(_name?: string): IngredientVisual {
+  return {
+    icon: 'eco',
+    bg: 'bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]',
+    text: 'text-[#2d5a38]',
+  };
+}
+
+// Loại bỏ các mã tài liệu đặc tả / quy tắc nội bộ (ví dụ: BR-ADM-CNT-003, FN-AUTH-02, D109) ra khỏi giao diện
+function cleanTechnicalCodes(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\s*\([A-Z0-9\-_,\s]+\)/g, '')
+    .replace(/\s+\./g, '.')
+    .replace(/\.\s*\./g, '.')
+    .trim();
+}
+
 export const FridgePage: React.FC = () => {
   const authed = useAuthStore(selectIsAuthenticated);
   const vip = useAuthStore(selectIsVip);
@@ -55,12 +88,19 @@ export const FridgePage: React.FC = () => {
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressionResult, setCompressionResult] = useState<ImageOptimizationResult | null>(null);
 
-  // Trạng thái kết quả nhận diện AI
+  const queryClient = useQueryClient();
+
+  // Trạng thái kết quả nhận diện AI & Bounding Box
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
+  const [deletedInventoryIds, setDeletedInventoryIds] = useState<number[]>([]);
+  const [isSavingToFridge, setIsSavingToFridge] = useState(false);
   const [editingDetectedIndex, setEditingDetectedIndex] = useState<number | null>(null);
   const [memberQuota, setMemberQuota] = useState<DetectionQuota | null>(null);
   const [serverError, setServerError] = useState<{ message: string; isTooSmall: boolean } | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
+  const [mainTab, setMainTab] = useState<'vision' | 'inventory'>('vision');
 
   // Trạng thái kho tủ lạnh ảo
   const [filter, setFilter] = useState<Freshness | 'ALL'>('ALL');
@@ -78,6 +118,18 @@ export const FridgePage: React.FC = () => {
   const hasItems = (allItemsQuery.data?.length ?? 0) > 0;
   const suggestionsQuery = useRecipeSuggestions(hasItems);
 
+  // Reset ảnh để chụp/quét ảnh mới
+  const handleResetImage = () => {
+    setSelectedFile(null);
+    setDetectionResult(null);
+    setDetectedItems([]);
+    setDeletedInventoryIds([]);
+    setServerError(null);
+    setImageError(null);
+    setCompressionResult(null);
+    setHoveredIndex(null);
+  };
+
   // Quản lý URL xem trước ảnh
   useEffect(() => {
     if (!selectedFile) {
@@ -93,8 +145,10 @@ export const FridgePage: React.FC = () => {
   const handleFilePick = async (file: File | undefined) => {
     setDetectionResult(null);
     setDetectedItems([]);
+    setDeletedInventoryIds([]);
     setServerError(null);
     setCompressionResult(null);
+    setHoveredIndex(null);
 
     if (!file) return;
 
@@ -153,16 +207,29 @@ export const FridgePage: React.FC = () => {
   const handleAnalyze = () => {
     if (!selectedFile || detectMutation.isPending || isCompressing) return;
     setServerError(null);
+    setHoveredIndex(null);
 
     detectMutation.mutate(selectedFile, {
-      onSuccess: (res) => {
+      onSuccess: async (res) => {
         setDetectionResult(res);
-        setDetectedItems(res.detected);
         if (authed && res.quota) {
           setMemberQuota(res.quota);
         }
+
+        // Tự động cắt thumbnail cận cảnh bằng Canvas cho các nguyên liệu có box2d
+        if (selectedFile) {
+          try {
+            const enriched = await cropAllDetectedThumbnails(selectedFile, res.detected);
+            setDetectedItems(enriched);
+          } catch {
+            setDetectedItems(res.detected);
+          }
+        } else {
+          setDetectedItems(res.detected);
+        }
+
         if (res.saved) {
-          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu và lưu vào tủ lạnh ảo!`);
+          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu và lưu vào tủ lạnh thông minh!`);
         } else {
           toast.info(`Đã nhận diện ${res.detected.length} nguyên liệu (kết quả dùng thử không lưu).`);
         }
@@ -211,8 +278,86 @@ export const FridgePage: React.FC = () => {
 
   // Xóa thủ công một nguyên liệu trong kết quả nhận diện
   const handleRemoveDetected = (idx: number) => {
+    const item = detectedItems[idx];
+    if (item?.inventoryId) {
+      setDeletedInventoryIds((prev) => [...prev, item.inventoryId!]);
+    }
     setDetectedItems((prev) => prev.filter((_, i) => i !== idx));
-    toast.info('Đã xóa nguyên liệu khỏi danh sách nhận diện.');
+    toast.info(`Đã loại bỏ “${item?.name || 'nguyên liệu'}” khỏi danh sách.`);
+  };
+
+  // Lưu và đồng bộ danh sách nguyên liệu đã nhận diện vào tủ lạnh cá nhân
+  const handleSaveToPersonalFridge = async () => {
+    if (!authed) {
+      openSignupPrompt('quota');
+      return;
+    }
+
+    if (detectedItems.length === 0 && deletedInventoryIds.length === 0) {
+      toast.info('Không có nguyên liệu nào để lưu.');
+      return;
+    }
+
+    setIsSavingToFridge(true);
+    try {
+      // 1. Xóa các mục người dùng đã bấm nút X (nếu đã từng lưu trong DB)
+      if (deletedInventoryIds.length > 0) {
+        await Promise.allSettled(
+          deletedInventoryIds.map((id) => deleteFridgeItem(id))
+        );
+        setDeletedInventoryIds([]);
+      }
+
+      // 2. Cập nhật các mục đã có trong kho hoặc thêm mới các mục chưa có
+      let savedCount = 0;
+      const operations: Promise<unknown>[] = [];
+      for (const item of detectedItems) {
+        if (item.inventoryId) {
+          operations.push(
+            updateFridgeItem(item.inventoryId, {
+              customItemName: item.name,
+              freshnessStatus: item.freshnessStatus,
+            })
+          );
+          savedCount++;
+        } else if (item.ingredientId) {
+          operations.push(
+            createFridgeItem({
+              ingredientId: item.ingredientId,
+              customItemName: item.name,
+              freshnessStatus: item.freshnessStatus,
+            })
+          );
+          savedCount++;
+        }
+      }
+
+      if (operations.length > 0) {
+        await Promise.allSettled(operations);
+      }
+
+      // 3. Làm mới cache dữ liệu kho tủ lạnh
+      await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
+
+      if (savedCount === detectedItems.length && savedCount > 0) {
+        toast.success(`Đã lưu thành công cả ${savedCount} nguyên liệu vào tủ lạnh! Xem các món gợi ý ngay bên dưới.`);
+      } else if (savedCount > 0) {
+        toast.success(
+          `Đã lưu ${savedCount}/${detectedItems.length} nguyên liệu vào tủ lạnh cá nhân. Xem các món gợi ý ngay bên dưới.`
+        );
+      } else {
+        toast.warning(
+          'Không có nguyên liệu nào khớp với danh mục nguyên liệu thực vật để lưu trữ.'
+        );
+      }
+
+      // Chuyển mượt sang Tab Kho Tủ Lạnh để xem thành quả
+      setMainTab('inventory');
+    } catch {
+      toast.error('Có lỗi xảy ra khi lưu vào tủ lạnh cá nhân. Vui lòng thử lại.');
+    } finally {
+      setIsSavingToFridge(false);
+    }
   };
 
   // Lọc và sắp xếp kho tủ lạnh ảo (ưu tiên mục NON-FRESH xếp trước)
@@ -252,49 +397,46 @@ export const FridgePage: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1240px] px-margin-mobile py-space-lg sm:px-margin">
       {/* Tiêu đề & Thanh trạng thái hạn mức */}
-      <header className="mb-6 flex flex-col justify-between gap-4 border-b border-outline-variant/40 pb-5 md:flex-row md:items-end">
-        <div>
+      <header className="mb-6 flex flex-col gap-4 border-b border-outline-variant/40 pb-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
-              <Icon name="kitchen" className="text-[26px]" />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+              <Icon name="kitchen" className="text-[24px]" />
             </span>
-            <h1 className="font-headline-lg text-headline-lg tracking-tight text-on-surface">
-              Tủ Lạnh Ảo &amp; Nhận Diện Nguyên Liệu AI
+            <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">
+              Tủ Lạnh Thông Minh
             </h1>
           </div>
           <p className="mt-1 font-body-md text-body-md text-on-surface-variant">
-            Chụp hoặc tải ảnh tủ lạnh để AI tự động nhận diện nguyên liệu chay, theo dõi độ tươi và gợi ý món ngon giải cứu.
+            Nhận diện nguyên liệu và theo dõi độ tươi bằng AI.
           </p>
         </div>
 
-        {/* Khối hiển thị hạn mức còn lại */}
-        <div className="flex shrink-0 flex-wrap items-center gap-3">
+        {/* Khối hiển thị hạn mức còn lại & hành động */}
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           <div
-            className="flex items-center gap-2 rounded-xl border border-outline-variant/60 bg-surface-container-low px-3.5 py-2 text-on-surface"
+            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/60 bg-surface-container-low px-3.5 py-2 text-on-surface"
             aria-live="polite"
           >
-            <Icon name="speed" className="text-[20px] text-primary" />
+            <Icon name="speed" className="text-[18px] text-primary" />
             <div className="font-label-md text-label-md">
               {authed ? (
                 memberQuota ? (
                   <span>
-                    Ảnh hôm nay: Còn <strong className="text-primary">{memberQuota.remaining}</strong>/
-                    {memberQuota.limit} lượt (Đã dùng {memberQuota.used})
+                    Còn <strong className="text-primary">{memberQuota.remaining}/{memberQuota.limit}</strong> lượt hôm nay
                   </span>
                 ) : (
                   <span>
-                    Hạn mức quét ảnh: Tối đa <strong className="text-primary">{imageLimit} ảnh/ngày</strong>{' '}
-                    ({vip ? 'Gói VIP' : 'Miễn phí'})
+                    Hạn mức: <strong className="text-primary">{imageLimit} lượt/ngày</strong>
                   </span>
                 )
               ) : typeof guestAiLeft === 'number' ? (
                 <span>
-                  Lượt AI dùng thử: Còn <strong className="text-amber-700 dark:text-amber-400">{guestAiLeft}</strong>/
-                  {QUOTA.guest.ai} lượt (Khách)
+                  Dùng thử: Còn <strong className="text-amber-700 dark:text-amber-400">{guestAiLeft}/{QUOTA.guest.ai}</strong> lượt
                 </span>
               ) : (
                 <span>
-                  Khách vãng lai: Có <strong className="text-amber-700 dark:text-amber-400">{QUOTA.guest.ai} lượt</strong> AI dùng thử
+                  Dùng thử: <strong className="text-amber-700 dark:text-amber-400">{QUOTA.guest.ai} lượt</strong>
                 </span>
               )}
             </div>
@@ -303,7 +445,10 @@ export const FridgePage: React.FC = () => {
           {authed && (
             <Button
               variant="secondary"
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                setMainTab('inventory');
+                setIsAddModalOpen(true);
+              }}
               className="inline-flex items-center gap-1.5"
             >
               <Icon name="add_circle" className="text-[18px]" />
@@ -313,7 +458,13 @@ export const FridgePage: React.FC = () => {
 
           <Button
             variant="primary"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              setMainTab('vision');
+              if (detectionResult) {
+                handleResetImage();
+              }
+              fileInputRef.current?.click();
+            }}
             className="inline-flex items-center gap-2"
           >
             <Icon name="photo_camera" className="text-[20px]" />
@@ -322,280 +473,492 @@ export const FridgePage: React.FC = () => {
         </div>
       </header>
 
-      {/* Bố cục 2 cột chính */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        {/* CỘT TRÁI: AI Vision Studio & Danh sách tủ lạnh (7 cột) */}
-        <section className="flex flex-col gap-6 lg:col-span-7">
-          {/* 1. KHU VỰC TẢI ẢNH VÀ NHẬN DIỆN */}
-          <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="flex items-center justify-between pb-4">
-              <div className="flex items-center gap-2">
-                <Icon name="center_focus_strong" className="text-[22px] text-primary" />
-                <h2 className="font-headline-sm text-headline-sm text-on-surface">AI Vision Studio</h2>
-              </div>
-              <span className="font-label-sm text-label-sm text-on-surface-variant">
-                Gemini 2.5 Flash Vision
-              </span>
-            </div>
+      {/* Input ẩn để tải tệp ảnh */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        aria-label="Chọn ảnh tủ lạnh"
+        onChange={(e) => {
+          void handleFilePick(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
 
-            {/* Vùng Drag & Drop */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              className={`rounded-2xl border-2 border-dashed p-4 text-center transition-all ${
-                isDragging
-                  ? 'border-primary bg-primary-fixed/20'
-                  : 'border-outline-variant/60 bg-surface-container-low hover:border-outline'
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                aria-label="Chọn ảnh tủ lạnh"
-                onChange={(e) => {
-                  void handleFilePick(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
+      {/* 2 Tab riêng biệt: Nhận Diện AI Vision & Kho Nguyên Liệu Tủ Lạnh */}
+      <nav className="mb-6 flex items-center border-b border-outline-variant/50" aria-label="Phân hệ tủ lạnh">
+        <button
+          type="button"
+          onClick={() => setMainTab('vision')}
+          className={`inline-flex items-center gap-2 border-b-2 px-6 py-3.5 font-label-lg text-sm sm:text-base font-semibold transition-all ${
+            mainTab === 'vision'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:border-outline-variant hover:text-on-surface'
+          }`}
+        >
+          <Icon name="center_focus_strong" className="text-[20px]" />
+          <span>Nhận Diện AI Vision</span>
+          {detectedItems.length > 0 && (
+            <span className="rounded-full bg-[#eaf3ec] px-2.5 py-0.5 text-xs font-bold text-[#2d5a38] border border-[#c4dec8]">
+              {detectedItems.length}
+            </span>
+          )}
+        </button>
 
-              <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-12">
-                {/* Xem trước ảnh */}
-                <div className="relative flex h-48 w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-highest shadow-inner md:col-span-5">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Ảnh tủ lạnh đã chọn"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 p-4 text-on-surface-variant">
-                      <Icon name="add_photo_alternate" className="text-[44px] text-outline" />
-                      <span className="font-label-sm text-xs text-outline">Chưa có ảnh</span>
-                    </div>
-                  )}
-                  {isCompressing && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-xs">
-                      <span className="font-label-sm text-sm">Đang tối ưu ảnh...</span>
-                    </div>
-                  )}
+        <button
+          type="button"
+          onClick={() => setMainTab('inventory')}
+          className={`inline-flex items-center gap-2 border-b-2 px-6 py-3.5 font-label-lg text-sm sm:text-base font-semibold transition-all ${
+            mainTab === 'inventory'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:border-outline-variant hover:text-on-surface'
+          }`}
+        >
+          <Icon name="kitchen" className="text-[20px]" />
+          <span>Kho Nguyên Liệu Tủ Lạnh</span>
+          <span className="rounded-full bg-surface-container-high px-2.5 py-0.5 text-xs font-bold text-on-surface-variant">
+            {allItemsQuery.data?.length ?? 0}
+          </span>
+        </button>
+      </nav>
+
+      {/* TAB 1: NHẬN DIỆN AI VISION */}
+      {mainTab === 'vision' && (
+        <section aria-label="Phân tích AI Vision" className="w-full">
+          {!detectionResult ? (
+            /* TRẠNG THÁI CHƯA NHẬN DIỆN / ĐANG CHỌN ẢNH: AI VISION STUDIO */
+            <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
+              <div className="flex items-center justify-between pb-4">
+                <div className="flex items-center gap-2">
+                  <Icon name="center_focus_strong" className="text-[22px] text-primary" />
+                  <h2 className="font-headline-sm text-headline-sm text-on-surface">AI Vision Studio</h2>
                 </div>
-
-                {/* Thông tin & nút thao tác */}
-                <div className="flex flex-col items-center px-2 text-center md:col-span-7 md:items-start md:text-left">
-                  <h3 className="font-headline-sm text-[16px] font-semibold text-on-surface">
-                    {selectedFile ? selectedFile.name : 'Kéo thả ảnh tủ lạnh hoặc chụp camera'}
-                  </h3>
-                  <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-                    Hỗ trợ JPG, PNG, WEBP · Tối thiểu <strong>640×480 px</strong> · Tối đa 10 MB
-                  </p>
-
-                  {/* Thông báo tự động thu nhỏ / nén ảnh thành công */}
-                  {compressionResult?.wasCompressed && (
-                    <div className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      <Icon name="bolt" className="text-[16px] text-emerald-600" />
-                      <span>
-                        Tự động nén ảnh: {(compressionResult.originalSize / (1024 * 1024)).toFixed(1)} MB →{' '}
-                        {(compressionResult.compressedSize / 1024).toFixed(0)} KB (giảm {compressionResult.reductionPercentage}%)
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      type="button"
-                    >
-                      {selectedFile ? 'Chọn ảnh khác' : 'Chọn tệp ảnh'}
-                    </Button>
-
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={handleAnalyze}
-                      disabled={!selectedFile || detectMutation.isPending || isCompressing}
-                      loading={detectMutation.isPending}
-                    >
-                      <Icon name="auto_awesome" className="text-[18px]" />
-                      {detectMutation.isPending ? 'AI đang nhận diện…' : 'Nhận diện nguyên liệu'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Báo lỗi thân thiện nếu ảnh quá nhỏ hoặc sai định dạng */}
-            {imageError && (
-              <div
-                role="alert"
-                className="mt-4 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-800 dark:bg-red-950/60 dark:text-red-200"
-              >
-                <Icon name="warning" className="shrink-0 text-[22px] text-red-600" />
-                <div className="flex-1 font-body-sm text-body-sm">
-                  <p className="font-semibold">Ảnh không đạt yêu cầu:</p>
-                  <p className="mt-0.5">{imageError}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Báo lỗi thân thiện từ máy chủ (Bao gồm lỗi ảnh quá nhỏ ERR_FRIDGE_IMAGE_TOO_SMALL) */}
-            {serverError && (
-              <div
-                role="alert"
-                className={`mt-4 flex items-start gap-3 rounded-xl border p-4 font-body-sm text-body-sm ${
-                  serverError.isTooSmall
-                    ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-200'
-                    : 'border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/60 dark:text-red-200'
-                }`}
-              >
-                <Icon
-                  name={serverError.isTooSmall ? 'photo_size_select_small' : 'cloud_off'}
-                  className={`shrink-0 text-[22px] ${serverError.isTooSmall ? 'text-amber-600' : 'text-red-600'}`}
-                />
-                <div className="flex-1">
-                  <p className="font-semibold">
-                    {serverError.isTooSmall ? 'Ảnh chưa đủ độ phân giải chuẩn' : 'Thông báo từ máy chủ'}
-                  </p>
-                  <p className="mt-0.5">{serverError.message}</p>
-                  {serverError.isTooSmall && (
-                    <p className="mt-1 text-xs opacity-80">
-                      💡 Mẹo: Hãy chụp thẳng góc từ khoảng cách 0.5 – 1 mét, đảm bảo ánh sáng đủ rõ để AI phân tách được từng loại rau củ.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Hiệu ứng loading khi AI đang xử lý */}
-            {detectMutation.isPending && (
-              <div
-                className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-surface-container-low p-6 text-on-surface"
-                role="status"
-                aria-live="polite"
-              >
-                <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
-                <span className="font-label-md text-label-md">
-                  Gemini Vision đang phân tích hình ảnh, nhận diện rau củ và ước lượng độ tươi...
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  Gemini 2.5 Flash Vision
                 </span>
               </div>
-            )}
 
-            {/* KẾT QUẢ NHẬN DIỆN CÓ THỂ SỬA TAY */}
-            {detectionResult && !detectMutation.isPending && (
-              <div className="mt-6 border-t border-outline-variant/40 pt-5" aria-label="Kết quả nhận diện">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-headline-sm text-[17px] font-semibold text-on-surface">
-                      Đã nhận diện {detectedItems.length} nguyên liệu
-                    </h3>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 font-label-sm text-xs font-semibold ${
-                        detectionResult.saved
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                      }`}
-                    >
-                      {detectionResult.saved ? '✓ Đã lưu vào tủ lạnh ảo' : 'Kết quả dùng thử (Chưa lưu)'}
-                    </span>
+              {/* Vùng Drag & Drop / Chọn tệp */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
+                  isDragging
+                    ? 'border-primary bg-primary-fixed/20'
+                    : 'border-outline-variant/60 bg-surface-container-low hover:border-outline'
+                }`}
+              >
+                {previewUrl ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative flex max-h-[380px] w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-highest shadow-inner">
+                      <img
+                        src={previewUrl}
+                        alt="Ảnh tủ lạnh đã chọn"
+                        className="max-h-[360px] w-auto max-w-full rounded-lg object-contain"
+                      />
+                      {isCompressing && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-xs">
+                          <span className="font-label-sm text-sm">Đang tối ưu ảnh...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {compressionResult?.wasCompressed && (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <Icon name="check_circle" className="text-[16px] text-emerald-600" />
+                        <span>Ảnh đã được tối ưu hóa tải nhanh</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        type="button"
+                      >
+                        Chọn ảnh khác
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleAnalyze}
+                        disabled={!selectedFile || detectMutation.isPending || isCompressing}
+                        loading={detectMutation.isPending}
+                      >
+                        <Icon name="auto_awesome" className="text-[18px]" />
+                        {detectMutation.isPending ? 'AI đang nhận diện…' : 'Nhận diện nguyên liệu'}
+                      </Button>
+                    </div>
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-8">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-fixed text-primary shadow-xs">
+                      <Icon name="add_photo_alternate" className="text-[36px]" />
+                    </div>
+                    <div>
+                      <h3 className="font-headline-sm text-lg font-semibold text-on-surface">
+                        Kéo thả ảnh tủ lạnh vào đây hoặc bấm để chọn tệp
+                      </h3>
+                      <p className="mt-1 font-body-sm text-sm text-on-surface-variant">
+                        Hỗ trợ JPG, PNG, WEBP · Tối thiểu <strong>640×480 px</strong> · Tối đa 10 MB
+                      </p>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => fileInputRef.current?.click()}
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-2"
+                    >
+                      <Icon name="photo_camera" className="text-[20px]" />
+                      Chọn ảnh tủ lạnh
+                    </Button>
+                  </div>
+                )}
+              </div>
 
+              {/* Báo lỗi ảnh nếu có */}
+              {imageError && (
+                <div
+                  role="alert"
+                  className="mt-4 flex items-start gap-3 rounded-xl border border-[#fecdca] bg-[#fdeeed] p-4 text-[#b42318]"
+                >
+                  <Icon name="warning" className="shrink-0 text-[22px] text-[#b42318]" />
+                  <div className="flex-1 font-body-sm text-body-sm">
+                    <p className="font-semibold">Ảnh không đạt yêu cầu:</p>
+                    <p className="mt-0.5">{cleanTechnicalCodes(imageError)}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Báo lỗi từ server */}
+              {serverError && (
+                <div
+                  role="alert"
+                  className={`mt-4 flex items-start gap-3 rounded-xl border p-4 font-body-sm text-body-sm ${
+                    serverError.isTooSmall
+                      ? 'border-[#f8dfbe] bg-[#fefbf6] text-[#8a4e0a]'
+                      : 'border-[#fecdca] bg-[#fdeeed] text-[#b42318]'
+                  }`}
+                >
+                  <Icon
+                    name={serverError.isTooSmall ? 'photo_size_select_small' : 'cloud_off'}
+                    className={`shrink-0 text-[22px] ${serverError.isTooSmall ? 'text-[#b76e1a]' : 'text-[#b42318]'}`}
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold">
+                      {serverError.isTooSmall ? 'Ảnh chưa đủ độ phân giải chuẩn' : 'Thông báo từ máy chủ'}
+                    </p>
+                    <p className="mt-0.5">{cleanTechnicalCodes(serverError.message)}</p>
+                    {serverError.isTooSmall && (
+                      <p className="mt-1 text-xs opacity-80">
+                        💡 Mẹo: Hãy chụp thẳng góc từ khoảng cách 0.5 – 1 mét, đảm bảo ánh sáng đủ rõ để AI phân tách được từng loại rau củ.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Hiệu ứng loading */}
+              {detectMutation.isPending && (
+                <div
+                  className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-surface-container-low p-6 text-on-surface"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+                  <span className="font-label-md text-label-md">
+                    Gemini Vision đang phân tích hình ảnh, nhận diện rau củ và ước lượng độ tươi...
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* TRẠNG THÁI ĐÃ NHẬN DIỆN XONG: TRANG TRÌNH BÀY ẢNH TỦ LẠNH TO BẢN RÕ NÉT CÙNG BOUNDING BOX */
+            <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
+              {/* Thanh điều khiển kết quả */}
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/40 pb-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <Icon name="center_focus_strong" className="text-[24px]" />
+                  </div>
+                  <div>
+                    <h2 className="font-headline-sm text-lg sm:text-xl font-bold text-on-surface">
+                      Kết Quả Nhận Diện Tủ Lạnh ({detectedItems.length} nguyên liệu)
+                    </h2>
+                    <p className="font-body-sm text-xs text-on-surface-variant">
+                      AI đã phát hiện và đóng khung vị trí các loại nguyên liệu trực tiếp trên ảnh
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 font-label-sm text-xs font-semibold ${
+                      detectionResult.saved
+                        ? 'bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]'
+                        : 'bg-[#fef6ea] text-[#935216] border border-[#f8dfbe]'
+                    }`}
+                  >
+                    {detectionResult.saved ? '✓ Đã lưu vào kho tủ lạnh' : 'Kết quả dùng thử'}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {detectedItems.some((it) => it.box2d) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowBoundingBoxes((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-low px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-surface-container"
+                      title={showBoundingBoxes ? 'Ẩn khung nhận diện trên ảnh' : 'Hiện khung nhận diện trên ảnh'}
+                    >
+                      <Icon
+                        name={showBoundingBoxes ? 'visibility_off' : 'visibility'}
+                        className="text-[16px] text-primary"
+                      />
+                      <span>{showBoundingBoxes ? 'Ẩn khung ảnh' : 'Hiện khung ảnh'}</span>
+                    </button>
+                  )}
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleResetImage}
+                    type="button"
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Icon name="photo_camera" className="text-[16px]" />
+                    <span>Quét ảnh khác</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* KHUNG HIỂN THỊ ẢNH TỦ LẠNH TO BẢN Ở TRUNG TÂM VỚI NỀN BE ẤM */}
+              {previewUrl && (
+                <div className="relative my-6 flex min-h-[440px] max-h-[640px] sm:max-h-[720px] w-full items-center justify-center overflow-hidden rounded-2xl border border-outline-variant/60 bg-[#f4efe8] dark:bg-surface-container p-3 sm:p-5 shadow-inner">
+                  <div className="relative inline-flex max-h-full max-w-full items-center justify-center">
+                    <img
+                      src={previewUrl}
+                      alt="Ảnh tủ lạnh nhận diện AI"
+                      className="max-h-[600px] sm:max-h-[680px] w-auto max-w-full rounded-xl object-contain shadow-lg ring-1 ring-black/10"
+                    />
+                    <BoundingBoxOverlay
+                      items={detectedItems}
+                      hoveredIndex={hoveredIndex}
+                      onHoverItem={setHoveredIndex}
+                      showBoxes={showBoundingBoxes}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Danh sách nguyên liệu đã nhận diện bên dưới */}
+              <div className="mt-6 border-t border-outline-variant/40 pt-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface">
+                    Danh Sách Nguyên Liệu Phát Hiện ({detectedItems.length})
+                  </h3>
                   <span className="font-body-sm text-xs text-on-surface-variant">
-                    💡 Bạn có thể bấm “Sửa tay” để chỉnh tên hoặc độ tươi
+                    💡 Rê chuột vào thẻ nguyên liệu để làm sáng khung tương ứng trên ảnh
                   </span>
                 </div>
 
                 {detectedItems.length === 0 ? (
-                  <div className="rounded-xl bg-surface-container-low p-4 text-center font-body-sm text-body-sm text-on-surface-variant">
+                  <div className="rounded-xl bg-surface-container-low p-6 text-center font-body-sm text-body-sm text-on-surface-variant">
                     AI không tìm thấy nguyên liệu thực vật nào trong ảnh. Bạn hãy thử chụp rõ nét và đủ ánh sáng hơn.
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2.5">
-                    {detectedItems.map((item, idx) => (
-                      <div
-                        key={`${item.name}-${idx}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low px-4 py-2.5 transition-all hover:bg-surface-container"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            name={item.freshnessStatus === 'FRESH' ? 'eco' : 'hourglass_bottom'}
-                            className={`text-[20px] ${
-                              item.freshnessStatus === 'FRESH' ? 'text-emerald-600' : 'text-amber-600'
-                            }`}
-                          />
-                          <span className="font-body-md text-body-md font-semibold text-on-surface">
-                            {item.name}
-                          </span>
-                          <FreshnessBadge status={item.freshnessStatus} size="sm" />
-                        </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {detectedItems.map((item, idx) => {
+                      const isHovered = hoveredIndex === idx;
+                      return (
+                        <div
+                          key={`${item.name}-${idx}`}
+                          className={`group relative flex items-center justify-between gap-3.5 rounded-2xl border p-3.5 sm:p-4 transition-all duration-150 ${
+                            isHovered
+                              ? 'border-primary bg-primary-fixed/20 shadow-lg ring-2 ring-primary scale-[1.01]'
+                              : 'border-outline-variant/50 bg-surface-container-low hover:border-outline hover:bg-surface-container'
+                          }`}
+                          onMouseEnter={() => setHoveredIndex(idx)}
+                          onMouseLeave={() => setHoveredIndex(null)}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {/* Thumbnail to rõ nét cắt cận cảnh từ Bounding Box hoặc Icon */}
+                            {item.thumbnailUrl ? (
+                              <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-xl border border-outline-variant/60 bg-surface-container shadow-xs">
+                                <img
+                                  src={item.thumbnailUrl}
+                                  alt={item.name}
+                                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-xl border border-[#c4dec8] bg-[#eaf3ec] text-[#2d5a38] shadow-xs">
+                                <Icon
+                                  name="eco"
+                                  className="text-[32px]"
+                                />
+                              </div>
+                            )}
 
-                        {/* Các nút chỉnh sửa tay */}
-                        <div className="flex items-center gap-1.5">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-8 px-2.5 text-xs"
-                            onClick={() => setEditingDetectedIndex(idx)}
-                            title="Sửa tay tên hoặc độ tươi"
-                          >
-                            <Icon name="edit" className="text-[15px]" />
-                            <span>Sửa tay</span>
-                          </Button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDetected(idx)}
-                            className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-red-600"
-                            title="Bỏ nguyên liệu này"
-                            aria-label={`Xóa ${item.name}`}
-                          >
-                            <Icon name="close" className="text-[18px]" />
-                          </button>
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <span className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
+                                {item.name}
+                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <FreshnessBadge status={item.freshnessStatus} size="sm" />
+                                {(item.isAnimalProduct || item.isRedMeat) && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#fdeeed] px-2.5 py-0.5 text-xs font-semibold text-[#b42318] border border-[#fecdca]">
+                                    <Icon name="warning" className="text-[14px]" />
+                                    <span>Cảnh báo mặn</span>
+                                  </span>
+                                )}
+                                {!item.ingredientId && !item.isAnimalProduct && !item.isRedMeat && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f6efe9] px-2.5 py-0.5 text-xs font-semibold text-[#824d2d] border border-[#e5d5ca]">
+                                    <Icon name="info" className="text-[13px]" />
+                                    <span>Chưa có trong danh mục mẫu</span>
+                                  </span>
+                                )}
+                                {item.confidence != null && (
+                                  <span className="text-[11px] font-medium text-on-surface-variant/80">
+                                    Độ tin cậy: {Math.round(item.confidence * 100)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Các nút chỉnh sửa tay */}
+                          <div className="flex flex-col sm:flex-row items-center gap-1.5 shrink-0">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs"
+                              onClick={() => setEditingDetectedIndex(idx)}
+                              title="Sửa tay tên hoặc độ tươi"
+                            >
+                              <Icon name="edit" className="text-[15px]" />
+                              <span className="hidden sm:inline">Sửa tay</span>
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDetected(idx)}
+                              className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-red-600"
+                              title="Bỏ nguyên liệu này"
+                              aria-label={`Xóa ${item.name}`}
+                            >
+                              <Icon name="close" className="text-[18px]" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
-                {/* Cảnh báo từ AI (nếu phát hiện thịt động vật hoặc vi phạm trường phái) */}
+                {/* Cảnh báo từ AI nếu có */}
                 {detectionResult.warnings && detectionResult.warnings.length > 0 && (
-                  <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-                    <div className="flex items-center gap-2 font-semibold">
-                      <Icon name="notification_important" className="text-[20px] text-amber-600" />
+                  <div className="mt-5 rounded-2xl border border-[#f8dfbe] bg-[#fefbf6] p-4 text-[#8a4e0a] shadow-xs">
+                    <div className="flex items-center gap-2 font-bold text-[#8a4e0a]">
+                      <Icon name="notification_important" className="text-[20px] text-[#b76e1a]" />
                       <span>Lưu ý cảnh báo từ AI:</span>
                     </div>
-                    <ul className="mt-1 list-disc pl-5 font-body-sm text-body-sm">
+                    <ul className="mt-1.5 list-disc pl-5 font-body-sm text-sm text-[#734008] space-y-1">
                       {detectionResult.warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
+                        <li key={i}>{cleanTechnicalCodes(w)}</li>
                       ))}
                     </ul>
                   </div>
                 )}
 
+                {/* KHU VỰC HÀNH ĐỘNG: LƯU VÀO TỦ LẠNH CÁ NHÂN & XEM KHO */}
+                <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-5 rounded-2xl border border-primary/25 bg-gradient-to-r from-emerald-500/10 via-primary-fixed/20 to-primary/10 p-5 sm:p-6 shadow-sm">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-md">
+                      <Icon name="kitchen" className="text-[28px]" />
+                    </div>
+                    <div>
+                      <h4 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface">
+                        Lưu Trữ Tủ Lạnh Cá Nhân
+                      </h4>
+                      <p className="font-body-sm text-xs sm:text-sm text-on-surface-variant">
+                        {authed
+                          ? `Đã nhận diện ${detectedItems.length} nguyên liệu. Bấm "Lưu vào tủ lạnh cá nhân" để đồng bộ lưu trữ và nhận gợi ý món ăn.`
+                          : 'Đăng ký tài khoản để lưu trữ các nguyên liệu này vào tủ lạnh cá nhân và nhận gợi ý món ăn.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto justify-end">
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={handleResetImage}
+                      type="button"
+                      className="inline-flex items-center gap-2"
+                    >
+                      <Icon name="photo_camera" className="text-[18px]" />
+                      <span>Quét ảnh khác</span>
+                    </Button>
+
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={handleSaveToPersonalFridge}
+                      type="button"
+                      loading={isSavingToFridge}
+                      className="inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold"
+                    >
+                      <Icon name="bookmark_added" className="text-[20px]" />
+                      <span>Lưu vào tủ lạnh cá nhân</span>
+                    </Button>
+
+                    {hasItems && (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={() => {
+                          setMainTab('inventory');
+                          setTimeout(() => {
+                            document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                          }, 100);
+                        }}
+                        type="button"
+                        className="inline-flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                      >
+                        <Icon name="soup_kitchen" className="text-[18px]" />
+                        <span>Xem gợi ý món ăn</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Hướng dẫn cho Khách */}
                 {!authed && (
-                  <div className="mt-4 flex items-center justify-between rounded-xl bg-primary-fixed/30 p-3.5 text-on-surface">
+                  <div className="mt-5 flex items-center justify-between rounded-xl bg-primary-fixed/30 p-4 text-on-surface">
                     <p className="font-body-sm text-body-sm">
-                      Kết quả của Khách chỉ để xem thử. Đăng ký tài khoản để tự động lưu nguyên liệu vào tủ lạnh ảo!
+                      Kết quả của Khách chỉ để xem thử. Đăng ký tài khoản để tự động lưu nguyên liệu vào tủ lạnh thông minh!
                     </p>
                     <Link
                       to={PATHS.AUTH.REGISTER}
-                      className="ml-3 shrink-0 rounded-lg bg-primary px-3 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary no-underline hover:bg-primary/90"
+                      className="ml-3 shrink-0 rounded-lg bg-primary px-3.5 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary no-underline hover:bg-primary/90"
                     >
                       Đăng ký ngay
                     </Link>
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </section>
+      )}
 
-          {/* 2. DANH SÁCH NGUYÊN LIỆU TRONG TỦ LẠNH ẢO (Thành viên) */}
+      {/* TAB 2: KHO NGUYÊN LIỆU TỦ LẠNH CỦA BẠN */}
+      {mainTab === 'inventory' && (
+        <section aria-label="Kho nguyên liệu tủ lạnh" className="w-full">
           <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
               <div>
@@ -607,7 +970,7 @@ export const FridgePage: React.FC = () => {
 
               {authed && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative w-44">
+                  <div className="relative w-52">
                     <input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -619,6 +982,20 @@ export const FridgePage: React.FC = () => {
                       className="absolute left-2.5 top-2 text-[18px] text-on-surface-variant"
                     />
                   </div>
+
+                  {hasItems && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 font-label-sm text-xs font-semibold text-primary transition hover:bg-primary/20"
+                      title="Cuộn tới danh sách gợi ý món ăn"
+                    >
+                      <Icon name="soup_kitchen" className="text-[16px]" />
+                      <span>Gợi ý món ({suggestionsQuery.data?.length ?? 0})</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -647,10 +1024,10 @@ export const FridgePage: React.FC = () => {
               <div className="flex flex-col items-center gap-2.5 rounded-xl bg-surface-container-low p-8 text-center">
                 <Icon name="lock" className="text-[44px] text-outline" />
                 <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                  Kho tủ lạnh ảo dành cho thành viên
+                  Kho tủ lạnh thông minh dành cho thành viên
                 </h3>
                 <p className="max-w-md font-body-sm text-body-sm text-on-surface-variant">
-                  Đăng nhập hoặc đăng ký tài khoản để lưu nguyên liệu, theo dõi hạn sử dụng độ tươi và nhận công thức giải cứu nguyên liệu sắp hỏng.
+                  Đăng nhập hoặc đăng ký tài khoản để lưu nguyên liệu, theo dõi hạn sử dụng độ tươi và quản lý nguyên liệu dễ dàng.
                 </p>
                 <Link
                   to={PATHS.AUTH.LOGIN}
@@ -687,172 +1064,361 @@ export const FridgePage: React.FC = () => {
                     : 'Tủ lạnh của bạn đang trống'}
                 </h3>
                 <p className="max-w-md font-body-sm text-body-sm text-on-surface-variant">
-                  Hãy chụp ảnh tủ lạnh bằng AI hoặc thêm thủ công nguyên liệu để bắt đầu theo dõi độ tươi và nhận gợi ý món ngon!
+                  Hãy chụp ảnh tủ lạnh bằng AI hoặc thêm thủ công nguyên liệu để bắt đầu theo dõi độ tươi!
                 </p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setIsAddModalOpen(true)}
-                >
-                  <Icon name="add" className="text-[18px]" />
-                  Thêm nguyên liệu ngay
-                </Button>
+                <div className="mt-3 flex items-center gap-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setMainTab('vision');
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <Icon name="photo_camera" className="text-[18px]" />
+                    Quét ảnh bằng AI
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    <Icon name="add" className="text-[18px]" />
+                    Thêm thủ công
+                  </Button>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {visibleItems.map((item) => (
-                  <div
-                    key={item.inventoryId}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low p-3.5 transition-all hover:border-outline-variant hover:bg-surface-container"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                          item.freshnessStatus === 'FRESH'
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                        }`}
-                      >
-                        <Icon
-                          name={item.freshnessStatus === 'FRESH' ? 'eco' : 'hourglass_bottom'}
-                          className="text-[22px]"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="truncate font-body-md text-body-md font-semibold text-on-surface">
-                            {item.name}
-                          </h4>
-                          <FreshnessBadge status={item.freshnessStatus} size="sm" />
-                        </div>
-                        {item.freshnessStatus === 'NON-FRESH' && (
-                          <p className="mt-0.5 font-label-sm text-xs font-medium text-amber-700 dark:text-amber-400">
-                            Cần ưu tiên chế biến sớm
-                          </p>
-                        )}
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleItems.map((item) => {
+                  const matchingDetected = detectedItems.find(
+                    (d) =>
+                      (item.ingredientId && d.ingredientId === item.ingredientId) ||
+                      d.name.toLowerCase() === item.name.toLowerCase()
+                  );
+                  const itemThumbnail = matchingDetected?.thumbnailUrl;
+                  const visual = getIngredientVisual(item.name);
 
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditingItem(item)}
-                        title="Chỉnh sửa tên hoặc độ tươi"
-                        className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-primary"
-                        aria-label={`Chỉnh sửa ${item.name}`}
-                      >
-                        <Icon name="edit" className="text-[18px]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeletingItem(item)}
-                        title="Xóa khỏi tủ lạnh"
-                        className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-red-600"
-                        aria-label={`Xóa ${item.name}`}
-                      >
-                        <Icon name="delete" className="text-[18px]" />
-                      </button>
+                  return (
+                    <div
+                      key={item.inventoryId}
+                      className="group relative flex flex-col justify-between rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3.5 sm:p-4 transition-all duration-200 hover:border-primary/50 hover:bg-surface-container-low hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          {/* Thumbnail thực tế từ scan hoặc Icon danh mục */}
+                          {itemThumbnail ? (
+                            <div className="relative h-13 w-13 sm:h-14 sm:w-14 shrink-0 overflow-hidden rounded-xl border border-outline-variant/60 bg-surface-container shadow-xs">
+                              <img
+                                src={itemThumbnail}
+                                alt={item.name}
+                                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className={`flex h-13 w-13 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl ${visual.bg} shadow-xs`}
+                            >
+                              <Icon name={visual.icon} className="text-[26px]" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <h4
+                              className="font-body-md text-sm sm:text-base font-bold text-on-surface leading-snug break-words"
+                              title={item.name}
+                            >
+                              {item.name}
+                            </h4>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              <FreshnessBadge status={item.freshnessStatus} size="sm" />
+                              {item.freshnessStatus === 'NON-FRESH' && (
+                                <span className="font-label-sm inline-flex items-center rounded-full bg-[#fef6ea] px-2 py-0.5 text-[11px] font-semibold text-[#935216] border border-[#f8dfbe]">
+                                  Cần dùng sớm
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Các nút chỉnh sửa / xoá */}
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingItem(item)}
+                            title="Chỉnh sửa tên hoặc độ tươi"
+                            className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-primary"
+                            aria-label={`Chỉnh sửa ${item.name}`}
+                          >
+                            <Icon name="edit" className="text-[17px]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingItem(item)}
+                            title="Xóa khỏi tủ lạnh"
+                            className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-red-600"
+                            aria-label={`Xóa ${item.name}`}
+                          >
+                            <Icon name="delete" className="text-[17px]" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
-        </section>
 
-        {/* CỘT PHẢI: GỢI Ý MÓN "GIẢI CỨU TỦ LẠNH" (5 cột - FN-VIS-03) */}
-        <section className="flex flex-col gap-6 lg:col-span-5">
-          <div className="sticky top-24 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="flex items-center gap-2.5 pb-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                <Icon name="lightbulb" className="text-[22px]" />
-              </span>
-              <div>
-                <h2 className="font-headline-sm text-headline-sm text-on-surface">
-                  Giải Cứu Tủ Lạnh
-                </h2>
-                <p className="font-body-sm text-xs text-on-surface-variant">
-                  Gợi ý công thức đạt độ khớp nguyên liệu ≥ 70%
-                </p>
+          {/* SECTION GỢI Ý MÓN ĂN NẤU NGAY (EMPTY THE FRIDGE - FN-VIS-03) */}
+          <div
+            id="recipe-suggestions-section"
+            className="mt-8 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm"
+          >
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline-variant/40">
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]">
+                  <Icon name="soup_kitchen" className="text-[24px]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-headline-sm text-lg font-bold text-on-surface">
+                      Món Chay Gợi Ý Nấu Ngay
+                    </h3>
+                    <span className="rounded-full bg-[#eaf3ec] px-2.5 py-0.5 text-xs font-semibold text-[#2d5a38] border border-[#c4dec8]">
+                      Empty the Fridge
+                    </span>
+                  </div>
+                  <p className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                    Gợi ý công thức đạt độ tương đồng nguyên liệu ≥ 70%, tự động ưu tiên giải cứu các món cần dùng sớm
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {!authed ? (
-              <div className="rounded-xl bg-surface-container-low p-5 text-center font-body-sm text-body-sm text-on-surface-variant">
-                Đăng nhập để nhận gợi ý món chay phù hợp với các nguyên liệu đang có trong tủ lạnh của bạn.
-              </div>
-            ) : !hasItems ? (
-              <div className="rounded-xl bg-surface-container-low p-5 text-center font-body-sm text-body-sm text-on-surface-variant">
-                Tủ lạnh hiện chưa có nguyên liệu nào. Hãy quét ảnh hoặc thêm nguyên liệu để nhận gợi ý món ngon!
-              </div>
-            ) : suggestionsQuery.isPending ? (
-              <div className="flex flex-col gap-3" role="status" aria-busy="true">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container" />
-                ))}
-              </div>
-            ) : suggestionsQuery.isError ? (
-              <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-900">
-                <p className="font-semibold text-sm">Không thể tải gợi ý món:</p>
-                <p className="mt-1 font-body-sm text-xs">{apiErrorMessage(suggestionsQuery.error)}</p>
+              {/* Action buttons */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="mt-2 text-xs"
                   onClick={() => void suggestionsQuery.refetch()}
+                  disabled={suggestionsQuery.isFetching}
+                  title="Tải lại danh sách gợi ý"
+                  className="inline-flex items-center gap-1.5 text-xs"
                 >
-                  Thử lại
+                  <Icon
+                    name="refresh"
+                    className={`text-[16px] ${suggestionsQuery.isFetching ? 'animate-spin' : ''}`}
+                  />
+                  <span>Làm mới</span>
                 </Button>
+
+                <Link
+                  to={`${PATHS.MEAL_PLANS.NEW}?useFridge=true`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20 no-underline"
+                  title="AI tự động sắp xếp 7 ngày thực đơn từ toàn bộ nguyên liệu trong tủ"
+                >
+                  <Icon name="calendar_month" className="text-[16px]" />
+                  <span>Lên thực đơn tuần</span>
+                </Link>
               </div>
-            ) : (suggestionsQuery.data ?? []).length === 0 ? (
-              <div className="rounded-xl bg-surface-container-low p-5 text-center font-body-sm text-body-sm text-on-surface-variant">
-                Chưa tìm thấy công thức nào đạt độ tương đồng nguyên liệu ≥ 70%. Hãy thử thêm một vài nguyên liệu phổ biến khác!
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3.5">
-                {(suggestionsQuery.data ?? []).map((suggestion) => (
-                  <div
-                    key={suggestion.recipeId}
-                    className="flex flex-col gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-low p-4 transition-all hover:border-outline hover:bg-surface-container"
+            </div>
+
+            {/* Content area */}
+            <div className="mt-5">
+              {!authed ? (
+                <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-6 text-center">
+                  <Icon name="lock" className="mx-auto text-[32px] text-on-surface-variant" />
+                  <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
+                    Yêu cầu đăng nhập
+                  </p>
+                  <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
+                    Đăng nhập hoặc đăng ký tài khoản để hệ thống đối chiếu nguyên liệu trong tủ lạnh với kho công thức chay chuẩn.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => openSignupPrompt('quota')}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-body-md text-[16px] font-bold text-on-surface">
-                        {suggestion.title}
-                      </h3>
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 font-label-sm text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        {Math.round(suggestion.similarity * 100)}% khớp
-                      </span>
-                    </div>
-
-                    {/* Huy hiệu ưu tiên dùng nguyên liệu sắp hỏng */}
-                    {suggestion.usesNonFreshItems && (
-                      <span className="w-fit rounded-md bg-amber-100 px-2 py-0.5 font-label-sm text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300">
-                        ⚡ Ưu tiên: Dùng nguyên liệu cần giải cứu
-                      </span>
-                    )}
-
-                    {/* Danh sách nguyên liệu còn thiếu */}
-                    {suggestion.missingIngredients && suggestion.missingIngredients.length > 0 && (
-                      <p className="font-body-sm text-xs text-on-surface-variant">
-                        Còn thiếu: {suggestion.missingIngredients.map((m) => m.name).join(', ')}
-                      </p>
-                    )}
-
-                    <Link
-                      to={PATHS.RECIPES.DETAIL(suggestion.recipeId)}
-                      className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-surface-container-highest py-2 text-center font-label-sm text-label-sm font-semibold text-on-surface no-underline transition-colors hover:bg-primary hover:text-on-primary"
+                    Đăng ký / Đăng nhập
+                  </Button>
+                </div>
+              ) : !hasItems ? (
+                <div className="rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low p-6 text-center">
+                  <Icon name="kitchen" className="mx-auto text-[32px] text-on-surface-variant" />
+                  <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
+                    Tủ lạnh hiện chưa có nguyên liệu nào
+                  </p>
+                  <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
+                    Hãy quét ảnh tủ lạnh hoặc thêm nguyên liệu thủ công để hệ thống tính toán độ tương đồng và gợi ý món ngon cho bạn!
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setMainTab('vision')}
+                  >
+                    <Icon name="photo_camera" className="text-[16px]" />
+                    Quét ảnh nguyên liệu ngay
+                  </Button>
+                </div>
+              ) : suggestionsQuery.isPending ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-low p-4 animate-pulse"
                     >
-                      <span>Xem công thức</span>
-                      <Icon name="arrow_forward" className="text-[16px]" />
-                    </Link>
+                      <div className="h-5 w-3/4 rounded bg-surface-container-high" />
+                      <div className="h-4 w-1/2 rounded bg-surface-container-high" />
+                      <div className="mt-2 h-9 w-full rounded-xl bg-surface-container-high" />
+                    </div>
+                  ))}
+                </div>
+              ) : suggestionsQuery.isError ? (
+                <div className="rounded-xl border border-[#fecdca] bg-[#fdeeed] p-4 text-[#b42318]">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <Icon name="error" className="text-[18px]" />
+                    <span>Không thể tải gợi ý món ăn lúc này</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <p className="mt-1 font-body-sm text-xs opacity-90">
+                    {cleanTechnicalCodes(apiErrorMessage(suggestionsQuery.error))}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3 text-xs"
+                    onClick={() => void suggestionsQuery.refetch()}
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              ) : (suggestionsQuery.data ?? []).length === 0 ? (
+                <div className="rounded-2xl border border-outline-variant/50 bg-[#fbf9f6] p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5efe6] text-[#8a532a]">
+                    <Icon name="search_off" className="text-[28px]" />
+                  </div>
+                  <h4 className="mt-3 font-headline-sm text-base font-bold text-on-surface">
+                    Chưa có công thức nào đạt độ tương đồng ≥ 70%
+                  </h4>
+                  <p className="mx-auto mt-1 max-w-md font-body-sm text-xs sm:text-sm text-on-surface-variant">
+                    Kho tủ lạnh của bạn hiện có {allItemsQuery.data?.length ?? 0} nguyên liệu. Hãy thử bổ sung thêm một số nguyên liệu cơ bản (như đậu phụ, nấm rơm, mì sợi...) để mở khóa các công thức nấu ngay nhé!
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      <Icon name="add" className="text-[16px]" />
+                      Thêm nguyên liệu thủ công
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setMainTab('vision')}
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      <Icon name="photo_camera" className="text-[16px]" />
+                      Quét thêm ảnh rau củ
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {(suggestionsQuery.data ?? []).map((suggestion) => {
+                    const matchPercent = Math.round(suggestion.similarity * 100);
+                    const isPerfectMatch = matchPercent >= 100;
+
+                    return (
+                      <div
+                        key={suggestion.recipeId}
+                        className="group flex flex-col justify-between rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-3.5 sm:p-4 transition-all duration-200 hover:border-primary/50 hover:bg-surface-container-low hover:shadow-md"
+                      >
+                        <div className="flex flex-col gap-2.5">
+                          {/* Thumbnail món ăn với huy hiệu nổi */}
+                          <div className="relative h-40 sm:h-44 w-full overflow-hidden rounded-xl bg-surface-container-high border border-outline-variant/30">
+                            {suggestion.imageUrl ? (
+                              <img
+                                src={suggestion.imageUrl}
+                                alt={suggestion.title}
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-[#f5efe6] text-[#8a532a]">
+                                <Icon name="soup_kitchen" className="text-[36px] opacity-70" />
+                              </div>
+                            )}
+
+                            {/* Huy hiệu độ tương đồng nổi ở góc phải trên ảnh */}
+                            <div className="absolute top-2.5 right-2.5 shadow-xs">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold backdrop-blur-md ${
+                                  isPerfectMatch
+                                    ? 'bg-[#eaf3ec]/95 text-[#2d5a38] border border-[#c4dec8]'
+                                    : 'bg-[#f4efe8]/95 text-[#734008] border border-[#e5d5ca]'
+                                }`}
+                              >
+                                {isPerfectMatch ? '✓ Đủ nguyên liệu' : `${matchPercent}% khớp`}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Title */}
+                          <div>
+                            <h4
+                              className="font-headline-sm text-base font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-1"
+                              title={suggestion.title}
+                            >
+                              {suggestion.title}
+                            </h4>
+                          </div>
+
+                          {/* Priority badge for non-fresh items */}
+                          {suggestion.usesNonFreshItems && (
+                            <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#fef6ea] px-2.5 py-1 text-xs font-semibold text-[#935216] border border-[#f8dfbe]">
+                              <Icon name="bolt" className="text-[15px] text-[#b76e1a]" />
+                              <span>Ưu tiên giải cứu: Tận dụng đồ cần dùng sớm</span>
+                            </div>
+                          )}
+
+                          {/* Missing ingredients */}
+                          {suggestion.missingIngredients && suggestion.missingIngredients.length > 0 ? (
+                            <div className="rounded-xl bg-surface-container-low p-2.5 text-xs text-on-surface-variant">
+                              <span className="font-semibold text-on-surface">Còn thiếu: </span>
+                              <span>
+                                {suggestion.missingIngredients.map((m) => m.name).join(', ')}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="rounded-xl bg-[#eaf3ec]/60 p-2.5 text-xs font-medium text-[#2d5a38]">
+                              ✨ Bạn đã có đầy đủ nguyên liệu trong tủ để nấu món này!
+                            </div>
+                          )}
+                        </div>
+
+                        {/* CTA button */}
+                        <div className="mt-4 pt-3 border-t border-outline-variant/30">
+                          <Link
+                            to={PATHS.RECIPES.DETAIL(suggestion.recipeId)}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-center font-label-md text-xs sm:text-sm font-semibold text-on-primary no-underline shadow-xs transition hover:bg-primary/90"
+                          >
+                            <span>Xem công thức & Nấu ngay</span>
+                            <Icon name="arrow_forward" className="text-[16px]" />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </section>
-      </div>
+      )}
 
       {/* CÁC MODAL HỖ TRỢ */}
       {/* 1. Modal thêm thủ công nguyên liệu */}
@@ -879,7 +1445,7 @@ export const FridgePage: React.FC = () => {
         title="Xóa nguyên liệu khỏi tủ?"
         message={
           deletingItem
-            ? `Nguyên liệu “${deletingItem.name}” sẽ bị xóa khỏi tủ lạnh ảo và không còn được dùng khi gợi ý món giải cứu.`
+            ? `Nguyên liệu “${deletingItem.name}” sẽ bị xóa khỏi tủ lạnh thông minh và không còn được dùng khi gợi ý món giải cứu.`
             : ''
         }
         confirmLabel={deleteMutation.isPending ? 'Đang xóa…' : 'Xóa'}

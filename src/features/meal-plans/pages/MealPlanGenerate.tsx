@@ -92,7 +92,7 @@ export const MealPlanGenerate: React.FC = () => {
       if (!items || items.length === 0) {
         onChange(false);
         setFridgeEmptyError(
-          'Tủ lạnh ảo của bạn chưa có nguyên liệu nào! Vui lòng chụp ảnh hoặc thêm nguyên liệu vào tủ lạnh trước khi sử dụng tùy chọn này.'
+          'Tủ lạnh thông minh của bạn chưa có nguyên liệu nào! Vui lòng chụp ảnh hoặc thêm nguyên liệu vào tủ lạnh trước khi sử dụng tùy chọn này.'
         );
         setFridgeItemsCount(0);
         setNonFreshCount(0);
@@ -104,7 +104,7 @@ export const MealPlanGenerate: React.FC = () => {
       }
     } catch {
       onChange(false);
-      setFridgeEmptyError('Không thể kiểm tra tủ lạnh ảo lúc này. Vui lòng kiểm tra lại kết nối và thử lại sau.');
+      setFridgeEmptyError('Không thể kiểm tra tủ lạnh thông minh lúc này. Vui lòng kiểm tra lại kết nối và thử lại sau.');
     } finally {
       setIsCheckingFridge(false);
     }
@@ -145,7 +145,7 @@ export const MealPlanGenerate: React.FC = () => {
             setProfileMessage(getErrorMessage(apiError));
           } else if (apiError.errorCode === 'ERR_FRIDGE_EMPTY') {
             setValue('useFridge', false);
-            setFridgeEmptyError(getErrorMessage(apiError) || 'Tủ lạnh ảo của bạn chưa có nguyên liệu nào.');
+            setFridgeEmptyError(getErrorMessage(apiError) || 'Tủ lạnh thông minh của bạn chưa có nguyên liệu nào.');
           } else if (
             apiError.errorCode === 'ERR_QUOTA_MEAL_PLAN_EXCEEDED' ||
             apiError.errorCode === 'ERR_MEAL_NO_CANDIDATE' ||
@@ -342,7 +342,7 @@ export const MealPlanGenerate: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-space-sm">
-                        <h3 className="font-label-lg text-label-lg text-primary font-medium">Ưu tiên nguyên liệu trong Tủ Lạnh Ảo</h3>
+                        <h3 className="font-label-lg text-label-lg text-primary font-medium">Ưu tiên nguyên liệu trong Tủ Lạnh Thông Minh</h3>
                         {fridgeItemsCount !== null && (
                           <span className="rounded bg-surface-container-lowest px-space-xs py-0.5 font-label-sm text-label-sm text-secondary">
                             {fridgeItemsCount} nguyên liệu
@@ -367,7 +367,7 @@ export const MealPlanGenerate: React.FC = () => {
                         type="button"
                         role="switch"
                         aria-checked={!!field.value}
-                        aria-label="Ưu tiên nguyên liệu trong tủ lạnh ảo"
+                        aria-label="Ưu tiên nguyên liệu trong tủ lạnh thông minh"
                         disabled={isCheckingFridge}
                         onClick={() => handleToggleFridge(!field.value, field.onChange)}
                         className={cn(
@@ -387,9 +387,9 @@ export const MealPlanGenerate: React.FC = () => {
                   />
                 </div>
 
-                {/* Chốt chặn tủ lạnh ảo rỗng */}
+                {/* Chốt chặn tủ lạnh thông minh rỗng */}
                 {fridgeEmptyError && (
-                  <FormAlert tone="error" title="Tủ lạnh ảo chưa có nguyên liệu" className="mt-space-sm">
+                  <FormAlert tone="error" title="Tủ lạnh thông minh chưa có nguyên liệu" className="mt-space-sm">
                     <p className="mt-0.5">{fridgeEmptyError}</p>
                     <div className="mt-2">
                       <Link
@@ -397,7 +397,7 @@ export const MealPlanGenerate: React.FC = () => {
                         className="inline-flex items-center gap-1 font-label-md text-label-md text-error underline underline-offset-2 hover:opacity-80"
                       >
                         <Icon name="kitchen" className="text-[16px]" />
-                        Đi tới Tủ lạnh ảo để nạp đồ
+                        Đi tới Tủ lạnh thông minh để nạp đồ
                       </Link>
                     </div>
                   </FormAlert>
