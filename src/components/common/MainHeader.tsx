@@ -57,15 +57,6 @@ export const MainHeader: React.FC = () => {
         <div className="flex shrink-0 items-center gap-space-sm">
           {sessionStatus === 'restoring' ? null : user ? (
             <>
-              <Link
-                to={PATHS.RECIPES.NEW}
-                title="Đăng công thức"
-                aria-label="Đăng công thức"
-                className="hidden items-center gap-1.5 rounded-lg bg-secondary px-3 py-2 font-label-md text-label-md text-on-secondary no-underline shadow-sm transition-all hover:bg-on-secondary-fixed-variant sm:flex 2xl:px-space-md"
-              >
-                <Icon name="add" className="text-[16px]" />
-                <span className="hidden 2xl:inline">Đăng công thức</span>
-              </Link>
               <Dropdown align="end">
                 <Dropdown.Toggle
                   as="button"

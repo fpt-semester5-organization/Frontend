@@ -8,8 +8,9 @@
  * (authorId, status, categoryId, dietarySchoolId, difficultyLevel, isOptional) — xem RecipeOwnerFields trong recipe.types.
  */
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { UseFormSetError } from 'react-hook-form';
+import { ContentTypeTabs } from '@/components/common/ContentTypeTabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { PageLoader } from '@/components/common/PageLoader';
@@ -97,6 +98,16 @@ const RecipeEditor: React.FC = () => {
   const isEdit = editId !== null;
   const validEditId = isEdit && Number.isInteger(editId) && editId > 0;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromCommunity = searchParams.get('from') === 'community';
+
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(fromCommunity ? PATHS.COMMUNITY.ROOT : isEdit ? PATHS.ME.RECIPES : PATHS.RECIPES.ROOT);
+    }
+  };
   const user = useAuthStore((state) => state.user);
   const sessionStatus = useAuthStore((state) => state.sessionStatus);
   const recipe = useRecipe(validEditId ? editId : 0);
@@ -232,25 +243,41 @@ const RecipeEditor: React.FC = () => {
 
   const header = (
     <div className="flex flex-col gap-space-xs py-space-md">
-      <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
-        <Link to={PATHS.HOME} className="text-on-surface-variant no-underline hover:text-primary">
-          Trang chủ
-        </Link>
-        <span className="text-outline-variant">/</span>
-        {isEdit ? (
-          <Link to={PATHS.ME.CONTENT('recipes')} className="text-on-surface-variant no-underline hover:text-primary">
-            Nội dung của tôi
+      <div className="flex flex-wrap items-center justify-between gap-space-sm pb-1">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+        >
+          <Icon name="arrow_back" className="text-[18px]" />
+          <span>Quay lại</span>
+        </button>
+
+        <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
+          <Link to={PATHS.HOME} className="text-on-surface-variant no-underline hover:text-primary">
+            Trang chủ
           </Link>
-        ) : (
-          <Link to={PATHS.RECIPES.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
-            Kho công thức
-          </Link>
-        )}
-        <span className="text-outline-variant">/</span>
-        <span aria-current="page" className="text-primary">
-          {isEdit ? 'Sửa công thức' : 'Đăng công thức'}
-        </span>
-      </nav>
+          <span className="text-outline-variant">/</span>
+          {isEdit ? (
+            <Link to={PATHS.ME.CONTENT('recipes')} className="text-on-surface-variant no-underline hover:text-primary">
+              Nội dung của tôi
+            </Link>
+          ) : fromCommunity ? (
+            <Link to={PATHS.COMMUNITY.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
+              Cộng đồng
+            </Link>
+          ) : (
+            <Link to={PATHS.RECIPES.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
+              Kho công thức
+            </Link>
+          )}
+          <span className="text-outline-variant">/</span>
+          <span aria-current="page" className="text-primary">
+            {isEdit ? 'Sửa công thức' : 'Đăng công thức'}
+          </span>
+        </nav>
+      </div>
+
       <h1 className="font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">
         {isEdit ? 'Sửa công thức' : 'Soạn công thức chay'}
       </h1>
@@ -276,6 +303,14 @@ const RecipeEditor: React.FC = () => {
             <Link to={PATHS.ME.CONTENT('recipes')} className={PRIMARY_LINK}>
               Xem nội dung của tôi
             </Link>
+            {fromCommunity && (
+              <Link
+                to={PATHS.COMMUNITY.ROOT}
+                className="inline-flex rounded-lg bg-surface-container px-5 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
+              >
+                Về Cộng đồng
+              </Link>
+            )}
             <Button variant="outline" onClick={startOver}>
               Soạn công thức khác
             </Button>
@@ -370,13 +405,14 @@ const RecipeEditor: React.FC = () => {
 
   return shell(
     <>
+      {!isEdit && <ContentTypeTabs activeType="RECIPE" />}
       <RecipeForm
         key={`${editId ?? 'new'}-${formKey}`}
         variant={variant}
         defaultValues={isEdit && editDefaults ? editDefaults : EMPTY_RECIPE_FORM}
         submitting={submitting}
         lockedSeconds={lockedSeconds}
-        cancelTo={isEdit ? PATHS.ME.CONTENT('recipes') : PATHS.RECIPES.ROOT}
+        cancelTo={isEdit ? PATHS.ME.CONTENT('recipes') : fromCommunity ? PATHS.COMMUNITY.ROOT : PATHS.RECIPES.ROOT}
         onSubmit={handleSubmit}
         statusNote={statusNote}
         alert={
