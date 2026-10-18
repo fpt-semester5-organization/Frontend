@@ -18,8 +18,9 @@ export const postFormSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(POST_TITLE_MIN, `Tiêu đề cần ít nhất ${POST_TITLE_MIN} ký tự.`)
-    .max(POST_TITLE_MAX, `Tiêu đề tối đa ${POST_TITLE_MAX} ký tự.`),
+    .max(POST_TITLE_MAX, `Tiêu đề tối đa ${POST_TITLE_MAX} ký tự.`)
+    .optional()
+    .or(z.literal('')),
   content: z.string().trim().min(1, 'Vui lòng nhập nội dung bài viết.'),
   visibility: z.enum(['PUBLIC', 'PRIVATE', 'KEEP']),
 });

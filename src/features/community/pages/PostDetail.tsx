@@ -124,7 +124,7 @@ const PostDetail: React.FC = () => {
       <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl">
         <header className="flex flex-wrap items-center justify-between gap-space-md pb-space-lg">
           <div className="flex items-center gap-space-sm">
-            <Avatar name={data.author.fullName} size="lg" />
+            <Avatar name={data.author.fullName} src={data.author.avatarUrl} size="lg" />
             <span className="font-headline-sm text-headline-sm text-on-surface">{data.author.fullName}</span>
           </div>
           <div className="ml-auto flex items-center gap-space-xs">
@@ -193,14 +193,14 @@ const PostDetail: React.FC = () => {
         </footer>
       </article>
 
-      <RelatedPosts currentPostId={postId} />
-
       <CommentSection
         target={target}
         authorId={data.author.userId}
         commentCount={data.commentCount}
         canComment={data.memberActions.canComment}
       />
+
+      <RelatedPosts currentPostId={postId} />
 
       <ConfirmDialog
         show={confirmDelete}

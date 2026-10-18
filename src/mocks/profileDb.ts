@@ -48,7 +48,7 @@ export const profiles = new Map<number, MockProfile>([
     1024,
     {
       phoneNumber: '0912345678',
-      avatarUrl: null,
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
       health: {
         gender: 'FEMALE',
         dateOfBirth: '2003-04-12',
@@ -66,13 +66,13 @@ export const profiles = new Map<number, MockProfile>([
     },
   ],
   // Trần Bình (VIP): chưa lập hồ sơ sức khỏe.
-  [2048, { phoneNumber: null, avatarUrl: null, health: null, allergies: [], weights: [] }],
+  [2048, { phoneNumber: null, avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=160&q=80', health: null, allergies: [], weights: [] }],
   // Lê Minh Chi: hồ sơ cũ hơn 30 ngày (isStaleMetrics), kiêng ngũ vị tân.
   [
     3072,
     {
       phoneNumber: '0387654321',
-      avatarUrl: null,
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80',
       health: {
         gender: 'MALE',
         dateOfBirth: '1998-09-02',

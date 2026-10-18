@@ -12,7 +12,9 @@ export interface ContentRef {
 }
 
 /** GET /posts (FN-POST-05). */
-export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][number]>;
+export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][number]> & {
+  authorAvatarUrl?: string | null;
+};
 export type PostListParams = NonNullable<ApiOperations['listPosts']['parameters']['query']>;
 export type PostSort = NonNullable<PostListParams['sort']>;
 
@@ -41,8 +43,13 @@ export interface PostRecipeAttachment {
 type PostDetailRaw = DeepRequired<Schemas['GetPostResponse']['data']>;
 
 /** GET /posts/{id} (FN-POST-06). */
-export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes'> & {
+export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes' | 'author'> & {
   imageUrl: string | null;
+  author: {
+    userId: number;
+    fullName: string;
+    avatarUrl?: string | null;
+  };
   videos: PostVideoAttachment[];
   recipes: PostRecipeAttachment[];
 };
@@ -50,7 +57,12 @@ export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes'> 
 type PostCommentRaw = DeepRequired<Schemas['ListPostCommentsResponse']['data'][number]>;
 
 /** Bình luận dạng cây (FN-COMM-01). replies[] chưa có schema phần tử; theo mô tả là bình luận con cùng cấu trúc. */
-export type PostComment = Omit<PostCommentRaw, 'parentCommentId' | 'replies'> & {
+export type PostComment = Omit<PostCommentRaw, 'parentCommentId' | 'replies' | 'author'> & {
+  author: {
+    userId: number;
+    fullName: string;
+    avatarUrl?: string | null;
+  };
   parentCommentId: number | null;
   replies: PostComment[];
 };
@@ -87,6 +99,7 @@ export interface CommunityFeedItem {
   title: string;
   imageUrl?: string | null;
   authorName?: string;
+  authorAvatarUrl?: string | null;
   createdAt?: string;
   voteCount: number;
   commentCount?: number;
@@ -103,6 +116,7 @@ export const fromPost = (p: PostListItem): CommunityFeedItem => ({
   title: p.title,
   imageUrl: p.imageUrl,
   authorName: p.authorName,
+  authorAvatarUrl: p.authorAvatarUrl,
   createdAt: p.createdAt,
   voteCount: p.voteCount,
   commentCount: p.commentCount,
@@ -114,6 +128,8 @@ export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').Re
   id: r.recipeId,
   title: r.title,
   imageUrl: r.imageUrl,
+  authorName: 'Bếp Chay VeggieLife',
+  authorAvatarUrl: '/logo.png',
   voteCount: r.voteCount,
   cookTimeMinutes: r.cookTimeMinutes,
   caloriesKcal: r.caloriesKcal,

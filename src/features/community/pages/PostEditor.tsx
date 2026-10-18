@@ -66,7 +66,7 @@ const PostEditor: React.FC = () => {
 
       if (!isEdit) {
         const res = await createPost.mutateAsync({
-          title: values.title,
+          title: values.title ?? '',
           content: values.content,
           visibility: values.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
           submit: intent === 'publish',
@@ -76,7 +76,7 @@ const PostEditor: React.FC = () => {
       } else {
         // GET /posts/{id} không trả visibility: chỉ gửi field người dùng thực sự sửa.
         const body: UpdatePostBody = {};
-        if (dirty.title) body.title = values.title;
+        if (dirty.title) body.title = values.title ?? '';
         if (dirty.content) body.content = values.content;
         if (dirty.visibility && values.visibility !== 'KEEP') body.visibility = values.visibility;
 

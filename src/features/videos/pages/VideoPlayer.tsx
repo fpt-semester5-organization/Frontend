@@ -139,7 +139,7 @@ const VideoPlayer: React.FC = () => {
           {postData ? (
             <div className="flex flex-col gap-space-md rounded-xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-space-sm">
-                <Avatar name={postData.author.fullName} />
+                <Avatar name={postData.author.fullName} src={postData.author.avatarUrl} />
                 <div className="min-w-0">
                   <p className="font-label-md text-label-md text-on-surface">{postData.author.fullName}</p>
                   <p className="truncate font-body-sm text-body-sm text-on-surface-variant">

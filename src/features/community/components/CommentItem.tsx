@@ -44,8 +44,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
   const updateComment = useUpdateComment(context.target);
   const deleteComment = useDeleteComment(context.target);
 
-  const isOwner = context.currentUserId !== null && comment.author.userId === context.currentUserId;
-  const isContentAuthor = context.authorId !== null && comment.author.userId === context.authorId;
+  const isOwner = context.currentUserId !== null && comment.author?.userId === context.currentUserId;
+  const isContentAuthor = context.authorId !== null && comment.author?.userId === context.authorId;
   const replies = isReply ? [] : flattenReplies(comment);
 
   const handleDelete = () =>
@@ -61,14 +61,17 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
       },
     });
 
+  const authorName = comment.author?.fullName || 'Thành viên';
+  const authorAvatarUrl = comment.author?.avatarUrl;
+
   return (
     <li className="flex flex-col gap-space-sm">
       <div className="flex items-start gap-space-sm">
-        <Avatar name={comment.author.fullName} size={isReply ? 'sm' : 'md'} />
+        <Avatar name={authorName} src={authorAvatarUrl} size={isReply ? 'sm' : 'md'} />
         <div className={cn('min-w-0 flex-1 rounded-lg p-space-md', isReply ? 'bg-surface-container' : 'bg-surface-container-low')}>
           <div className="mb-1 flex items-start justify-between gap-space-xs">
             <div className="flex min-w-0 flex-wrap items-center gap-space-xs">
-              <span className="font-headline-sm text-body-lg font-bold text-on-surface">{comment.author.fullName}</span>
+              <span className="font-headline-sm text-body-lg font-bold text-on-surface">{authorName}</span>
               {isContentAuthor && (
                 <span className="rounded bg-primary px-1.5 py-0.5 font-label-sm text-label-sm text-on-primary">Tác giả</span>
               )}
@@ -197,7 +200,7 @@ function flattenReplies(root: PostComment): FlatReply[] {
   const result: FlatReply[] = [];
   const walk = (parent: PostComment) => {
     for (const reply of parent.replies ?? []) {
-      result.push({ reply, parentId: parent.commentId, parentName: parent.author.fullName });
+      result.push({ reply, parentId: parent.commentId, parentName: parent.author?.fullName || 'Thành viên' });
       walk(reply);
     }
   };

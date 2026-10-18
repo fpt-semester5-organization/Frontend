@@ -291,13 +291,13 @@ const RecipeDetail: React.FC = () => {
       {/* Bản chưa công khai (tác giả tự xem) không có gợi ý liên quan, bình luận, thả tim (chỉ cho APPROVED_ACTIVE). */}
       {isPublic && (
         <>
-          <RelatedRecipes recipeId={recipeId} />
           <CommentSection
             target={target}
             authorId={data.authorId ?? null}
             commentCount={data.commentCount}
             canComment={data.memberActions.canComment}
           />
+          <RelatedRecipes recipeId={recipeId} />
         </>
       )}
 

@@ -42,7 +42,7 @@ const RelatedCard: React.FC<{ post: PostListItem }> = ({ post }) => {
 
         <div className="mt-auto flex items-center justify-between pt-space-xs text-on-surface-variant">
           <div className="flex items-center gap-1.5">
-            <Avatar name={post.authorName} className="h-6 w-6 text-[10px]" />
+            <Avatar name={post.authorName} src={post.authorAvatarUrl} className="h-6 w-6 text-[10px]" />
             <span className="truncate max-w-[100px] font-label-sm text-label-sm">{post.authorName}</span>
           </div>
 

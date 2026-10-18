@@ -22,7 +22,7 @@ export const HomePostCard: React.FC<{ post: PostListItem }> = ({ post }) => (
       />
     ) : (
       <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60">
-        <Avatar name={post.authorName} className="h-11 w-11" />
+        <Avatar name={post.authorName} src={post.authorAvatarUrl} className="h-11 w-11" />
       </div>
     )}
     <div className="flex min-w-0 flex-1 flex-col gap-1">

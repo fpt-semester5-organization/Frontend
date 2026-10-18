@@ -76,7 +76,7 @@ export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submitt
           <div className="space-y-space-xs">
             <div className="flex items-center justify-between">
               <label htmlFor="post-title" className="font-label-sm text-label-sm text-outline">
-                Tiêu đề bài viết <span className="text-secondary">*</span>
+                Tiêu đề bài viết <span className="font-normal text-on-surface-variant">(tùy chọn)</span>
               </label>
               <span className="font-label-sm text-label-sm text-outline">
                 {titleLength} / {POST_TITLE_MAX}
@@ -86,7 +86,7 @@ export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submitt
               id="post-title"
               type="text"
               maxLength={POST_TITLE_MAX}
-              placeholder="Nhập tiêu đề bài viết (10–150 ký tự)"
+              placeholder="Nhập tiêu đề bài viết nếu có (tùy chọn)..."
               {...register('title')}
               aria-invalid={!!errors.title}
               className={cn(INPUT_CLASS, 'font-headline-md text-headline-md', errors.title && INPUT_ERROR_CLASS)}

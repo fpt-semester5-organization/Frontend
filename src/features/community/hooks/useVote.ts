@@ -13,6 +13,11 @@ export function useVote(target: ContentRef) {
         content ? { ...content, voteCount: data.voteCount } : content
       );
       queryClient.invalidateQueries({ queryKey: communityKeys.contentLists(target) });
+      queryClient.invalidateQueries({ queryKey: [...communityKeys.all, 'infinite'] });
+      queryClient.invalidateQueries({ queryKey: communityKeys.all });
+      if (target.resource === 'recipes') {
+        queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      }
     },
   });
 }

@@ -23,10 +23,13 @@ export interface Paged<T> {
   meta: PageMeta;
 }
 
-const toPaged = <T>(envelope: ApiEnvelope<T[]>, fallbackSize: number): Paged<T> => ({
-  items: envelope.data,
-  meta: envelope.meta ?? { page: 1, size: fallbackSize, total: envelope.data.length },
-});
+const toPaged = <T>(envelope: ApiEnvelope<T[]>, fallbackSize: number): Paged<T> => {
+  const items = Array.isArray(envelope?.data) ? envelope.data : [];
+  return {
+    items,
+    meta: envelope?.meta ?? { page: 1, size: fallbackSize, total: items.length },
+  };
+};
 
 /** GET /posts — FN-POST-05 Tìm kiếm & xem danh sách bài viết. */
 export async function listPosts(params: PostListParams): Promise<Paged<PostListItem>> {
