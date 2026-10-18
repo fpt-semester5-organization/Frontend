@@ -13,6 +13,12 @@ function useInvalidateComments(target: ContentRef) {
   return () => {
     queryClient.invalidateQueries({ queryKey: communityKeys.comments(target) });
     queryClient.invalidateQueries({ queryKey: communityKeys.content(target) });
+    queryClient.invalidateQueries({ queryKey: [...communityKeys.all, 'infinite'] });
+    queryClient.invalidateQueries({ queryKey: communityKeys.contentLists(target) });
+    queryClient.invalidateQueries({ queryKey: communityKeys.all });
+    if (target.resource === 'recipes') {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    }
   };
 }
 
@@ -112,6 +118,7 @@ export function useCreateComment(target: ContentRef) {
         author: {
           userId: currentUser?.userId ?? 0,
           fullName: currentUser?.fullName ?? 'Tôi',
+          avatarUrl: currentUser?.avatarUrl ?? null,
         },
         content: body.content,
         parentCommentId: body.parentCommentId ?? null,

@@ -22,6 +22,7 @@ const notFound = () => fail(404, 'ERR_CONTENT_NOT_FOUND', 'Nội dung không t�
 const notOwner = () => fail(403, 'ERR_CONTENT_NOT_OWNER', 'Bạn không phải tác giả của nội dung này.');
 
 export const authorName = (userId: number) => users.find((user) => user.userId === userId)?.fullName ?? 'Thành viên';
+export const authorAvatar = (userId: number) => users.find((user) => user.userId === userId)?.avatarUrl ?? null;
 const voteCount = (post: MockPost) =>
   post.baseVotes + [...votes].filter((key) => key.endsWith(`:${post.postId}`)).length;
 export const isVisibleComment = (comment: MockComment) => comment.status === 'ACTIVE' && !comment.isSoftDeleted;
@@ -37,6 +38,7 @@ const toListItem = (post: MockPost) => ({
   postId: post.postId,
   title: post.title,
   authorName: authorName(post.authorId),
+  authorAvatarUrl: authorAvatar(post.authorId),
   imageUrl: post.imageUrl,
   voteCount: voteCount(post),
   commentCount: commentCount(post.postId),
@@ -45,7 +47,7 @@ const toListItem = (post: MockPost) => ({
 
 export type CommentDto = {
   commentId: number;
-  author: { userId: number; fullName: string };
+  author: { userId: number; fullName: string; avatarUrl?: string | null };
   content: string;
   parentCommentId: number | null;
   status: string;
@@ -55,7 +57,7 @@ export type CommentDto = {
 
 export const toCommentDto = (comment: MockComment, withReplies = true): CommentDto => ({
   commentId: comment.commentId,
-  author: { userId: comment.authorId, fullName: authorName(comment.authorId) },
+  author: { userId: comment.authorId, fullName: authorName(comment.authorId), avatarUrl: authorAvatar(comment.authorId) },
   content: comment.content,
   parentCommentId: comment.parentCommentId,
   status: comment.status,
@@ -162,7 +164,7 @@ export const communityHandlers = [
       title: post.title,
       content: post.content,
       imageUrl: post.imageUrl,
-      author: { userId: post.authorId, fullName: authorName(post.authorId) },
+      author: { userId: post.authorId, fullName: authorName(post.authorId), avatarUrl: authorAvatar(post.authorId) },
       videos: post.videos,
       recipes: post.recipes,
       voteCount: voteCount(post),

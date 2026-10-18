@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -30,10 +30,16 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
     const id = item ? item.id : post?.postId ?? 0;
     const title = item ? item.title : post?.title ?? '';
     const authorName = item?.authorName ?? post?.authorName ?? (isRecipe ? 'Bếp Chay VeggieLife' : 'Thành viên');
+    const authorAvatarUrl = item?.authorAvatarUrl ?? post?.authorAvatarUrl ?? (isRecipe ? '/logo.png' : null);
     const imageUrl = item?.imageUrl ?? post?.imageUrl;
     const createdAt = item?.createdAt ?? post?.createdAt;
     const voteCount = item?.voteCount ?? post?.voteCount ?? 0;
     const commentCount = item?.commentCount ?? post?.commentCount ?? 0;
+
+    const [cardVoteCount, setCardVoteCount] = useState(voteCount);
+    useEffect(() => {
+      setCardVoteCount(voteCount);
+    }, [voteCount]);
 
     const to = isRecipe ? PATHS.RECIPES.DETAIL(id) : PATHS.COMMUNITY.POST_DETAIL(id);
     const targetResource = isRecipe ? ('recipes' as const) : ('posts' as const);
@@ -56,7 +62,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
         )}
       >
         <header className="flex items-center gap-3 px-4 pt-4 pb-2">
-          <Avatar name={authorName} className="h-10 w-10 shrink-0" />
+          <Avatar name={authorName} src={authorAvatarUrl} className="h-10 w-10 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate font-label-md text-label-md font-semibold text-on-surface">
@@ -157,10 +163,10 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
         <div className="flex items-center justify-between px-4 py-2 font-label-md text-label-md text-on-surface-variant">
           <span
             className="flex items-center gap-1.5 tabular-nums"
-            aria-label={`${voteCount} lượt thích`}
+            aria-label={`${cardVoteCount} lượt thích`}
           >
             <Icon name="favorite" filled className="text-[18px] text-secondary" />
-            {formatNumber(voteCount)}
+            {formatNumber(cardVoteCount)}
           </span>
           <Link
             to={to}
@@ -173,7 +179,8 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
         <div className="mx-3 mb-3 flex items-center gap-1 border-t border-surface-container pt-1.5">
           <VoteButton
             target={{ resource: targetResource, id }}
-            voteCount={voteCount}
+            voteCount={cardVoteCount}
+            onVoteChange={(count) => setCardVoteCount(count)}
             className="flex-1 justify-center bg-transparent"
           />
           <Link to={to} className={cn(ACTION, 'text-on-surface-variant')}>

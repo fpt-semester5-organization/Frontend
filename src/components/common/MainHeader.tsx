@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import Dropdown from 'react-bootstrap/Dropdown';
 import Offcanvas from 'react-bootstrap/Offcanvas';
+import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { ACCOUNT_NAV, MAIN_NAV, isNavActive } from '@/config/nav';
 import { useLogout } from '@/features/auth/hooks/useLogout';
+import { useCurrentUser } from '@/features/profile/hooks/useProfile';
 import { cn } from '@/lib/cn';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
@@ -15,6 +17,7 @@ const menuItemClass =
 
 /** Header dùng chung cho Khách / Thành viên / VIP (MainLayout), cao 72px, dính đầu trang. */
 export const MainHeader: React.FC = () => {
+  useCurrentUser();
   const { user, sessionStatus } = useAuthStore();
   const logout = useLogout();
   const location = useLocation();
@@ -64,9 +67,7 @@ export const MainHeader: React.FC = () => {
                   aria-label="Tài khoản"
                   className="flex items-center gap-space-xs rounded-lg p-1 hover:bg-surface-container"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary shadow-sm">
-                    <Icon name="person" className="text-[18px] text-on-primary" />
-                  </span>
+                  <Avatar name={user.fullName} src={user.avatarUrl} size="sm" />
                   {user.isVip && (
                     <span className="rounded bg-secondary-fixed px-1.5 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed">
                       VIP

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { retryServerErrorsOnce } from '@/features/recipes/hooks/useRecipes';
 import { useAuthStore } from '@/stores/auth.store';
@@ -25,13 +26,27 @@ export const profileKeys = {
 /** Hồ sơ của người đang đăng nhập (GET /users/me); Khách không gọi (server trả 403 ERR_GUEST_PERSONALIZATION_RESTRICTED). */
 export function useCurrentUser() {
   const isMember = useAuthStore((state) => state.isAuthenticated);
-  return useQuery({
+  const query = useQuery({
     queryKey: profileKeys.me(),
     queryFn: getCurrentUser,
     enabled: isMember,
     staleTime: 30 * 1000,
     retry: retryServerErrorsOnce,
   });
+
+  useEffect(() => {
+    if (query.data) {
+      const auth = useAuthStore.getState();
+      if (
+        auth.user &&
+        (auth.user.avatarUrl !== query.data.avatarUrl || auth.user.fullName !== query.data.fullName)
+      ) {
+        auth.updateUser({ avatarUrl: query.data.avatarUrl, fullName: query.data.fullName });
+      }
+    }
+  }, [query.data]);
+
+  return query;
 }
 
 export function useWeightHistory(params: WeightHistoryParams, enabled: boolean) {

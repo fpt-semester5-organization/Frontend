@@ -14,13 +14,14 @@ interface VoteButtonProps {
   /** memberActions.canVote của trang chi tiết; danh sách không có trường này nên mặc định cho phép. */
   canVote?: boolean;
   className?: string;
+  onVoteChange?: (count: number, voted: boolean) => void;
 }
 
 /**
  * Thả tim / bỏ tim (FN-COMM-04, BR-INT-LIKE-01). Khách bấm thì mở SignupPromptModal.
  * UNSPECIFIED: API không trả "đã thả tim chưa", nên trạng thái tim chỉ biết sau lần bấm đầu.
  */
-export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVote = true, className }) => {
+export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVote = true, className, onVoteChange }) => {
   const [state, setState] = useState<{ voted: boolean; count: number } | null>(null);
   const { isMember, requireMember } = useRequireMember();
   const vote = useVote(target);
@@ -35,7 +36,10 @@ export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVo
   const handleClick = () =>
     requireMember(() =>
       vote.mutate(undefined, {
-        onSuccess: ({ data }) => setState({ voted: data.voted, count: data.voteCount }),
+        onSuccess: ({ data }) => {
+          setState({ voted: data.voted, count: data.voteCount });
+          onVoteChange?.(data.voteCount, data.voted);
+        },
         onError: notifyApiError,
       })
     );
