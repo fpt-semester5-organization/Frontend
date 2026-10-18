@@ -80,14 +80,15 @@ afterEach(() => {
 const recipeCards = () => within(screen.getByRole('region', { name: /Công thức nổi bật|Kết quả cho/ })).queryAllByRole('article');
 
 describe('HomePage (SCR-10)', () => {
-  it('hiện skeleton khi đang tải rồi hiện bảng tin công thức và bài cộng đồng', async () => {
+  it('hiện skeleton khi đang tải rồi hiện bảng tin công thức và tiện ích AI', async () => {
     mockHome();
     renderPage(<HomePage />);
     expect(screen.getByRole('status', { name: 'Đang tải công thức' })).toBeInTheDocument();
     expect(await screen.findByText('Món chay số 1')).toBeInTheDocument();
     expect(recipeCards()).toHaveLength(6);
     expect(screen.getByText('6 công thức và video')).toBeInTheDocument();
-    expect(await screen.findByText('Một tuần ăn chay')).toBeInTheDocument();
+    expect(screen.getByText('Dọn sạch Tủ Lạnh')).toBeInTheDocument();
+    expect(screen.getByText('Hỏi trợ lý dinh dưỡng AI')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Món chay số 1' })).toHaveAttribute('href', '/recipes/1');
   });
 
@@ -132,7 +133,7 @@ describe('HomePage (SCR-10)', () => {
     expect(await screen.findByRole('heading', { name: 'Dịch vụ tạm gián đoạn' }, { timeout: 3000 })).toBeInTheDocument();
   });
 
-  it('tìm kiếm gửi keyword cho cả công thức và bài viết, ghi vào URL', async () => {
+  it('tìm kiếm gửi keyword cho công thức, ghi vào URL', async () => {
     const calls = mockHome();
     renderPage(
       <>
@@ -144,7 +145,6 @@ describe('HomePage (SCR-10)', () => {
     await userEvent.type(screen.getByRole('searchbox'), 'đậu hũ');
     await userEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
     await waitFor(() => expect(calls.some((c) => c.url === '/recipes' && (c.params as { keyword?: string }).keyword === 'đậu hũ')).toBe(true));
-    expect(calls.some((c) => c.url === '/posts' && (c.params as { keyword?: string }).keyword === 'đậu hũ')).toBe(true);
     expect(screen.getByTestId('location').textContent).toBe('?q=%C4%91%E1%BA%ADu+h%C5%A9');
     expect(await screen.findByRole('heading', { name: 'Kết quả cho “đậu hũ”' })).toBeInTheDocument();
   });

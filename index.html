@@ -19,6 +19,8 @@
          CSS font nạp kiểu media="print" rồi đổi sang "all" khi tải xong để không chặn lần vẽ đầu (Lighthouse di động);
          nếu sau này thêm Content-Security-Policy chặn script inline thì phải cho phép handler onload này. -->
 
+    <link rel="preload" as="image" href="/images/home-hero-bg.webp" type="image/webp" fetchpriority="high" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

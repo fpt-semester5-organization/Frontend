@@ -33,18 +33,12 @@ const TrialCard: React.FC<TrialCardProps> = ({ icon, iconClass, title, descripti
   </div>
 );
 
-/** Hai lối vào tiện ích AI; Khách thấy số lượt dùng thử còn lại (GET /guest/quota, BR-GUEST-02, BR-GUEST-07). */
+/** Hai lối vào tiện ích AI: Dọn sạch Tủ Lạnh & Hỏi trợ lý dinh dưỡng AI. */
 export const TrialCards: React.FC = () => {
   const isGuest = useAuthStore((state) => !state.user);
   const quota = useGuestStore((state) => state.quota);
 
-  const barcode = quota?.barcodeDaily;
   const ai = quota?.ai;
-  const scanText = !isGuest
-    ? 'Đối chiếu phụ gia E-numbers và cảnh báo dị ứng của bạn.'
-    : barcode
-      ? `Khách dùng thử miễn phí: còn ${Math.max(0, barcode.remaining)}/${barcode.limit} lượt hôm nay.`
-      : 'Khách dùng thử miễn phí 3 lượt mỗi ngày, không cần đăng ký.';
   const chatText = !isGuest
     ? 'Hỏi đáp dinh dưỡng chay, câu trả lời có nguồn tham khảo.'
     : ai
@@ -54,12 +48,12 @@ export const TrialCards: React.FC = () => {
   return (
     <section aria-label="Tiện ích dùng thử" className="grid gap-space-md md:grid-cols-2">
       <TrialCard
-        icon="barcode_scanner"
+        icon="kitchen"
         iconClass="bg-primary-fixed text-on-primary-fixed-variant"
-        title="Quét mã vạch & phụ gia"
-        description={scanText}
-        to={PATHS.SCANNER.ROOT}
-        cta="Quét ngay"
+        title="Dọn sạch Tủ Lạnh"
+        description="Quét ảnh nguyên liệu trong tủ và nhận gợi ý món chay giải cứu ngay."
+        to={PATHS.FRIDGE}
+        cta="Dọn ngay"
       />
       <TrialCard
         icon="auto_awesome"
