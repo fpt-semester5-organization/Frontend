@@ -15,6 +15,12 @@ export interface DetectedItem {
   ingredientId?: number | null;
   name: string;
   freshnessStatus: Freshness;
+  box2d?: [number, number, number, number] | null;
+  thumbnailUrl?: string | null;
+  confidence?: number;
+  foodGroup?: string | null;
+  isAnimalProduct?: boolean;
+  isRedMeat?: boolean;
 }
 
 export interface DetectionQuota {
@@ -33,6 +39,7 @@ export interface DetectionResult {
 export interface RecipeSuggestion {
   recipeId: number;
   title: string;
+  imageUrl?: string | null;
   similarity: number;
   missingIngredients: { ingredientId: number; name: string }[];
   usesNonFreshItems: boolean;
