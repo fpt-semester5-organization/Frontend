@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { isMonday, todayInVietnam } from '../lib/dates';
+import { addDays, todayInVietnam } from '../lib/dates';
 
-/** Form tạo thực đơn (SCR-23), validate đúng ràng buộc của POST /meal-plans. */
+/** Form tạo thực đơn (SCR-23), áp dụng 7 ngày liên tiếp từ ngày bắt đầu bất kỳ. */
 export const generatePlanSchema = z.object({
   startDate: z
     .string()
-    .refine(isMonday, 'Ngày bắt đầu phải là Thứ Hai.')
-    .refine((value) => value >= todayInVietnam(), 'Không chọn tuần đã qua.'),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Định dạng ngày không hợp lệ.')
+    .refine((value) => value >= addDays(todayInVietnam(), -6), 'Không chọn ngày quá xa trong quá khứ.'),
   budgetTier: z.enum(['ECONOMICAL', 'STANDARD', 'PREMIUM'], { message: 'Hãy chọn mức ngân sách.' }),
   useFridge: z.boolean(),
   customInstructions: z.string().trim().max(200, 'Ghi chú tối đa 200 ký tự.'),

@@ -1,9 +1,16 @@
+/**
+ * SCR-22 · meal-plans/MealPlan · `/meal-plans/:id`
+ * FN: FN-MEAL-02 (xem, kích hoạt), FN-MEAL-03 (đổi món), FN-MEAL-04 (đã ăn), FN-MEAL-07 (calo),
+ *     FN-MEAL-05 (tạo danh sách đi chợ), FN-MEAL-08 (xuất PDF - VIP).
+ * Nguyễn Văn Minh Tâm · Sprint 6
+ * Chuẩn hóa 100% theo bản mẫu Prototype & Stich AI UI Screen Spec (4 Thẻ KPI + Thanh Tab 7 ngày + 3 Bữa ăn lớn).
+ */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { VipLockCard, VipUpsellDialog } from '@/components/common/VipUpsell';
+import { VipUpsellDialog } from '@/components/common/VipUpsell';
 import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
@@ -17,8 +24,6 @@ import { formatNumber } from '@/lib/format';
 import { getErrorMessage, notifyApiError, notifySuccess } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
-import { DayColumn } from '../components/DayColumn';
-import { MealSlotCard } from '../components/MealSlotCard';
 import { SwapMealDialog } from '../components/SwapMealDialog';
 import { useExportPdf } from '../hooks/useExportPdf';
 import {
@@ -28,14 +33,29 @@ import {
   useMealPlanNutrition,
   useSwapMealSlot,
 } from '../hooks/useMealPlans';
-import { addDays, formatWeekRange, todayInVietnam } from '../lib/dates';
-import { BUDGET_LABEL, DAYS, MEALS, STATUS_CLASS, STATUS_LABEL } from '../lib/labels';
-import type { MealSlot, NutritionLevel, SwapReason } from '../types/mealPlan.types';
+import { formatDate, getWeekdayFull, getWeekdayShort, todayInVietnam } from '../lib/dates';
+import {
+  DAYS,
+  DAY_LABEL,
+  MEAL_BADGE,
+  MEAL_LABEL,
+  STATUS_CLASS,
+  STATUS_LABEL,
+} from '../lib/labels';
+import {
+  dateOfDay,
+  dayKcal,
+  editsOfPhase,
+  labelOfDay,
+  progress,
+  slotsByDay,
+} from '../lib/plan.utils';
+import type { DayOfWeek, MealSlot, NutritionLevel, SwapReason } from '../types/mealPlan.types';
 
-const PAGE = 'mx-auto flex w-full max-w-[1280px] flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin';
-const CARD = 'rounded-xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card';
-const LINK_BUTTON =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 font-label-md text-label-md no-underline transition-colors';
+const KPI_CARD =
+  'flex flex-col justify-between rounded-xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card';
+const BTN_ACTION =
+  'inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface shadow-sm transition-colors hover:bg-surface-container-high disabled:opacity-60';
 
 const NotFound: React.FC = () => (
   <EmptyState
@@ -43,21 +63,21 @@ const NotFound: React.FC = () => (
     title="Không tìm thấy thực đơn"
     description="Thực đơn không tồn tại hoặc không thuộc về bạn."
     action={
-      <Link to={PATHS.MEAL_PLANS.ROOT} className={`${LINK_BUTTON} bg-primary-container text-on-primary hover:bg-primary`}>
+      <Link
+        to={PATHS.MEAL_PLANS.ROOT}
+        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-container px-4 py-2.5 font-label-md text-label-md text-on-primary no-underline transition-colors hover:bg-primary"
+      >
         Về danh sách thực đơn
       </Link>
     }
   />
 );
 
-/**
- * SCR-22 meal-plans/MealPlan — /meal-plans/:id. FN-MEAL-02 (xem, kích hoạt), FN-MEAL-03 (đổi món),
- * FN-MEAL-04 (đã ăn), FN-MEAL-07 (calo); tạo danh sách đi chợ (FN-MEAL-05) và xuất PDF (FN-MEAL-08, VIP).
- */
-const MealPlanDetail: React.FC = () => {
+export const MealPlanDetail: React.FC = () => {
   const { id } = useParams();
   const planId = Number(id);
   const validId = Number.isInteger(planId) && planId > 0;
+  const navigate = useNavigate();
   const isVip = useAuthStore((state) => state.user?.isVip ?? false);
 
   const plan = useMealPlan(planId);
@@ -68,79 +88,175 @@ const MealPlanDetail: React.FC = () => {
   const complete = useCompleteMealSlot(planId);
   const exportPdf = useExportPdf(planId);
 
+  const [day, setDay] = useState<DayOfWeek>('MON');
   const [confirmActivate, setConfirmActivate] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
   const [upsell, setUpsell] = useState<{ title: string; message: string } | null>(null);
   const [swapSlot, setSwapSlot] = useState<MealSlot | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
-  /** Các món đã bị đổi đi ở từng bữa trong phiên: không chọn lại (excludedRecipeIds). */
   const [swappedAway, setSwappedAway] = useState<Record<number, number[]>>({});
   const [shoppingOpen, setShoppingOpen] = useState(false);
 
-  // VIP hết hạn: DETAILED bị 403 ERR_VIP_REQUIRED thì chỉ xem tổng calo mỗi ngày.
+  // VIP hết hạn: DETAILED bị 403 ERR_VIP_REQUIRED thì chuyển về BASIC
   useEffect(() => {
-    if (nutrition.error && toApiError(nutrition.error).errorCode === 'ERR_VIP_REQUIRED') setNutritionLevel('BASIC');
+    if (nutrition.error && toApiError(nutrition.error).errorCode === 'ERR_VIP_REQUIRED') {
+      setNutritionLevel('BASIC');
+    }
   }, [nutrition.error]);
 
   const data = plan.data;
-  const slotsByDay = useMemo(() => {
-    const map = new Map<string, MealSlot[]>();
-    for (const slot of data?.slots ?? []) map.set(slot.dayOfWeek, [...(map.get(slot.dayOfWeek) ?? []), slot]);
-    for (const [day, slots] of map) map.set(day, [...slots].sort((a, b) => MEALS.indexOf(a.mealType) - MEALS.indexOf(b.mealType)));
-    return map;
-  }, [data?.slots]);
+  const byDay = useMemo(() => (data ? slotsByDay(data.slots) : null), [data]);
+
+  // Mặc định chọn hôm nay nếu nằm trong tuần của thực đơn
+  useEffect(() => {
+    if (!data) return;
+    const today = todayInVietnam();
+    const hit = DAYS.find((d) => {
+      const dt = dateOfDay(data.startDate, d);
+      return dt === today;
+    });
+    if (hit) setDay(hit);
+  }, [data?.planId, data?.startDate]);
 
   if (!validId) return <NotFound />;
 
   if (plan.isPending) {
     return (
-      <div className={PAGE} role="status" aria-busy="true" aria-label="Đang tải thực đơn">
-        <Skeleton className="h-10 w-1/2" />
-        <Skeleton className="h-24" />
-        <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-7 lg:gap-2">
-          {DAYS.map((day) => (
-            <Skeleton key={day} className="h-[420px] lg:h-[760px]" />
-          ))}
+      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
+        <div className="flex flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin" role="status" aria-busy="true">
+          <Skeleton className="h-10 w-1/3" />
+          <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-28" />
+            ))}
+          </div>
+          <Skeleton className="h-16" />
+          <div className="space-y-space-md">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (plan.isError || !data) {
+  if (plan.isError || !data || !byDay) {
     if (toApiError(plan.error).status === 404) return <NotFound />;
-    return <ErrorState error={plan.error} onRetry={() => plan.refetch()} retrying={plan.isRefetching} />;
+    return (
+      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
+        <div className="px-margin-mobile py-space-lg sm:px-margin">
+          <ErrorState error={plan.error} onRetry={() => plan.refetch()} retrying={plan.isRefetching} />
+        </div>
+      </main>
+    );
   }
 
   const status = data.planStatus;
   const isDraft = status === 'DRAFT';
   const isActive = status === 'ACTIVE';
   const editable = isDraft || isActive;
-  const editLimit = isDraft ? data.edits.preDeployLimit : data.edits.postDeployLimit;
-  const editsLeft = Math.max(0, editLimit - (isDraft ? data.edits.preDeployUsed : data.edits.postDeployUsed));
-  const completedCount = data.slots.filter((slot) => slot.isCompleted).length;
-  const totalSlots = data.slots.length || 21;
-  const showDetail = nutritionLevel === 'DETAILED' && !!nutrition.data;
+  const edits = editsOfPhase(data);
+  const editsLeft = Math.max(0, edits.limit - edits.used);
+  const prog = progress(data);
+
+  const nutDay = nutrition.data?.days.find((d) => d.dayOfWeek === day);
+  const daySlots = byDay[day] ?? [];
+  const dayTotal = nutDay?.kcal != null ? Math.round(nutDay.kcal) : dayKcal(daySlots);
+  const weekTotal =
+    nutrition.data?.totalKcalWeek != null ? Math.round(nutrition.data.totalKcalWeek) : dayKcal(data.slots);
+  const avg = Math.round(weekTotal / 7);
+  const hitPct = data.targetDailyKcal > 0 ? Math.round((avg / data.targetDailyKcal) * 100) : null;
   const today = todayInVietnam();
   const knownListId = listIdOfPlan(planId);
 
-  const dayKcal = (day: string, slots: MealSlot[]) => {
-    const fromApi = nutrition.data?.days.find((item) => item.dayOfWeek === day);
-    if (fromApi) return { kcal: fromApi.kcal, delta: showDetail ? (fromApi.deltaKcal ?? null) : null };
-    // API calo chưa trả lời được: tự cộng tổng ngày (không lộ calo từng món).
-    if (nutrition.isError) return { kcal: slots.reduce((sum, slot) => sum + slot.recipe.caloriesKcal, 0), delta: null };
-    return { kcal: null, delta: null };
+  const dayKcalOf = (d: DayOfWeek) => {
+    const n = nutrition.data?.days.find((x) => x.dayOfWeek === d);
+    return n?.kcal != null ? Math.round(n.kcal) : dayKcal(byDay[d] ?? []);
   };
 
-  const quotaUpsell = (message: string) => {
-    setSwapSlot(null);
-    setUpsell({ title: 'Bạn đã dùng hết lượt đổi món', message });
+  const handleOpenShopping = () => {
+    if (knownListId) {
+      navigate(PATHS.SHOPPING_LISTS.DETAIL(knownListId));
+      return;
+    }
+    if (!isActive) {
+      setNotice({
+        title: 'Cần kích hoạt thực đơn',
+        message: 'Bạn cần kích hoạt thực đơn trước khi tạo danh sách đi chợ.',
+      });
+      return;
+    }
+    setShoppingOpen(true);
+  };
+
+  const isFuturePlan = data.startDate > today;
+  const isExpiredPlan = data.endDate < today;
+
+  const handleOpenActivate = () => {
+    if (isFuturePlan) {
+      setNotice({
+        title: 'Chưa đến thời gian áp dụng',
+        message: `Thực đơn này bắt đầu từ ${getWeekdayFull(data.startDate)}, ${formatDate(data.startDate)}. Bạn có thể đổi món tùy ý ngay bây giờ để chuẩn bị, và bấm Kích hoạt khi đến ngày bắt đầu.`,
+      });
+      return;
+    }
+    if (isExpiredPlan) {
+      setNotice({
+        title: 'Thực đơn đã hết hạn áp dụng',
+        message: `Thực đơn này áp dụng cho tuần đã qua (${formatDate(data.startDate)} – ${formatDate(data.endDate)}) nên không thể kích hoạt. Bạn vui lòng tạo thực đơn mới.`,
+      });
+      return;
+    }
+    setConfirmActivate(true);
+  };
+
+  const runActivate = () => {
+    activate.mutate(undefined, {
+      onSuccess: (res) => {
+        setConfirmActivate(false);
+        notifySuccess(res.message || 'Đã kích hoạt thực đơn thành công.');
+      },
+      onError: (error) => {
+        setConfirmActivate(false);
+        const apiError = toApiError(error);
+        if (apiError.status === 409) {
+          setNotice({ title: 'Không kích hoạt được', message: getErrorMessage(apiError) });
+        } else {
+          notifyApiError(apiError);
+        }
+      },
+    });
+  };
+
+  const runExport = () => {
+    if (!isVip) {
+      setUpsell({
+        title: 'Xuất PDF dành cho thành viên VIP',
+        message: 'Nâng cấp VIP để tải bản in PDF thực đơn tuần và danh sách đi chợ chuyên nghiệp.',
+      });
+      return;
+    }
+    exportPdf.mutate(knownListId ? 'PLAN,SHOPPING' : 'PLAN', {
+      onSuccess: () => {
+        notifySuccess('Đã tạo tệp PDF thành công.');
+      },
+      onError: (error) => {
+        const apiError = toApiError(error);
+        if (apiError.errorCode === 'ERR_VIP_REQUIRED') {
+          setUpsell({ title: 'Xuất PDF dành cho VIP', message: getErrorMessage(apiError) });
+        } else {
+          notifyApiError(apiError);
+        }
+      },
+    });
   };
 
   const openSwap = (slot: MealSlot) => {
     if (editsLeft <= 0) {
-      const message = `Bạn đã dùng hết ${editLimit} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`;
+      const message = `Bạn đã dùng hết ${edits.limit} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`;
       if (isVip) setNotice({ title: 'Hết lượt đổi món', message });
-      else quotaUpsell(message);
+      else setUpsell({ title: 'Bạn đã dùng hết lượt đổi món', message });
       return;
     }
     setSwapError(null);
@@ -164,7 +280,7 @@ const MealPlanDetail: React.FC = () => {
           const apiError = toApiError(error);
           if (apiError.errorCode === 'ERR_QUOTA_MEAL_SWAP_EXCEEDED') {
             if (isVip) setSwapError(getErrorMessage(apiError));
-            else quotaUpsell(getErrorMessage(apiError));
+            else setUpsell({ title: 'Hết lượt đổi món', message: getErrorMessage(apiError) });
           } else if (apiError.errorCode === 'ERR_MEAL_NO_SUBSTITUTE' || apiError.status === 422) {
             setSwapError(getErrorMessage(apiError));
           } else if (apiError.status === 409) {
@@ -178,7 +294,7 @@ const MealPlanDetail: React.FC = () => {
     );
   };
 
-  const toggleComplete = (slot: MealSlot) =>
+  const toggleComplete = (slot: MealSlot) => {
     complete.mutate(
       { slotId: slot.slotId, isCompleted: !slot.isCompleted },
       {
@@ -189,234 +305,373 @@ const MealPlanDetail: React.FC = () => {
         },
       }
     );
-
-  const runActivate = () =>
-    activate.mutate(undefined, {
-      onSuccess: (res) => {
-        setConfirmActivate(false);
-        notifySuccess(res.message || 'Đã kích hoạt thực đơn.');
-      },
-      onError: (error) => {
-        setConfirmActivate(false);
-        const apiError = toApiError(error);
-        if (apiError.status === 409) setNotice({ title: 'Không kích hoạt được', message: getErrorMessage(apiError) });
-        else notifyApiError(apiError);
-      },
-    });
-
-  const runExport = () =>
-    exportPdf.mutate(knownListId ? 'PLAN,SHOPPING' : 'PLAN', {
-      onError: (error) => {
-        const apiError = toApiError(error);
-        if (apiError.errorCode === 'ERR_VIP_REQUIRED') {
-          setUpsell({ title: 'Xuất PDF dành cho VIP', message: getErrorMessage(apiError) });
-        } else {
-          notifyApiError(apiError);
-        }
-      },
-    });
-
-  const shoppingAction = !isActive ? (
-    <p className="font-body-sm text-body-sm text-on-surface-variant">Kích hoạt thực đơn để tạo danh sách đi chợ.</p>
-  ) : knownListId ? (
-    <Link
-      to={PATHS.SHOPPING_LISTS.DETAIL(knownListId)}
-      className={`${LINK_BUTTON} bg-secondary text-on-secondary hover:bg-on-secondary-fixed-variant`}
-    >
-      <Icon name="shopping_cart" className="text-[18px]" />
-      Mở danh sách đi chợ
-    </Link>
-  ) : (
-    <Button variant="accent" onClick={() => setShoppingOpen(true)}>
-      <Icon name="add_shopping_cart" className="text-[18px]" />
-      Tạo danh sách đi chợ
-    </Button>
-  );
+  };
 
   return (
-    <div className={PAGE}>
-      <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
-        <Link to={PATHS.MEAL_PLANS.ROOT} className="flex items-center gap-1 text-on-surface-variant no-underline hover:text-primary">
-          <Icon name="restaurant_menu" className="text-[16px]" />
-          Thực đơn tuần
-        </Link>
-        <span className="text-outline-variant">/</span>
-        <span className="text-primary" aria-current="page">
-          {data.planName}
-        </span>
-      </nav>
-
-      <header className="flex flex-wrap items-start justify-between gap-space-md">
-        <div className="flex min-w-0 flex-col gap-space-xs">
-          <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">{data.planName}</h1>
-          <div className="flex flex-wrap items-center gap-space-xs font-label-sm text-label-sm">
-            <span className={cn('rounded-full px-2.5 py-0.5', STATUS_CLASS[status])}>{STATUS_LABEL[status]}</span>
-            <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-on-surface-variant">
-              Tuần {formatWeekRange(data.startDate)}
-            </span>
-            <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-on-surface-variant">
-              Ngân sách {BUDGET_LABEL[data.budgetTier]}
-            </span>
-            {data.generatedByAi && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-secondary-fixed px-2.5 py-0.5 text-on-secondary-fixed-variant">
-                <Icon name="auto_awesome" className="text-[14px]" />
-                AI tạo
+    <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
+      <div className="flex w-full flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin">
+        {/* Navigation & Header Actions */}
+        <section className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
+          <div className="flex flex-col gap-1.5">
+            <nav aria-label="Điều hướng" className="flex flex-wrap items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+              <Link to={PATHS.HOME} className="hover:text-primary">
+                Trang chủ
+              </Link>
+              <span>/</span>
+              <Link to={PATHS.MEAL_PLANS.ROOT} className="hover:text-primary">
+                Thực đơn tuần
+              </Link>
+              <span>/</span>
+              <span className="font-semibold text-on-surface">
+                {formatDate(data.startDate)} – {formatDate(data.endDate)}
               </span>
-            )}
+            </nav>
+
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg tracking-tight">
+                {data.planName}
+              </h1>
+              <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-label-sm text-xs font-semibold', STATUS_CLASS[status])}>
+                {STATUS_LABEL[status]}
+              </span>
+              {data.generatedByAi && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary-fixed px-2.5 py-0.5 font-label-sm text-xs text-on-secondary-fixed-variant">
+                  <Icon name="auto_awesome" className="text-[14px]" />
+                  AI tạo
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        {isVip && (
-          <Button variant="outline" onClick={runExport} loading={exportPdf.isPending}>
-            <Icon name="picture_as_pdf" className="text-[18px]" />
-            Tải PDF
-          </Button>
-        )}
-      </header>
 
-      {!data.generatedByAi && (
-        <FormAlert tone="info" title="Thực đơn được tạo từ mẫu có sẵn">
-          AI đang bận nên hệ thống dùng thực đơn mẫu hợp với hồ sơ của bạn. Bạn vẫn đổi món như bình thường.
-        </FormAlert>
-      )}
-
-      {/* Tóm tắt: trạng thái, tiến độ, hạn mức đổi món, calo mục tiêu */}
-      <section aria-label="Tóm tắt thực đơn" className={cn(CARD, 'grid grid-cols-1 gap-space-md md:grid-cols-3')}>
-        <div className="flex flex-col gap-space-xs">
-          {isDraft && (
-            <>
-              <p className="font-label-md text-label-md text-on-surface">Bản nháp: đổi món tùy ý rồi kích hoạt</p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Sau khi kích hoạt, bạn đánh dấu được bữa đã ăn và tạo danh sách đi chợ.
-              </p>
-              <Button className="mt-1 self-start" onClick={() => setConfirmActivate(true)}>
-                <Icon name="play_circle" className="text-[18px]" />
-                Kích hoạt thực đơn
-              </Button>
-            </>
-          )}
-          {isActive && (
-            <>
-              <p className="font-label-md text-label-md text-on-surface">
-                Đã ăn {completedCount}/{totalSlots} bữa
-              </p>
-              <div
-                className="h-2 overflow-hidden rounded-full bg-surface-container"
-                role="progressbar"
-                aria-label="Tiến độ ăn theo thực đơn"
-                aria-valuemin={0}
-                aria-valuemax={totalSlots}
-                aria-valuenow={completedCount}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {isDraft && (
+              <button
+                type="button"
+                onClick={handleOpenActivate}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 font-label-md text-label-md shadow-sm transition-all',
+                  isFuturePlan
+                    ? 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
+                    : 'bg-secondary text-on-secondary hover:opacity-95'
+                )}
+                title={isFuturePlan ? `Sẵn sàng kích hoạt từ ${getWeekdayFull(data.startDate)}, ${formatDate(data.startDate)}` : undefined}
               >
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedCount / totalSlots) * 100}%` }} />
-              </div>
-              <div className="mt-1">{shoppingAction}</div>
-            </>
-          )}
-          {!editable && (
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Thực đơn {STATUS_LABEL[status].toLowerCase()}: chỉ xem, không đổi món hay đánh dấu được nữa.
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="font-label-sm text-label-sm text-on-surface-variant">
-            {isDraft ? 'Lần chỉnh sửa còn lại' : 'Lần đổi món còn lại'}
-          </span>
-          <span className="font-headline-sm text-headline-sm text-on-surface tabular-nums">
-            {editable ? `${editsLeft}/${editLimit}` : '—'}
-          </span>
-          <span className="font-body-sm text-body-sm text-outline">
-            {isDraft ? 'Trước khi kích hoạt' : 'Sau khi kích hoạt'}, cả gói Free và VIP.
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="font-label-sm text-label-sm text-on-surface-variant">Calo mục tiêu mỗi ngày</span>
-          <span className="font-headline-sm text-headline-sm text-on-surface tabular-nums">
-            {formatNumber(Math.round(nutrition.data?.targetKcalPerDay ?? data.targetDailyKcal))} kcal
-          </span>
-          {showDetail && nutrition.data?.totalKcalWeek != null && (
-            <span className="font-body-sm text-body-sm text-outline">
-              Cả tuần: {formatNumber(Math.round(nutrition.data.totalKcalWeek))} kcal
-            </span>
-          )}
-        </div>
-      </section>
-
-      {data.customInstructions && (
-        <p className="flex items-start gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
-          <Icon name="sticky_note_2" className="mt-0.5 text-[16px]" />
-          Ghi chú cho AI: “{data.customInstructions}”
-        </p>
-      )}
-
-      {!showDetail && (
-        <VipLockCard
-          title="Calo từng món và so với mục tiêu"
-          description="Gói Free xem tổng calo mỗi ngày. Nâng cấp VIP để xem calo từng món, từng bữa và chênh lệch so với mục tiêu."
-        />
-      )}
-
-      {/* Lưới 7 ngày × 3 bữa */}
-      <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-7 lg:gap-2">
-        {DAYS.map((day, index) => {
-          const date = addDays(data.startDate, index);
-          const slots = slotsByDay.get(day) ?? [];
-          const { kcal, delta } = dayKcal(day, slots);
-          return (
-            <DayColumn
-              key={day}
-              day={day}
-              date={date}
-              isToday={date === today}
-              kcal={kcal}
-              deltaKcal={delta}
-              targetKcal={nutrition.data?.targetKcalPerDay ?? data.targetDailyKcal}
+                <Icon name={isFuturePlan ? 'schedule' : 'rocket_launch'} className="text-[18px]" />
+                {isFuturePlan ? `Kích hoạt (từ ${formatDate(data.startDate)})` : 'Kích hoạt thực đơn'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleOpenShopping}
+              className={BTN_ACTION}
             >
-              {slots.map((slot) => (
-                <MealSlotCard
-                  key={slot.slotId}
-                  slot={slot}
-                  showKcal={showDetail}
-                  canComplete={isActive}
-                  canSwap={editable}
-                  completing={complete.isPending && complete.variables?.slotId === slot.slotId}
-                  onToggleComplete={() => toggleComplete(slot)}
-                  onSwap={() => openSwap(slot)}
-                />
-              ))}
-            </DayColumn>
-          );
-        })}
+              <Icon name="shopping_basket" className="text-[18px] text-secondary" />
+              Đi chợ
+            </button>
+            <button
+              type="button"
+              onClick={runExport}
+              disabled={exportPdf.isPending}
+              className={BTN_ACTION}
+            >
+              <Icon name="picture_as_pdf" className="text-[18px] text-on-surface-variant" />
+              {exportPdf.isPending ? 'Đang tạo PDF…' : isVip ? 'Xuất PDF' : 'Xuất PDF (VIP)'}
+            </button>
+            <Link
+              to={PATHS.MEAL_PLANS.NEW}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-container px-4 py-2 font-label-md text-label-md text-on-primary shadow-sm hover:opacity-95 transition-opacity"
+            >
+              <Icon name="auto_awesome" className="text-[18px]" />
+              Sinh thực đơn AI
+            </Link>
+          </div>
+        </section>
+
+        {/* Draft Notice Alert */}
+        {isDraft && (
+          <FormAlert
+            tone="info"
+            title={isFuturePlan ? `Bản nháp kế hoạch (${formatDate(data.startDate)} – ${formatDate(data.endDate)})` : 'Đây là bản nháp thực đơn'}
+          >
+            {isFuturePlan ? (
+              <p>
+                Bạn có tối đa <strong>{data.edits.preDeployLimit} lượt đổi món</strong> để chuẩn bị thực đơn.
+                Hệ thống sẽ mở quyền kích hoạt khi đến ngày áp dụng (từ <strong>{getWeekdayFull(data.startDate)}, {formatDate(data.startDate)}</strong>).
+              </p>
+            ) : (
+              <p>
+                Chỉnh sửa tối đa <strong>{data.edits.preDeployLimit} lần</strong> trước khi kích hoạt. Hãy đổi món ưng ý rồi
+                nhấn <strong>Kích hoạt thực đơn</strong> để bắt đầu theo dõi bữa ăn và đi chợ.
+              </p>
+            )}
+          </FormAlert>
+        )}
+
+        {/* 4 Thẻ KPI Chỉ số thực đơn */}
+        <section className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-4" aria-label="Chỉ số thực đơn">
+          <div className={KPI_CARD}>
+            <div className="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+              <span>MỤC TIÊU NĂNG LƯỢNG</span>
+              <Icon name="bolt" className="text-[20px] text-primary" />
+            </div>
+            <div className="my-2 font-headline-md text-headline-md font-bold text-on-surface">
+              {formatNumber(Math.round(data.targetDailyKcal))}{' '}
+              <span className="font-body-sm text-body-sm font-normal text-on-surface-variant">kcal / ngày</span>
+            </div>
+          </div>
+
+          <div className={KPI_CARD}>
+            <div className="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+              <span>TRUNG BÌNH THỰC ĐƠN</span>
+              <Icon name="verified" className="text-[20px] text-secondary" />
+            </div>
+            <div className="my-2">
+              <div className="font-headline-md text-headline-md font-bold text-primary">
+                {formatNumber(avg)}{' '}
+                <span className="font-body-sm text-body-sm font-normal text-on-surface-variant">kcal / ngày</span>
+              </div>
+              {hitPct !== null && (
+                <div className="font-body-sm text-body-sm text-on-surface-variant">{hitPct}% so với mục tiêu</div>
+              )}
+            </div>
+          </div>
+
+          <div className={KPI_CARD}>
+            <div className="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+              <span>HẠN MỨC ĐỔI MÓN</span>
+              <Icon name="swap_horizontal_circle" className="text-[20px] text-on-surface-variant" />
+            </div>
+            <div className="my-2 font-headline-md text-headline-md font-bold text-on-surface">
+              {editsLeft}{' '}
+              <span className="font-body-sm text-body-sm font-normal text-on-surface-variant">
+                / {edits.limit} lượt còn lại ({edits.phase})
+              </span>
+            </div>
+          </div>
+
+          <div className={KPI_CARD}>
+            <div className="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+              <span>TIẾN ĐỘ TUẦN</span>
+              <Icon name="task_alt" className="text-[20px] text-secondary" />
+            </div>
+            <div className="my-1.5 font-headline-md text-headline-md font-bold text-on-surface">
+              {prog.done}{' '}
+              <span className="font-body-sm text-body-sm font-normal text-on-surface-variant">
+                / {prog.total} bữa đã ăn
+              </span>
+            </div>
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container"
+              role="progressbar"
+              aria-valuenow={prog.done}
+              aria-valuemax={prog.total}
+              aria-label="Tiến độ bữa đã ăn"
+            >
+              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${prog.pct}%` }} />
+            </div>
+          </div>
+        </section>
+
+        {/* Thanh Tab 7 ngày */}
+        <section className="rounded-xl border border-surface-container-high bg-surface-container-lowest p-1.5 shadow-sm" aria-label="Chọn ngày">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7" role="tablist">
+            {DAYS.map((d) => {
+              const dt = dateOfDay(data.startDate, d);
+              const isToday = dt === today;
+              const active = d === day;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setDay(d)}
+                  className={cn(
+                    'flex flex-col items-center justify-center rounded-lg px-2 py-2.5 transition-all',
+                    active
+                      ? 'bg-primary-container text-on-primary shadow-sm font-semibold'
+                      : 'border border-surface-container-high bg-surface-container-lowest text-on-surface hover:bg-surface-container'
+                  )}
+                >
+                  <span className={cn('font-label-sm text-label-sm', !active && 'text-on-surface-variant')}>
+                    {isToday ? 'Hôm nay' : labelOfDay(data.startDate, d)}
+                  </span>
+                  <span className="font-headline-sm text-headline-sm font-bold">{getWeekdayShort(dt)}</span>
+                  <span className={cn('mt-0.5 font-body-sm text-body-sm', active ? 'text-primary-fixed' : 'text-on-surface-variant')}>
+                    {formatNumber(dayKcalOf(d))} kcal
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Danh sách 3 bữa ăn của ngày đang chọn */}
+        <section className="flex flex-col gap-space-md" aria-label={`Các bữa ${getWeekdayFull(dateOfDay(data.startDate, day))}`}>
+          <div className="flex items-center justify-between rounded-xl bg-surface-container px-space-md py-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Icon name="calendar_today" className="text-[20px] text-primary" />
+              <span className="font-headline-sm text-headline-sm text-on-surface">
+                {getWeekdayFull(dateOfDay(data.startDate, day))}, {labelOfDay(data.startDate, day)}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 font-label-md text-label-md text-on-surface-variant">
+              <span>
+                Tổng calo: <strong className="text-on-surface">{formatNumber(dayTotal)} kcal</strong>
+              </span>
+              {isVip && nutDay?.deltaKcal != null && (
+                <span className={nutDay.deltaKcal > 0 ? 'text-secondary font-medium' : 'text-primary font-medium'}>
+                  {nutDay.deltaKcal > 0 ? '+' : ''}
+                  {Math.round(nutDay.deltaKcal)} so với mục tiêu
+                </span>
+              )}
+            </div>
+          </div>
+
+          {!isVip && (
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-container-low px-4 py-3 border border-surface-container"
+              role="note"
+            >
+              <span className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
+                <Icon name="lock" className="text-[18px] text-secondary" />
+                Calo chi tiết từng món/bữa và chênh lệch so với mục tiêu dành cho thành viên VIP.
+              </span>
+              <Link
+                to={PATHS.SUBSCRIPTION.PRICING}
+                className="rounded-lg bg-secondary px-3 py-1.5 font-label-md text-label-md text-on-secondary hover:opacity-90"
+              >
+                Nâng cấp VIP
+              </Link>
+            </div>
+          )}
+
+          {daySlots.length === 0 ? (
+            <p className="rounded-xl bg-surface-container-low p-space-md font-body-md text-body-md text-on-surface-variant" role="status">
+              Ngày này chưa có bữa nào.
+            </p>
+          ) : (
+            daySlots.map((s) => (
+              <article
+                key={s.slotId}
+                className={cn(
+                  'rounded-xl border border-surface-container-high bg-surface-container-lowest p-space-md shadow-card transition-all hover:shadow-md',
+                  s.isCompleted && 'bg-primary-fixed/20 border-primary-fixed'
+                )}
+              >
+                <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
+                  <div className="flex gap-space-md">
+                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-container sm:h-28 sm:w-28 shadow-inner">
+                      {s.recipe?.imageUrl ? (
+                        <img
+                          src={s.recipe.imageUrl}
+                          alt={s.recipe.title}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-primary">
+                          <Icon name="restaurant" className="text-[28px]" />
+                        </span>
+                      )}
+                      <span className={cn('absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
+                        {MEAL_LABEL[s.mealType]}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isVip && s.recipe?.caloriesKcal != null && (
+                          <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
+                            {formatNumber(Math.round(s.recipe.caloriesKcal))} kcal
+                          </span>
+                        )}
+                        {s.isCompleted && (
+                          <span className="inline-flex items-center gap-0.5 rounded bg-surface-container px-2 py-0.5 font-label-sm text-xs font-semibold text-primary">
+                            <Icon name="check" className="text-[13px]" />
+                            Đã dùng
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                        {s.recipe?.title ?? 'Chưa có món'}
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {s.recipe && (
+                      <Link
+                        to={PATHS.RECIPES.DETAIL(s.recipe.recipeId)}
+                        className="rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container-high"
+                      >
+                        Xem công thức
+                      </Link>
+                    )}
+                    {isActive && (
+                      <button
+                        type="button"
+                        disabled={complete.isPending}
+                        onClick={() => toggleComplete(s)}
+                        aria-pressed={s.isCompleted}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-lg px-3.5 py-2 font-label-md text-label-md transition-colors',
+                          s.isCompleted
+                            ? 'bg-primary-fixed text-on-primary-fixed font-semibold'
+                            : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                        )}
+                      >
+                        <Icon name={s.isCompleted ? 'check_circle' : 'radio_button_unchecked'} className="text-[16px]" />
+                        {s.isCompleted ? 'Đã ăn' : 'Đánh dấu đã ăn'}
+                      </button>
+                    )}
+                    {editable && (
+                      <button
+                        type="button"
+                        onClick={() => openSwap(s)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary-container px-3.5 py-2 font-label-md text-label-md text-on-primary transition-opacity hover:opacity-90"
+                      >
+                        <Icon name="swap_horiz" className="text-[16px]" />
+                        Đổi món
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </section>
       </div>
 
+      {/* Swap Modal */}
       <SwapMealDialog
         key={swapSlot?.slotId ?? 'none'}
         slot={swapSlot}
         remaining={editsLeft}
-        limit={editLimit}
+        limit={edits.limit}
         submitting={swap.isPending}
         error={swapError}
         onCancel={() => setSwapSlot(null)}
         onConfirm={confirmSwap}
       />
 
+      {/* Confirm Activate Dialog */}
       <ConfirmDialog
         show={confirmActivate}
         title="Kích hoạt thực đơn?"
         message={
           <>
-            Thực đơn đang áp dụng khác trong cùng tuần (nếu có) sẽ được chuyển sang lưu trữ. Sau khi kích hoạt, bạn có{' '}
-            {data.edits.postDeployLimit} lần đổi món.
+            Sau khi kích hoạt, bạn có thể đánh dấu bữa đã ăn và tạo danh sách đi chợ; việc đổi món chuyển sang hạn mức{' '}
+            <strong>{data.edits.postDeployLimit} lượt</strong> của giai đoạn áp dụng.
           </>
         }
-        confirmLabel="Kích hoạt"
+        confirmLabel={activate.isPending ? 'Đang kích hoạt…' : 'Kích hoạt'}
         loading={activate.isPending}
         onConfirm={runActivate}
         onCancel={() => setConfirmActivate(false)}
       />
 
+      {/* Notice Info Modal */}
       <Modal show={notice !== null} onHide={() => setNotice(null)} title={notice?.title} size="sm">
         <div className="flex flex-col gap-space-md p-space-lg">
           <p className="font-body-md text-body-md text-on-surface-variant">{notice?.message}</p>
@@ -426,6 +681,7 @@ const MealPlanDetail: React.FC = () => {
         </div>
       </Modal>
 
+      {/* VIP Upsell Dialog */}
       <VipUpsellDialog
         show={upsell !== null}
         onHide={() => setUpsell(null)}
@@ -433,10 +689,11 @@ const MealPlanDetail: React.FC = () => {
         message={upsell?.message}
       />
 
+      {/* Create Shopping List Dialog */}
       {isActive && (
         <CreateShoppingListDialog planId={planId} show={shoppingOpen} onHide={() => setShoppingOpen(false)} />
       )}
-    </div>
+    </main>
   );
 };
 
