@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ContentTypeTabs } from '@/components/common/ContentTypeTabs';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Icon } from '@/components/ui/Icon';
@@ -114,21 +115,40 @@ const PostEditor: React.FC = () => {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(isEdit ? PATHS.COMMUNITY.POST_DETAIL(postId) : PATHS.COMMUNITY.ROOT);
+    }
+  };
+
   const header = (
-    <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs py-space-md font-label-md text-label-md text-on-surface-variant">
-      <Link to={PATHS.HOME} className="flex items-center gap-1 text-on-surface-variant no-underline hover:text-primary">
-        <Icon name="home" className="text-[16px]" />
-        Trang chủ
-      </Link>
-      <span className="text-outline-variant">/</span>
-      <Link to={PATHS.COMMUNITY.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
-        Cộng đồng
-      </Link>
-      <span className="text-outline-variant">/</span>
-      <h1 className="font-label-md text-label-md text-primary" aria-current="page">
-        {isEdit ? 'Sửa bài viết' : 'Viết bài mới'}
-      </h1>
-    </nav>
+    <div className="flex flex-wrap items-center justify-between gap-space-sm py-space-md">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+      >
+        <Icon name="arrow_back" className="text-[18px]" />
+        <span>Quay lại</span>
+      </button>
+
+      <nav aria-label="Đường dẫn" className="flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
+        <Link to={PATHS.HOME} className="flex items-center gap-1 text-on-surface-variant no-underline hover:text-primary">
+          <Icon name="home" className="text-[16px]" />
+          Trang chủ
+        </Link>
+        <span className="text-outline-variant">/</span>
+        <Link to={PATHS.COMMUNITY.ROOT} className="text-on-surface-variant no-underline hover:text-primary">
+          Cộng đồng
+        </Link>
+        <span className="text-outline-variant">/</span>
+        <h1 className="font-label-md text-label-md text-primary" aria-current="page">
+          {isEdit ? 'Sửa bài viết' : 'Viết bài mới'}
+        </h1>
+      </nav>
+    </div>
   );
 
   const renderBody = () => {
@@ -174,6 +194,7 @@ const PostEditor: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1100px] px-margin-mobile pb-space-xl sm:px-margin">
       {header}
+      {!isEdit && <ContentTypeTabs activeType="POST" />}
       {renderBody()}
     </div>
   );

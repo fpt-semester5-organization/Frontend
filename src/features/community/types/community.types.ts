@@ -76,3 +76,58 @@ export type CreateReportResult = DeepRequired<Schemas['CreateReportResponse']['d
 
 /** POST /videos (FN-POST-08): tải ảnh/video lên Cloudinary và gắn vào bài viết. */
 export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']>;
+
+export type FeedItemKind = 'POST' | 'RECIPE';
+
+/** Mục trong feed cộng đồng: hợp nhất bài viết (Blog) và công thức món chay (Recipe). */
+export interface CommunityFeedItem {
+  key: string;
+  kind: FeedItemKind;
+  id: number;
+  title: string;
+  imageUrl?: string | null;
+  authorName?: string;
+  createdAt?: string;
+  voteCount: number;
+  commentCount?: number;
+  cookTimeMinutes?: number | null;
+  caloriesKcal?: number | null;
+  dietarySchool?: string | null;
+  isVerified?: boolean;
+}
+
+export const fromPost = (p: PostListItem): CommunityFeedItem => ({
+  key: `POST-${p.postId}`,
+  kind: 'POST',
+  id: p.postId,
+  title: p.title,
+  imageUrl: p.imageUrl,
+  authorName: p.authorName,
+  createdAt: p.createdAt,
+  voteCount: p.voteCount,
+  commentCount: p.commentCount,
+});
+
+export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').RecipeListItem): CommunityFeedItem => ({
+  key: `RECIPE-${r.recipeId}`,
+  kind: 'RECIPE',
+  id: r.recipeId,
+  title: r.title,
+  imageUrl: r.imageUrl,
+  voteCount: r.voteCount,
+  cookTimeMinutes: r.cookTimeMinutes,
+  caloriesKcal: r.caloriesKcal,
+  dietarySchool: r.dietarySchool,
+  isVerified: r.isVerified,
+});
+
+/** Trộn xen kẽ hai mảng (bài viết, công thức) để feed Tất cả luôn đa dạng nội dung. */
+export function interleaveItems<T>(a: T[], b: T[]): T[] {
+  const out: T[] = [];
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i++) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
