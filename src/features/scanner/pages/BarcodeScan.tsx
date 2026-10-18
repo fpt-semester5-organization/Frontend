@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/Button';
@@ -19,6 +19,7 @@ import { ScanResultCard } from '../components/ScanResultCard';
 import type { CameraState } from '../hooks/useBarcodeCamera';
 import { useLookupBarcode } from '../hooks/useScanner';
 import { VERDICT_INFO } from '../lib/verdict';
+import { BARCODE_PATTERN } from '../types/scanner.schemas';
 import type { ScanMethod } from '../types/scanner.types';
 
 type Mode = 'camera' | 'manual';
@@ -53,20 +54,46 @@ const BarcodeScan: React.FC = () => {
   const [mode, setMode] = useState<Mode>(() => (canUseCamera() ? 'camera' : 'manual'));
   const [cameraNotice, setCameraNotice] = useState<CameraState | null>(() => (canUseCamera() ? null : 'unsupported'));
   const [initialBarcode, setInitialBarcode] = useState<string | undefined>();
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [scanKey, setScanKey] = useState(0);
+  const lastScannedRef = useRef<string | null>(null);
+  const lastScannedAtRef = useRef<number>(0);
 
   const runLookup = useCallback(
-    (barcode: string, method: ScanMethod) =>
+    (rawBarcode: string, method: ScanMethod) => {
+      const barcode = rawBarcode.trim();
+      if (!BARCODE_PATTERN.test(barcode)) {
+        setValidationError('Mã vạch gồm 8–14 chữ số (EAN-8, EAN-13, UPC-A).');
+        return;
+      }
+      setValidationError(null);
+
+      // Chặn quét trùng liên tiếp cùng một mã (debounce) để không tốn lượt
+      if (lookup.isPending) return;
+      if (lookup.data?.data?.barcode === barcode) return;
+      if (lastScannedRef.current === barcode && Date.now() - lastScannedAtRef.current < 2500) {
+        return;
+      }
+      lastScannedRef.current = barcode;
+      lastScannedAtRef.current = Date.now();
+
       lookup.mutate(
         { barcode, method },
         {
           onError: (error) => {
             const apiError = toApiError(error);
+            if (apiError.status === 500 || apiError.errorCode === 'ERR_SYS_DATABASE_UNAVAILABLE') {
+              console.error('[BarcodeScan] ERR_SYS_DATABASE_UNAVAILABLE', {
+                correlationId: apiError.correlationId,
+                errorCode: apiError.errorCode,
+              });
+            }
             // 404, 403 hết lượt, 503, 400 hiện ngay trong trang; còn lại báo bằng toast.
             if (![400, 403, 404, 502, 503].includes(apiError.status)) notifyApiError(apiError);
           },
         }
-      ),
+      );
+    },
     [lookup]
   );
 
@@ -89,6 +116,8 @@ const BarcodeScan: React.FC = () => {
   const scanAnother = () => {
     lookup.reset();
     setInitialBarcode(undefined);
+    setValidationError(null);
+    lastScannedRef.current = null;
     setScanKey((key) => key + 1);
   };
 
@@ -107,7 +136,7 @@ const BarcodeScan: React.FC = () => {
       );
     }
     if (error) {
-      if (error.status === 404) {
+      if (error.status === 404 || error.errorCode === 'ERR_PRODUCT_NOT_FOUND') {
         return (
           <EmptyState
             icon="search_off"
@@ -118,16 +147,31 @@ const BarcodeScan: React.FC = () => {
         );
       }
       if (error.errorCode === 'ERR_QUOTA_BARCODE_EXCEEDED') {
+        if (!isMember) {
+          return (
+            <EmptyState
+              icon="lock"
+              title={`Bạn đã dùng hết ${QUOTA.guest.barcodeDaily} lượt quét hôm nay`}
+              description="Đăng ký tài khoản miễn phí để quét không giới hạn, được cảnh báo dị ứng cá nhân và lưu lịch sử quét."
+              action={<Button onClick={() => openSignupPrompt('quota')}>Đăng ký miễn phí</Button>}
+            />
+          );
+        }
         return (
           <EmptyState
             icon="lock"
-            title={`Bạn đã dùng hết ${QUOTA.guest.barcodeDaily} lượt quét hôm nay`}
-            description="Đăng ký tài khoản miễn phí để quét không giới hạn, được cảnh báo dị ứng cá nhân và lưu lịch sử quét."
-            action={<Button onClick={() => openSignupPrompt()}>Đăng ký miễn phí</Button>}
+            title="Bạn đã đạt giới hạn lượt quét hôm nay"
+            description="Nâng cấp gói tài khoản để mở rộng hạn mức và quét không giới hạn."
+            action={<Button onClick={() => navigate(PATHS.SUBSCRIPTION.PRICING)}>Nâng cấp ngay</Button>}
           />
         );
       }
-      if (error.status === 503 || error.status === 502) {
+      if (
+        error.status === 503 ||
+        error.status === 502 ||
+        error.errorCode === 'ERR_EXT_OPENFOODFACTS_FAILED' ||
+        error.errorCode === 'ERR_AI_CIRCUIT_OPEN'
+      ) {
         return (
           <FormAlert tone="warning" title="Dịch vụ tạm gián đoạn">
             <p>{getErrorMessage(error)}</p>
@@ -243,7 +287,10 @@ const BarcodeScan: React.FC = () => {
               onSubmit={(barcode) => runLookup(barcode, 'MANUAL_INPUT')}
               submitting={lookup.isPending}
               initialBarcode={initialBarcode}
-              serverError={error?.status === 400 ? getErrorMessage(error) : null}
+              serverError={
+                validationError ??
+                (error?.status === 400 || error?.errorCode === 'ERR_VALIDATION' ? getErrorMessage(error) : null)
+              }
               autoFocus={cameraNotice !== null}
             />
           )}
@@ -252,6 +299,33 @@ const BarcodeScan: React.FC = () => {
             <p className="font-body-sm text-body-sm text-on-surface-variant">
               Khách quét được {QUOTA.guest.barcodeDaily} lượt mỗi ngày (mã không tìm thấy không bị tính).
             </p>
+          )}
+
+          {lookup.data?.data?.imageUrl && (
+            <div
+              data-testid="product-image-frame"
+              className="flex flex-col items-center justify-center overflow-hidden rounded-xl border border-surface-container bg-surface-container-low p-space-md shadow-xs"
+            >
+              <div className="mb-space-xs flex w-full items-center justify-between">
+                <span className="font-label-md text-label-md font-semibold text-on-surface">
+                  Hình ảnh sản phẩm
+                </span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  Open Food Facts
+                </span>
+              </div>
+              <div className="relative flex aspect-square w-full max-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest p-2 shadow-xs">
+                <img
+                  src={lookup.data.data.imageUrl}
+                  alt={lookup.data.data.productName}
+                  className="h-full w-full object-contain transition-transform duration-200 hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget.parentElement?.parentElement as HTMLElement)?.classList.add('hidden');
+                  }}
+                />
+              </div>
+            </div>
           )}
         </section>
 

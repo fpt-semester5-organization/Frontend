@@ -78,7 +78,7 @@ http.interceptors.response.use(
         config.headers.Authorization = `Bearer ${token}`;
         return http(config); // lần thử lại bị 401 tiếp sẽ rơi vào nhánh `_retried` ở trên
       }
-      if (auth.guestToken) {
+      if (!auth.user) {
         const token = await bootstrapGuestSession(true);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
