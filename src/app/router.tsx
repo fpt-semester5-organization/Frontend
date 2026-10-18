@@ -30,6 +30,7 @@ const BarcodeScan = lazy(() => import('@/features/scanner/pages/BarcodeScan'));
 const ScanHistory = lazy(() => import('@/features/scanner/pages/ScanHistory'));
 const PostEditor = lazy(() => import('@/features/community/pages/PostEditor'));
 const VenueMap = lazy(() => import('@/features/venues/pages/VenueMap'));
+const VenueDetailPage = lazy(() => import('@/features/venues/pages/VenueDetailPage'));
 const MyContent = lazy(() => import('@/features/community/pages/MyContent'));
 const MealPlanList = lazy(() => import('@/features/meal-plans/pages/MealPlanList'));
 const MealPlanGenerate = lazy(() => import('@/features/meal-plans/pages/MealPlanGenerate'));
@@ -49,8 +50,9 @@ const router = createBrowserRouter([
       {
         element: <MainLayout />,
         children: [
-          // Bản đồ quán chay (SCR-18)
+          // Bản đồ quán chay (SCR-18) & Chi tiết quán chay (SCR-19)
           { path: PATHS.VENUES.ROOT, element: <VenueMap /> },
+          { path: PATHS.VENUES.DETAIL(':id'), element: <VenueDetailPage /> },
 
           // Trang chủ (SCR-10)
           { path: PATHS.HOME, element: <HomePage /> },
