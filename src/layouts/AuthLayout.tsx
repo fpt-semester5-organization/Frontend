@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Logo } from '@/components/common/Logo';
+import { ServiceBanner } from '@/components/common/ServiceBanner';
 import { PATHS } from '@/routes/paths';
 
 /** Layout cho SCR-01 … SCR-05 (đăng nhập, đăng ký, OTP, quên/đặt lại mật khẩu). */
@@ -22,6 +23,10 @@ export function AuthLayout() {
           </nav>
         </div>
       </header>
+      {/* Header cố định: banner 503 đặt ngay dưới header. */}
+      <div className="fixed inset-x-0 top-[72px] z-40">
+        <ServiceBanner />
+      </div>
       <div className="flex flex-1 flex-col">
         <Outlet />
       </div>

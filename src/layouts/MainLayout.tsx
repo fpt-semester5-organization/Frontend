@@ -1,8 +1,9 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, type ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { MainFooter } from '@/components/common/MainFooter';
 import { MainHeader } from '@/components/common/MainHeader';
 import { PageLoader } from '@/components/common/PageLoader';
+import { ServiceBanner } from '@/components/common/ServiceBanner';
 
 // Bảng chọn vai trò giả lập chỉ có khi chạy dữ liệu giả (VITE_ENABLE_MOCKS=true), không vào bản build.
 const MockSessionPanel =
@@ -10,8 +11,11 @@ const MockSessionPanel =
     ? lazy(() => import('@/mocks/MockSessionPanel'))
     : null;
 
-/** Layout cho Khách / Thành viên / VIP: header 72px + nội dung (mỗi trang tự đặt khung) + footer. */
-export const MainLayout: React.FC = () => (
+/**
+ * Layout cho Khách / Thành viên / VIP: header 72px + nội dung (mỗi trang tự đặt khung) + footer.
+ * `children` dùng khi guard cần hiện một trang trạng thái (ví dụ 403) trong khung chung thay cho route con.
+ */
+export const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => (
   <div className="flex min-h-screen flex-col bg-background">
     <a
       href="#main-content"
@@ -20,6 +24,7 @@ export const MainLayout: React.FC = () => (
       Bỏ qua tới nội dung chính
     </a>
     <MainHeader />
+    <ServiceBanner />
     <main id="main-content" className="w-full flex-1">
       {/* Khung chờ cao bằng một màn hình để footer không lộ ra rồi bị đẩy đi khi trang tải xong (CLS). */}
       <Suspense
@@ -29,7 +34,7 @@ export const MainLayout: React.FC = () => (
           </div>
         }
       >
-        <Outlet />
+        {children ?? <Outlet />}
       </Suspense>
     </main>
     <MainFooter />
