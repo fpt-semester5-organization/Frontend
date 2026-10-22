@@ -1,7 +1,11 @@
 import { AxiosError } from 'axios';
 import type { ApiErrorBody, ApiErrorDetail } from '@/api/types';
+import { cleanUserMessage } from '@/lib/userMessage';
 
-/** Lỗi API đã chuẩn hóa từ envelope lỗi { statusCode, errorCode, message, details }. */
+/**
+ * Lỗi API đã chuẩn hóa từ envelope lỗi { statusCode, errorCode, message, details }.
+ * `message` và `details[].message` đã được làm sạch mã tham chiếu (UI-4), nên giao diện hiện thẳng được.
+ */
 export class ApiError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -15,11 +19,11 @@ export class ApiError extends Error {
     details?: ApiErrorDetail[];
     correlationId?: string;
   }) {
-    super(params.message);
+    super(cleanUserMessage(params.message));
     this.name = 'ApiError';
     this.status = params.status;
     this.errorCode = params.errorCode;
-    this.details = params.details ?? [];
+    this.details = (params.details ?? []).map((d) => ({ ...d, message: cleanUserMessage(d.message) }));
     this.correlationId = params.correlationId;
   }
 }
