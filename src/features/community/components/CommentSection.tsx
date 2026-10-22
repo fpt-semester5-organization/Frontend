@@ -111,7 +111,6 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId
                 requireMember(() => undefined);
               }
             }}
-            aria-label="Đăng nhập để tham gia bình luận"
             className="group flex cursor-pointer flex-col gap-space-sm rounded-lg border border-dashed border-outline-variant bg-surface-container-lowest p-space-md transition-all hover:border-primary hover:bg-surface-container-low"
           >
             <p className="font-body-md text-body-md text-on-surface-variant">

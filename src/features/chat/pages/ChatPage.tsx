@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { MEDICAL_DISCLAIMER, QUOTA } from '@/constants/quota';
+import { toApiError } from '@/lib/apiError';
 import { formatDateTime } from '@/lib/format';
 import { notifySuccess, notifyApiError, getErrorMessage } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
@@ -22,6 +23,12 @@ import {
 } from '../hooks/useChat';
 import { MESSAGE_MAX, messageSchema } from '../schemas/chat.schema';
 import type { ChatMessage, ContextType } from '../types/chat.types';
+
+/**
+ * Dưới 1024 px hai panel bên là lớp phủ (max-lg:absolute) che khung chat, nên mặc định đóng và chỉ mở một panel mỗi lúc.
+ * Hỏi "màn hẹp" thay vì "màn rộng" để môi trường không có matchMedia (test) vẫn coi là màn rộng như trước.
+ */
+const isNarrowScreen = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1023px)').matches;
 
 const SHORTCUTS = [
   {
@@ -108,7 +115,7 @@ function IconBtn({
       title={label}
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface ${className}`}
     >
-      <span className="material-symbols-outlined text-[20px]">{icon}</span>
+      <span aria-hidden="true" className="material-symbols-outlined text-[20px]">{icon}</span>
     </button>
   );
 }
@@ -135,8 +142,8 @@ export const ChatPage: React.FC = () => {
   const sendMsg = useSendMessage();
   const del = useDeleteSession();
 
-  const [histOpen, setHistOpen] = useState(true);
-  const [profOpen, setProfOpen] = useState(true);
+  const [histOpen, setHistOpen] = useState(() => !isNarrowScreen());
+  const [profOpen, setProfOpen] = useState(() => !isNarrowScreen());
 
   // Trạng thái tìm kiếm, lọc và ghim phiên hội thoại (phong cách Gemini)
   const [showSearch, setShowSearch] = useState(false);
@@ -187,18 +194,17 @@ export const ChatPage: React.FC = () => {
     setSendError(null);
     setInputError(null);
     if (routeId) setDraftId(null);
+    // Màn hẹp: chọn phiên hoặc tạo cuộc trò chuyện mới thì đóng lớp phủ để thấy khung chat.
+    if (isNarrowScreen()) {
+      setHistOpen(false);
+      setProfOpen(false);
+    }
   }, [routeId]);
 
   useEffect(() => {
     if (routeId && messagesQ.isError) {
-      const err = messagesQ.error as {
-        status?: number;
-        errorCode?: string;
-        response?: { status?: number; data?: { errorCode?: string } };
-      };
-      const status = err?.status ?? err?.response?.status;
-      const code = err?.errorCode ?? err?.response?.data?.errorCode;
-      if (status === 404 || code === 'ERR_CHAT_SESSION_NOT_FOUND') {
+      const err = toApiError(messagesQ.error);
+      if (err.status === 404 || err.errorCode === 'ERR_CHAT_SESSION_NOT_FOUND') {
         navigate(PATHS.CHAT.ROOT, { replace: true });
       }
     }
@@ -299,13 +305,10 @@ export const ChatPage: React.FC = () => {
         navigate(PATHS.CHAT.SESSION(sid), { replace: true });
       }
     } catch (err: unknown) {
-      const errorObj = err as {
-        status?: number;
-        errorCode?: string;
-        message?: string;
-      };
-      const code = errorObj.errorCode || '';
-      const message = errorObj.message || getErrorMessage(err);
+      // Lỗi từ axios phải chuẩn hóa trước: err.message của axios là câu kỹ thuật ("Request failed with status code 503").
+      const errorObj = toApiError(err);
+      const code = errorObj.errorCode;
+      const message = getErrorMessage(errorObj);
 
       if (errorObj.status === 403 && (code.startsWith('ERR_GUEST_') || code === 'ERR_QUOTA_AI_EXCEEDED')) {
         if (!authed) {
@@ -387,7 +390,7 @@ export const ChatPage: React.FC = () => {
             <div className="flex items-center justify-between px-3.5 py-3">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-2xs">
-                  <span className="material-symbols-outlined text-[18px]">psychology</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">psychology</span>
                 </div>
                 <span className="font-headline-sm text-sm font-bold tracking-tight text-on-surface">
                   VeggieLife
@@ -416,7 +419,7 @@ export const ChatPage: React.FC = () => {
             {showSearch && (
               <div className="px-3 pt-1 pb-2">
                 <div className="flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1.5 text-xs text-on-surface border border-outline-variant/30 focus-within:border-primary">
-                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant">search</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-on-surface-variant">search</span>
                   <input
                     type="text"
                     value={searchQuery}
@@ -432,7 +435,7 @@ export const ChatPage: React.FC = () => {
                       className="text-on-surface-variant hover:text-on-surface"
                       title="Xóa tìm kiếm"
                     >
-                      <span className="material-symbols-outlined text-[15px]">close</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[15px]">close</span>
                     </button>
                   )}
                 </div>
@@ -447,7 +450,7 @@ export const ChatPage: React.FC = () => {
                 onClick={handleNewChat}
                 className="flex w-full items-center gap-2.5 rounded-full bg-surface-container px-4 py-2.5 font-label-md text-xs sm:text-sm font-medium text-on-surface transition-all hover:bg-surface-container-high hover:shadow-2xs active:scale-[0.99] border border-outline-variant/20"
               >
-                <span className="material-symbols-outlined text-[19px] text-on-surface-variant">
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-on-surface-variant">
                   edit_square
                 </span>
                 <span>Cuộc trò chuyện mới</span>
@@ -468,7 +471,7 @@ export const ChatPage: React.FC = () => {
                   filterMode === 'PINNED' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">tune</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">tune</span>
               </button>
             </div>
 
@@ -542,7 +545,7 @@ export const ChatPage: React.FC = () => {
                             isPinned ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100'
                           }`}
                         >
-                          <span className={`material-symbols-outlined text-[16px] ${isPinned ? 'rotate-[-45deg]' : ''}`}>
+                          <span aria-hidden="true" className={`material-symbols-outlined text-[16px] ${isPinned ? 'rotate-[-45deg]' : ''}`}>
                             push_pin
                           </span>
                         </button>
@@ -557,7 +560,7 @@ export const ChatPage: React.FC = () => {
                           aria-label="Xóa cuộc trò chuyện"
                           className="p-1 rounded-md text-on-surface-variant opacity-0 transition-opacity hover:bg-surface-container-high hover:text-error group-hover:opacity-100"
                         >
-                          <span className="material-symbols-outlined text-[16px]">
+                          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                             delete
                           </span>
                         </button>
@@ -636,7 +639,7 @@ export const ChatPage: React.FC = () => {
                   title={authed ? 'Cài đặt tài khoản' : 'Đăng nhập'}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[20px]">settings</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">settings</span>
                 </button>
               </div>
             </div>
@@ -671,12 +674,15 @@ export const ChatPage: React.FC = () => {
               <IconBtn
                 icon="history"
                 label="Lịch sử chat"
-                onClick={() => setHistOpen(!histOpen)}
+                onClick={() => {
+                  setHistOpen(!histOpen);
+                  if (isNarrowScreen()) setProfOpen(false);
+                }}
                 className="lg:hidden"
               />
               <div className="flex items-center gap-2.5">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-xs">
-                  <span className="material-symbols-outlined text-[20px]">psychology_alt</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">psychology_alt</span>
                 </div>
                 <div>
                   <h1 className="font-headline-sm text-base sm:text-headline-sm font-bold text-on-surface">Cố vấn Dinh dưỡng Chay</h1>
@@ -695,7 +701,10 @@ export const ChatPage: React.FC = () => {
               <IconBtn
                 icon="badge"
                 label="Hồ sơ & Lối tắt"
-                onClick={() => setProfOpen(!profOpen)}
+                onClick={() => {
+                  setProfOpen(!profOpen);
+                  if (isNarrowScreen()) setHistOpen(false);
+                }}
                 className="lg:hidden"
               />
             </div>
@@ -735,10 +744,10 @@ export const ChatPage: React.FC = () => {
                           <span
                             className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-label-sm text-[11px] font-semibold ${item.tagColor}`}
                           >
-                            <span className="material-symbols-outlined text-[13px]">{item.icon}</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[13px]">{item.icon}</span>
                             {item.category}
                           </span>
-                          <span className="material-symbols-outlined text-[16px] text-outline-variant transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
+                          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-outline-variant transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
                             north_east
                           </span>
                         </div>
@@ -765,7 +774,7 @@ export const ChatPage: React.FC = () => {
                           className="inline-flex items-center gap-1 rounded-lg bg-primary/10 hover:bg-primary px-2.5 py-1 font-label-sm text-xs font-semibold text-primary hover:text-on-primary transition active:scale-[0.98] disabled:opacity-40"
                         >
                           <span>Hỏi ngay</span>
-                          <span className="material-symbols-outlined text-[13px]">send</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[13px]">send</span>
                         </button>
                       </div>
                     </div>
@@ -814,7 +823,7 @@ export const ChatPage: React.FC = () => {
                       className="flex items-center gap-2 self-start rounded-2xl rounded-tl-none bg-surface-container-low px-4 py-3 font-body-sm text-xs text-on-surface-variant"
                       role="status"
                     >
-                      <span className="material-symbols-outlined animate-spin text-[16px] text-primary">
+                      <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px] text-primary">
                         progress_activity
                       </span>
                       Trợ lý đang tìm kiếm thông tin và chuẩn bị câu trả lời cho bạn…
@@ -838,7 +847,7 @@ export const ChatPage: React.FC = () => {
             >
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 font-label-md text-xs font-semibold sm:text-sm">
-                  <span className="material-symbols-outlined text-[18px]">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                     {sendError.unsafe ? 'gpp_maybe' : 'error'}
                   </span>
                   {sendError.unsafe
@@ -863,7 +872,7 @@ export const ChatPage: React.FC = () => {
                     aria-label="Đóng thông báo lỗi"
                     className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-black/5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">close</span>
                   </button>
                 </div>
               </div>
@@ -904,7 +913,7 @@ export const ChatPage: React.FC = () => {
                 aria-label="Gửi câu hỏi"
                 className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-xs transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <span className="material-symbols-outlined text-[18px]">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                   {sending ? 'hourglass_top' : 'send'}
                 </span>
               </button>
@@ -912,7 +921,7 @@ export const ChatPage: React.FC = () => {
 
             <div className="mt-2 px-1">
               <p className="flex items-center gap-1 font-label-sm text-[11px] text-on-surface-variant">
-                <span className="material-symbols-outlined text-[13px] text-outline">info</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-outline">info</span>
                 {MEDICAL_DISCLAIMER}
               </p>
             </div>
@@ -924,6 +933,19 @@ export const ChatPage: React.FC = () => {
           </footer>
         </div>
       </section>
+
+      {/* Màn hẹp: nền mờ dưới panel đang mở, bấm để đóng (màn rộng panel nằm cạnh khung chat nên không cần). */}
+      {(histOpen || profOpen) && (
+        <button
+          type="button"
+          aria-label="Đóng bảng bên"
+          onClick={() => {
+            setHistOpen(false);
+            setProfOpen(false);
+          }}
+          className="absolute inset-0 z-10 bg-black/30 lg:hidden"
+        />
+      )}
 
       {/* 3. Panel Phải: Hồ sơ sức khỏe & Lối tắt điều hướng */}
       <aside
@@ -946,7 +968,7 @@ export const ChatPage: React.FC = () => {
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <span className="material-symbols-outlined text-[17px]">vital_signs</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-[17px]">vital_signs</span>
                       </div>
                       <span className="font-label-md text-sm font-bold text-on-surface">
                         Hồ sơ Dinh dưỡng Cá nhân
@@ -1039,7 +1061,7 @@ export const ChatPage: React.FC = () => {
                     className="group flex items-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 !no-underline transition hover:border-primary/40 hover:bg-surface-container-lowest hover:shadow-xs"
                   >
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-on-primary">
-                      <span className="material-symbols-outlined text-[19px] !no-underline">{s.icon}</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] !no-underline">{s.icon}</span>
                     </div>
                     <div className="min-w-0 flex-1 !no-underline">
                       <span className="block font-label-md text-sm font-semibold text-on-surface !no-underline">
@@ -1049,7 +1071,7 @@ export const ChatPage: React.FC = () => {
                         {s.desc}
                       </span>
                     </div>
-                    <span className="material-symbols-outlined text-[18px] text-outline-variant transition-transform group-hover:translate-x-1 group-hover:text-primary !no-underline">
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-outline-variant transition-transform group-hover:translate-x-1 group-hover:text-primary !no-underline">
                       chevron_right
                     </span>
                   </Link>
@@ -1073,7 +1095,7 @@ export const ChatPage: React.FC = () => {
                 }}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container !no-underline"
               >
-                <span className="material-symbols-outlined text-[20px] !no-underline">{s.icon}</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px] !no-underline">{s.icon}</span>
               </Link>
             ))}
           </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
-import { notifySuccess } from '@/lib/notify';
+import { getErrorMessage, notifySuccess } from '@/lib/notify';
 import { useCreateSurvey } from '../hooks/useChat';
 import { surveySchema } from '../schemas/chat.schema';
 
@@ -48,8 +48,8 @@ export const SurveyStars: React.FC<SurveyStarsProps> = ({ sessionId, question })
         notifySuccess('Cảm ơn bạn đã đánh giá câu trả lời.');
       },
       onError: (err: unknown) => {
-        const msg = (err as { message?: string })?.message || 'Không thể gửi đánh giá, vui lòng thử lại.';
-        setError(msg);
+        // getErrorMessage đọc message/errorCode của server; không dùng err.message của axios (câu kỹ thuật).
+        setError(getErrorMessage(err) || 'Không thể gửi đánh giá, vui lòng thử lại.');
       },
     });
   };
@@ -57,7 +57,7 @@ export const SurveyStars: React.FC<SurveyStarsProps> = ({ sessionId, question })
   if (done) {
     return (
       <span className="font-label-sm text-xs text-on-surface-variant flex items-center gap-1 text-primary">
-        <span className="material-symbols-outlined text-[15px]">check_circle</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-[15px]">check_circle</span>
         Cảm ơn bạn đã phản hồi! ({score}/5 sao)
       </span>
     );
@@ -83,6 +83,7 @@ export const SurveyStars: React.FC<SurveyStarsProps> = ({ sessionId, question })
                 className="transition-transform hover:scale-125 active:scale-95 focus:outline-none"
               >
                 <span
+                  aria-hidden="true"
                   className="material-symbols-outlined text-[19px] text-primary"
                   style={{ fontVariationSettings: `'FILL' ${n <= score ? 1 : 0}` }}
                 >

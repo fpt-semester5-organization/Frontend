@@ -371,14 +371,15 @@ export const MealPlanGenerate: React.FC = () => {
                         disabled={isCheckingFridge}
                         onClick={() => handleToggleFridge(!field.value, field.onChange)}
                         className={cn(
-                          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-container focus:ring-offset-2',
+                          // p-0.5 ghi đè padding mặc định của <button> (Bootstrap Reboot không xóa), nếu không núm bị lệch và tràn khỏi rãnh.
+                          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-0 p-0.5 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-container focus:ring-offset-2',
                           field.value ? 'bg-primary-container' : 'bg-outline-variant',
                           isCheckingFridge && 'opacity-60 cursor-not-allowed'
                         )}
                       >
                         <span
                           className={cn(
-                            'inline-block h-6 w-6 transform rounded-full bg-surface-container-lowest shadow transition duration-200',
+                            'inline-block h-5 w-5 transform rounded-full bg-surface-container-lowest shadow transition duration-200',
                             field.value ? 'translate-x-5' : 'translate-x-0'
                           )}
                         />

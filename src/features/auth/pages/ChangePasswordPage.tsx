@@ -44,7 +44,7 @@ export function ChangePasswordPage() {
       width={520}
       footer={
         <Link to={PATHS.PROFILE.ROOT} className="flex items-center gap-1 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface">
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
           Về hồ sơ cá nhân
         </Link>
       }

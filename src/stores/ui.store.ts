@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { cleanUserMessage } from '@/lib/userMessage';
 
 export type ToastVariant = 'success' | 'info' | 'warning' | 'danger';
 export type ToastKind = 'success' | 'error' | 'warning' | 'info';
@@ -46,7 +47,11 @@ export const useUiStore = create<UiState>((set, get) => ({
     const id = ++seq;
     const variant: ToastVariant = variantOrKind === 'error' ? 'danger' : variantOrKind;
     const kind: ToastKind = variantOrKind === 'danger' ? 'error' : variantOrKind;
-    set((s) => ({ toasts: [...s.toasts, { id, variant, kind, message, action }] }));
+    // Lớp chặn cuối (UI-4): bỏ mã tham chiếu trong câu server; câu kỹ thuật thô thì thay bằng câu chung.
+    const text = cleanUserMessage(message) || (variant === 'danger' || variant === 'warning' ? 'Đã có lỗi xảy ra, vui lòng thử lại.' : message);
+    // Nhiều request lỗi cùng lúc (kể cả lần tự thử lại của React Query) không chồng nhiều toast giống hệt nhau.
+    if (get().toasts.some((t) => t.variant === variant && t.message === text)) return;
+    set((s) => ({ toasts: [...s.toasts, { id, variant, kind, message: text, action }] }));
     window.setTimeout(() => get().dismissToast(id), toastDuration(variant, action));
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

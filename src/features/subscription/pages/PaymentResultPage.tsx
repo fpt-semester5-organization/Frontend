@@ -92,7 +92,7 @@ export function PaymentResultPage() {
         ) : (
           <>
             <span className={`flex h-16 w-16 items-center justify-center rounded-full ${tone.box}`}>
-              <span className={`material-symbols-outlined text-[36px] ${pending && !timedOut ? 'animate-pulse' : ''}`}>{tone.icon}</span>
+              <span aria-hidden="true" className={`material-symbols-outlined text-[36px] ${pending && !timedOut ? 'animate-pulse' : ''}`}>{tone.icon}</span>
             </span>
             <h1 className="font-headline-md text-headline-md text-primary" role="status">{tx ? info.text : 'Đang chờ giao dịch'}</h1>
             <p className="font-body-md text-body-md text-on-surface-variant">

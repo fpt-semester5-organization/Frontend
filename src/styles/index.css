@@ -11,6 +11,12 @@
 @import 'tailwindcss/utilities.css' layer(utilities) important;
 
 /*
+ * Giao diện chỉ có chế độ sáng: class `dark:` chỉ áp dụng khi có lớp .dark (không dùng), không theo cài đặt
+ * chế độ tối của hệ điều hành. Nếu không, chữ màu sáng của `dark:` hiện trên nền sáng, thiếu tương phản (UI-7).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * Design system "Linen & Earth Culinary Sanctuary", bảng màu "Sage & Clay on Linen"
  * (Stitch: _asset_linen-earth-culinary-sanctuary/DESIGN.md; mọi cặp chữ/nền đạt tương phản >= 4,5:1, NFR UI-7).
  * Tên token giữ đúng như prototype để dùng chung class: bg-primary-container, text-on-surface, font-headline-md...

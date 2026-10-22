@@ -17,10 +17,11 @@ import { useDeleteAccount } from '../hooks/useProfile';
 import { REASON_MAX, deleteAccountSchema, type DeleteAccountValues } from '../types/profile.schemas';
 
 /**
- * Backend (develop, 17/10/2026) chưa có DELETE /users/me (trả 405) nên thẻ hiện nhưng khóa nút.
- * Đổi thành true khi Backend làm xong FN-PROF-07.
+ * Backend develop đã có DELETE /users/me (FN-PROF-07, PR #71). Đã thử 22/10/2026: sai mật khẩu → 401 ERR_AUTH_INVALID_CREDENTIALS,
+ * thành công → restoreDeadline, đăng nhập lại → 409 ERR_AUTH_ACCOUNT_PENDING_DELETION, khôi phục bằng restoreAccount=true.
+ * Đặt false nếu cần tạm khóa nút (thẻ vẫn hiện kèm ghi chú).
  */
-const DEACTIVATION_AVAILABLE = false;
+const DEACTIVATION_AVAILABLE = true;
 
 /**
  * Vô hiệu hóa tài khoản (SCR-07, FN-PROF-07): SOFT_DELETED, có 30 ngày để khôi phục bằng cách đăng nhập lại.

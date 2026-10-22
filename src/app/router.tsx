@@ -2,6 +2,7 @@ import React, { lazy } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { NotFoundPage } from '@/app/NotFoundPage';
+import { RouteErrorPage } from '@/app/RouteErrorPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AdminLayout } from '@/layouts/AdminLayout';
@@ -46,9 +47,12 @@ const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySu
 const router = createBrowserRouter([
   {
     element: <AppShell />,
+    // Lỗi ngoài dự kiến (render lỗi, không tải được mã trang…) hiện trang thân thiện thay vì màn lỗi mặc định có stack trace (UI-4).
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <MainLayout />,
+        errorElement: <RouteErrorPage withLayout />,
         children: [
           // Bản đồ quán chay (SCR-18) & Chi tiết quán chay (SCR-19)
           { path: PATHS.VENUES.ROOT, element: <VenueMap /> },

@@ -3,9 +3,13 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
 
-/** Biểu tượng VeggieLife (public/logo.png, nền trong suốt). */
-export const LogoMark: React.FC<{ size?: number; className?: string }> = ({ size = 36, className }) => (
-  <img src="/logo.png" width={size} height={size} alt="VeggieLife" className={cn('shrink-0 object-contain', className)} />
+/**
+ * Biểu tượng VeggieLife (public/logo.png, nền trong suốt).
+ * Mặc định là ảnh trang trí (alt rỗng) vì luôn đi kèm chữ "VeggieLife" hoặc nằm trong link đã có nhãn;
+ * truyền `alt` nếu dùng biểu tượng đứng một mình.
+ */
+export const LogoMark: React.FC<{ size?: number; className?: string; alt?: string }> = ({ size = 36, className, alt = '' }) => (
+  <img src="/logo.png" width={size} height={size} alt={alt} className={cn('shrink-0 object-contain', className)} />
 );
 
 export interface LogoProps {

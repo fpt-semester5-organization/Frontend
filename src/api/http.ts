@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { errorMessage } from '@/constants/errorCodes';
 import { API_BASE_URL } from '@/lib/env';
+import { cleanUserMessage } from '@/lib/userMessage';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
@@ -48,7 +49,11 @@ function expireSession() {
 }
 
 http.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    // Có phản hồi thành công nghĩa là dịch vụ đã hoạt động lại: ẩn banner "Dịch vụ tạm gián đoạn".
+    if (useUiStore.getState().serviceBanner) useUiStore.getState().setServiceBanner(null);
+    return res;
+  },
   async (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status;
     const body = error.response?.data;
@@ -92,7 +97,7 @@ http.interceptors.response.use(
     if (status === 403 && /^ERR_GUEST_/.test(code) && code !== 'ERR_GUEST_REGION_UNSUPPORTED') {
       ui.openSignupPrompt(code === 'ERR_GUEST_PERSONALIZATION_RESTRICTED' ? 'personalization' : 'guest');
     } else if (status === 403 && /^ERR_QUOTA_/.test(code)) {
-      if (auth.user) toast.warning(body?.message || errorMessage(code)); // Thành viên Free: trang tự hiện gợi ý nâng cấp VIP
+      if (auth.user) toast.warning(cleanUserMessage(body?.message) || cleanUserMessage(errorMessage(code))); // Thành viên Free: trang tự hiện gợi ý nâng cấp VIP
       else ui.openSignupPrompt('quota');
     } else if (status === 429) {
       toast.warning('Thao tác quá nhanh, thử lại sau');
@@ -116,10 +121,10 @@ export const unwrapPaged = async <T>(req: Promise<AxiosResponse<ApiEnvelope<T[]>
   return { items, meta: body.meta ?? { page: 1, size: items.length, total: items.length } };
 };
 
-/** Lấy thông điệp tiếng Việt từ lỗi API (ưu tiên `message` của server). */
+/** Lấy thông điệp tiếng Việt từ lỗi API (ưu tiên `message` của server, đã bỏ mã tham chiếu — UI-4). */
 export function apiErrorMessage(err: unknown, fallback?: string): string {
   const e = err as AxiosError<ApiErrorBody> | null | undefined;
-  return e?.response?.data?.message || errorMessage(e?.response?.data?.errorCode, fallback);
+  return cleanUserMessage(e?.response?.data?.message) || cleanUserMessage(errorMessage(e?.response?.data?.errorCode, fallback));
 }
 
 export function apiErrorCode(err: unknown): string | undefined {
@@ -137,7 +142,7 @@ export function apiErrorData(err: unknown): Record<string, unknown> {
 
 export function apiFieldErrors(err: unknown): Record<string, string> {
   const details = (err as AxiosError<ApiErrorBody> | null | undefined)?.response?.data?.details ?? [];
-  return Object.fromEntries(details.map((d) => [d.field, d.message]));
+  return Object.fromEntries(details.map((d) => [d.field, cleanUserMessage(d.message)]));
 }
 
 export default http;

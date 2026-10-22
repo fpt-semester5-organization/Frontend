@@ -216,7 +216,7 @@ export const GoongMap: React.FC<GoongMapProps> = ({
           }">
             ${
               hasRating
-                ? `<span class="material-symbols-outlined text-[13px] text-amber-400 leading-none">star</span><span>${formatNumber(ratingNum)}</span>`
+                ? `<span aria-hidden="true" class="material-symbols-outlined text-[13px] text-amber-400 leading-none">star</span><span>${formatNumber(ratingNum)}</span>`
                 : ''
             }
             <span class="max-w-[120px] truncate">${escapeHtml(venue.name)}</span>
@@ -228,7 +228,7 @@ export const GoongMap: React.FC<GoongMapProps> = ({
               <path d="M15 0C6.71573 0 0 6.71573 0 15C0 25.5 13.5 37 14.2 37.7C14.6 38.1 15.4 38.1 15.8 37.7C16.5 37 30 25.5 30 15C30 6.71573 23.2843 0 15 0Z" fill="${isSelected ? '#94532f' : '#3d5c47'}"/>
               <circle cx="15" cy="14" r="9" fill="white"/>
             </svg>
-            <span class="venue-pin-icon material-symbols-outlined absolute text-[15px] top-[6px] ${isSelected ? 'text-[#94532f]' : 'text-[#3d5c47]'} font-bold select-none leading-none">
+            <span aria-hidden="true" class="venue-pin-icon material-symbols-outlined absolute text-[15px] top-[6px] ${isSelected ? 'text-[#94532f]' : 'text-[#3d5c47]'} font-bold select-none leading-none">
               ${venue.isFullyVegan ? 'spa' : 'restaurant'}
             </span>
           </div>
@@ -255,7 +255,7 @@ export const GoongMap: React.FC<GoongMapProps> = ({
           ${
             hasRating
               ? `<span class="inline-flex items-center gap-0.5 font-semibold text-[#d97706]">
-                   <span class="material-symbols-outlined text-[14px]">star</span>
+                   <span aria-hidden="true" class="material-symbols-outlined text-[14px]">star</span>
                    ${formatNumber(ratingNum)}
                  </span>`
               : ''
@@ -263,7 +263,7 @@ export const GoongMap: React.FC<GoongMapProps> = ({
           ${
             distanceText
               ? `<span class="inline-flex items-center gap-0.5 text-[#636a60]">
-                   <span class="material-symbols-outlined text-[14px]">near_me</span>
+                   <span aria-hidden="true" class="material-symbols-outlined text-[14px]">near_me</span>
                    ${escapeHtml(distanceText)}
                  </span>`
               : ''
@@ -281,7 +281,7 @@ export const GoongMap: React.FC<GoongMapProps> = ({
             rel="noopener noreferrer"
             class="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#3d5c47] px-2.5 py-1.5 text-xs font-semibold text-white no-underline transition-colors hover:bg-[#2d4736] shadow-sm"
           >
-            <span class="material-symbols-outlined text-[14px]">directions</span>
+            <span aria-hidden="true" class="material-symbols-outlined text-[14px]">directions</span>
             Chỉ đường
           </a>
           <button

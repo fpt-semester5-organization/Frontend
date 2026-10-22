@@ -127,7 +127,7 @@ const RecipeDetail: React.FC = () => {
         </button>
 
         {/* Luôn một dòng (tên món dài thì cắt bớt) để đổi font không làm khối bên dưới nhảy (CLS). */}
-        <nav aria-label="Đường dẫn" className="flex items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+        <nav aria-label="Đường dẫn" className="flex min-w-0 max-w-full items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
           <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
             Trang chủ
           </Link>
@@ -136,7 +136,7 @@ const RecipeDetail: React.FC = () => {
             Kho công thức
           </Link>
           <span className="text-outline-variant">/</span>
-          <span aria-current="page" className="min-w-0 truncate text-primary max-w-[200px] sm:max-w-[320px]">
+          <span aria-current="page" className="min-w-0 truncate text-primary sm:max-w-[320px]">
             {data.title}
           </span>
         </nav>

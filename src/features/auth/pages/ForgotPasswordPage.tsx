@@ -36,7 +36,7 @@ export function ForgotPasswordPage() {
       width={480}
       footer={
         <Link to={PATHS.AUTH.LOGIN} className="flex items-center gap-1 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface">
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
           Quay lại đăng nhập
         </Link>
       }

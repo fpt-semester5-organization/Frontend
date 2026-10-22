@@ -10,8 +10,10 @@ export default mergeConfig(
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       css: false,
-      // Luôn gọi API thật qua axios (đã giả lập bằng mockApi), không dùng dữ liệu giả của .env.local
-      env: { VITE_MOCK_AUTH: 'false', VITE_ENABLE_MOCKS: 'false' },
+      // Luôn gọi API thật qua axios (đã giả lập bằng mockApi), không dùng dữ liệu giả của .env.local.
+      // Bỏ Google Client ID của .env máy cá nhân: có ID thì GoogleButton render nút Google thật, cần GoogleOAuthProvider
+      // nên test trang đăng nhập/đăng ký lỗi tùy máy.
+      env: { VITE_MOCK_AUTH: 'false', VITE_ENABLE_MOCKS: 'false', VITE_GOOGLE_CLIENT_ID: '' },
     },
   }),
 );

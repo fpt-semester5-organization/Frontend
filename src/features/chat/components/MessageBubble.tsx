@@ -74,7 +74,7 @@ export const AssistantBubble: React.FC<{
           <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2.5">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <span className="material-symbols-outlined text-[16px]">psychology</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">psychology</span>
               </div>
               <span className="font-label-md text-label-md font-bold text-on-surface">
                 Cố vấn Dinh dưỡng VeggieLife
@@ -155,7 +155,7 @@ export const AssistantBubble: React.FC<{
                   >
                     <div>
                       <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
-                        <span className="material-symbols-outlined text-[15px]">restaurant</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-[15px]">restaurant</span>
                         <span>Món ăn khuyên dùng</span>
                       </div>
                       <h4 className="mt-1 font-headline-sm text-[14px] font-bold text-on-surface">
@@ -163,7 +163,7 @@ export const AssistantBubble: React.FC<{
                       </h4>
                       {r.cookTimeMinutes != null && (
                         <p className="mt-1 font-body-sm text-xs text-on-surface-variant flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[13px]">timer</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[13px]">timer</span>
                           Thời gian nấu: {r.cookTimeMinutes} phút
                         </p>
                       )}
@@ -173,7 +173,7 @@ export const AssistantBubble: React.FC<{
                       className="inline-flex w-fit items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-label-sm text-xs font-semibold text-on-primary transition hover:opacity-90 active:scale-[0.98]"
                     >
                       Xem công thức
-                      <span className="material-symbols-outlined text-[14px] transition-transform group-hover:translate-x-0.5">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px] transition-transform group-hover:translate-x-0.5">
                         arrow_forward
                       </span>
                     </Link>
@@ -187,7 +187,7 @@ export const AssistantBubble: React.FC<{
           {sources.length > 0 && (
             <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest/80 p-3.5" aria-label="Nguồn tham chiếu">
               <div className="mb-2 flex items-center gap-2 font-label-sm text-label-sm font-semibold text-on-surface">
-                <span className="material-symbols-outlined text-[16px] text-primary">menu_book</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-primary">menu_book</span>
                 Tài liệu tham khảo y khoa
               </div>
               <ol className="flex flex-col gap-1.5">
@@ -222,7 +222,7 @@ export const AssistantBubble: React.FC<{
 
           {/* Miễn trừ y khoa */}
           <p className="flex items-start gap-1.5 font-label-sm text-xs text-on-surface-variant">
-            <span className="material-symbols-outlined shrink-0 text-[14px] text-outline">info</span>
+            <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[14px] text-outline">info</span>
             {m.disclaimer || MEDICAL_DISCLAIMER}
           </p>
 

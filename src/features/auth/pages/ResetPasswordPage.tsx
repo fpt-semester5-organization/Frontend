@@ -65,7 +65,7 @@ export function ResetPasswordPage() {
             to={PATHS.AUTH.LOGIN}
             className="flex items-center gap-1 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
           >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
             Quay lại đăng nhập
           </Link>
           <Link
@@ -84,11 +84,11 @@ export function ResetPasswordPage() {
         {/* Thông tin email đã xác minh qua OTP ở bước trước */}
         <div className="flex items-center justify-between rounded-lg border border-surface-container-high bg-surface-container-low px-space-md py-space-sm">
           <div className="flex min-w-0 items-center gap-space-sm">
-            <span className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
+            <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
             <span className="truncate font-label-md text-label-md font-medium text-on-surface">{email}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1 font-label-sm text-label-sm text-primary">
-            <span className="material-symbols-outlined text-[16px]">verified</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>
             <span>Đã xác thực OTP</span>
           </div>
         </div>
@@ -111,25 +111,25 @@ export function ResetPasswordPage() {
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 font-label-sm text-label-sm">
             <div className={`flex items-center gap-1.5 transition-colors ${hasMinLength ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
-              <span className="material-symbols-outlined text-[15px]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[15px]">
                 {hasMinLength ? 'check_circle' : 'radio_button_unchecked'}
               </span>
               <span>Tối thiểu 8 ký tự</span>
             </div>
             <div className={`flex items-center gap-1.5 transition-colors ${hasUpper ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
-              <span className="material-symbols-outlined text-[15px]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[15px]">
                 {hasUpper ? 'check_circle' : 'radio_button_unchecked'}
               </span>
               <span>Có chữ cái in hoa</span>
             </div>
             <div className={`flex items-center gap-1.5 transition-colors ${hasLower ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
-              <span className="material-symbols-outlined text-[15px]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[15px]">
                 {hasLower ? 'check_circle' : 'radio_button_unchecked'}
               </span>
               <span>Có chữ cái in thường</span>
             </div>
             <div className={`flex items-center gap-1.5 transition-colors ${hasNumber && hasSpecial ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
-              <span className="material-symbols-outlined text-[15px]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[15px]">
                 {hasNumber && hasSpecial ? 'check_circle' : 'radio_button_unchecked'}
               </span>
               <span>Có chữ số & ký tự đặc biệt</span>
