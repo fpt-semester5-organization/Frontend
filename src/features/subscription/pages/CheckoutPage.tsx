@@ -51,7 +51,7 @@ export function CheckoutPage() {
         ) : plans.isError ? (
           <PageError error={plans.error} onRetry={() => void plans.refetch()} />
         ) : !planId || !plan ? (
-          <PageEmpty title="Không tìm thấy gói" hint="Gói không tồn tại hoặc đã ngừng bán (ERR_PLAN_NOT_FOUND).">
+          <PageEmpty title="Không tìm thấy gói" hint="Gói không tồn tại hoặc đã ngừng bán.">
             <Link to={PATHS.SUBSCRIPTION.PRICING} className="mt-2 rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary">Xem các gói VIP</Link>
           </PageEmpty>
         ) : (
@@ -127,7 +127,7 @@ function GatewayForm({ planId, planName, onCreated }: { planId: number; planName
       {formError && <FormAlert>{formError}</FormAlert>}
       <p className="font-label-sm text-label-sm text-on-surface-variant">Đơn có hiệu lực 5 phút. Hệ thống tự kích hoạt VIP sau khi nhận xác nhận từ cổng thanh toán.</p>
       <button type="submit" disabled={checkout.isPending} className="flex items-center justify-center gap-2 rounded-lg bg-primary-container px-4 py-3 font-label-md text-label-md text-on-primary hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60">
-        {checkout.isPending && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+        {checkout.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
         {gateway === 'MOMO' ? 'Thanh toán bằng MoMo' : 'Tạo mã VietQR'}
       </button>
 
@@ -178,7 +178,7 @@ function PayPanel({ order, onExpired }: { order: PendingOrder; onExpired: () => 
           <dt className="text-on-surface-variant">Mã đơn hàng</dt>
           <dd className="flex items-center gap-2 font-mono font-semibold text-secondary">
             {order.orderCode}
-            <button type="button" aria-label="Sao chép mã đơn" onClick={() => copy(order.orderCode)} className="text-outline hover:text-on-surface"><span className="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button type="button" aria-label="Sao chép mã đơn" onClick={() => copy(order.orderCode)} className="text-outline hover:text-on-surface"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">content_copy</span></button>
           </dd>
         </div>
       </dl>

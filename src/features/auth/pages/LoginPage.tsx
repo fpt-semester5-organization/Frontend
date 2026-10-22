@@ -17,7 +17,7 @@ import { toast } from '@/stores/ui.store';
 import { AuthCard } from '../components/AuthCard';
 import { useApiFormErrors } from '../components/useApiFormErrors';
 import { formatMmSs, useCountdown } from '../hooks/useCountdown';
-import { useLogin, useLoginWithGoogle } from '../hooks/useAuth';
+import { readReturnUrl, useLogin, useLoginWithGoogle } from '../hooks/useAuth';
 import { loginSchema, type LoginForm } from '../schemas/auth.schemas';
 
 /** Khóa đăng nhập mặc định 15 phút (BR-AUTH-004) khi server không trả `lockedUntil`. */
@@ -160,7 +160,7 @@ export function LoginPage() {
         {notVerifiedEmail && (
           <FormAlert kind="info">
             Tài khoản chưa được kích hoạt.{' '}
-            <button type="button" className="font-semibold underline" onClick={() => navigate(PATHS.AUTH.VERIFY_OTP, { state: { email: notVerifiedEmail, otpExpiresIn: 0, purpose: 'EMAIL_VERIFY', returnUrl: (location.state as { returnUrl?: string } | null)?.returnUrl } })}>
+            <button type="button" className="font-semibold underline" onClick={() => navigate(PATHS.AUTH.VERIFY_OTP, { state: { email: notVerifiedEmail, otpExpiresIn: 0, purpose: 'EMAIL_VERIFY', returnUrl: readReturnUrl(location) } })}>
               Nhập mã OTP để kích hoạt
             </button>
           </FormAlert>

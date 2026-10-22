@@ -14,6 +14,23 @@ export function mapRedirectUrl(redirectUrl?: string): string | undefined {
   return redirectUrl.startsWith('/') && !redirectUrl.startsWith('//') ? redirectUrl : undefined;
 }
 
+/** Chỉ nhận đường dẫn nội bộ (chống chuyển hướng ra trang ngoài) và không quay lại chính các trang xác thực. */
+function safeReturnUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return undefined;
+  return value.startsWith('/auth/') ? undefined : value;
+}
+
+/**
+ * returnUrl để quay lại sau xác thực (UI-5, BR-GUEST-AUTH-01): guard, SignupPromptModal… gắn vào URL `?returnUrl=`,
+ * còn Đăng ký → OTP chuyển tiếp qua `location.state`; đọc cả hai.
+ */
+export function readReturnUrl(location: { state: unknown; search: string }): string | undefined {
+  return (
+    safeReturnUrl((location.state as { returnUrl?: unknown } | null)?.returnUrl) ??
+    safeReturnUrl(new URLSearchParams(location.search).get('returnUrl'))
+  );
+}
+
 /** Sau khi đăng nhập/kích hoạt: lưu phiên, bỏ phiên Khách (server đã hợp nhất ngữ cảnh), về returnUrl / redirectUrl / trang chủ; Admin về /admin. */
 export function useAfterLogin() {
   const navigate = useNavigate();
@@ -25,7 +42,7 @@ export function useAfterLogin() {
     auth.clearGuestToken();
     useGuestStore.getState().reset();
     void qc.invalidateQueries(); // dữ liệu tải khi còn là Khách (memberActions…) được làm mới theo vai trò mới
-    const returnUrl = (loc.state as { returnUrl?: string } | null)?.returnUrl;
+    const returnUrl = readReturnUrl(loc);
     const target = returnUrl ?? mapRedirectUrl((result as VerifyOtpResult).redirectUrl) ?? (result.user.role === 'ADMIN' ? PATHS.ADMIN.ROOT : PATHS.HOME);
     navigate(target, { replace: true });
   };

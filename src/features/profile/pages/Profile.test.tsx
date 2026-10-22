@@ -91,11 +91,13 @@ describe('Profile (SCR-07)', () => {
     expect(await screen.findByText('Tệp > 5 MB.')).toBeInTheDocument();
   });
 
-  it('Backend chưa có DELETE /users/me: nút vô hiệu hóa bị khóa, kèm ghi chú', async () => {
+  it('Backend đã có DELETE /users/me: nút vô hiệu hóa bấm được và mở hộp xác nhận mật khẩu', async () => {
     mockProfileApi();
     renderProfile();
     const button = await screen.findByRole('button', { name: 'Vô hiệu hóa tài khoản' });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('Chức năng đang được phát triển, bạn chưa thể vô hiệu hóa tài khoản lúc này.');
+    expect(button).toBeEnabled();
+    expect(screen.queryByText('Chức năng đang được phát triển, bạn chưa thể vô hiệu hóa tài khoản lúc này.')).not.toBeInTheDocument();
+    await userEvent.click(button);
+    expect(await screen.findByText('Nhập mật khẩu để xác nhận. Bạn có 30 ngày để khôi phục tài khoản.')).toBeInTheDocument();
   });
 });

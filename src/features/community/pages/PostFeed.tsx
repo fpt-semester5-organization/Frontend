@@ -177,10 +177,13 @@ const PostFeed: React.FC = () => {
         {leftOpen ? (
           <aside
             aria-label="Tạo nội dung và bộ lọc"
-            className="flex flex-col gap-space-md lg:sticky lg:top-24"
+            // Màn rộng: dính dưới header và cao tối đa bằng khung nhìn (top-24 = 96px, chừa 16px dưới đáy).
+            // Phần trên giữ nguyên, khung bộ lọc co lại và cuộn riêng; nếu không giới hạn chiều cao, khối sticky cao hơn
+            // màn hình chỉ lộ phần dưới khi đã cuộn hết bảng tin.
+            className="flex flex-col gap-space-md lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)]"
           >
             {/* Header thanh bên trái có nút thu gọn */}
-            <div className="flex items-center justify-between px-1">
+            <div className="flex shrink-0 items-center justify-between px-1">
               <span className="font-label-md text-label-md font-bold text-on-surface">Điều hướng & Lọc</span>
               <button
                 type="button"
@@ -194,13 +197,13 @@ const PostFeed: React.FC = () => {
               </button>
             </div>
 
-            <Button size="lg" className="w-full shadow-sm" onClick={writePost}>
+            <Button size="lg" className="w-full shrink-0 shadow-sm" onClick={writePost}>
               <Icon name="edit_square" className="text-[20px]" />
               Viết bài mới
             </Button>
 
             {isMember ? (
-              <Link to={PATHS.ME.POSTS} className={sideLink}>
+              <Link to={PATHS.ME.POSTS} className={cn(sideLink, 'shrink-0')}>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant">
                   <Icon name="article" />
                 </span>
@@ -221,7 +224,7 @@ const PostFeed: React.FC = () => {
                     requireMember(() => undefined);
                   }
                 }}
-                className={cn(sideLink, 'cursor-pointer flex-col items-start gap-space-xs hover:border-primary')}
+                className={cn(sideLink, 'shrink-0 cursor-pointer flex-col items-start gap-space-xs hover:border-primary')}
               >
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-container text-on-primary">
@@ -366,7 +369,7 @@ const PostFeed: React.FC = () => {
                     </span>
                   )}
                 </p>
-                <span className="font-label-sm text-label-sm text-on-surface-variant/70">
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
                   Đang hiển thị {feedItems.length} mục
                 </span>
               </div>

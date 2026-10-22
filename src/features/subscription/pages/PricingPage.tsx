@@ -65,7 +65,7 @@ export function PricingPage() {
               <ul className="flex flex-col gap-2">
                 {rows.vip.map(([label, vip], i) => (
                   <li key={label} className="flex items-start gap-2 font-body-md text-body-md text-on-surface">
-                    <span className="material-symbols-outlined text-[20px] text-surface-tint">check_circle</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-surface-tint">check_circle</span>
                     <span>
                       {label} {vip} <span className="text-on-surface-variant">(Thành viên: {rows.free[i][1]})</span>
                     </span>

@@ -13,7 +13,7 @@ import { PATHS } from '@/routes/paths';
 import { toast } from '@/stores/ui.store';
 import { AuthCard } from '../components/AuthCard';
 import { useApiFormErrors } from '../components/useApiFormErrors';
-import { useRegister } from '../hooks/useAuth';
+import { readReturnUrl, useRegister } from '../hooks/useAuth';
 import { passwordStrength, registerSchema, type RegisterForm } from '../schemas/auth.schemas';
 
 export function RegisterPage() {
@@ -33,7 +33,7 @@ export function RegisterPage() {
       reg.mutate(v, {
         onSuccess: (r) => {
           toast.success('Đã gửi mã OTP tới email của bạn');
-          navigate(PATHS.AUTH.VERIFY_OTP, { state: { email: r.email, otpExpiresIn: r.otpExpiresIn, purpose: 'EMAIL_VERIFY', returnUrl: (location.state as { returnUrl?: string } | null)?.returnUrl } });
+          navigate(PATHS.AUTH.VERIFY_OTP, { state: { email: r.email, otpExpiresIn: r.otpExpiresIn, purpose: 'EMAIL_VERIFY', returnUrl: readReturnUrl(location) } });
         },
         onError: handle,
       });

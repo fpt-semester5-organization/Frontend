@@ -41,7 +41,7 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
         />
       </div>
       <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
-        <span className="material-symbols-outlined text-[13px] text-primary">verified</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-primary">verified</span>
         <span className="truncate">Trợ lý Dinh dưỡng VeggieLife</span>
       </div>
       {isAuthenticated && !isVip && (
@@ -50,7 +50,7 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
           className="mt-0.5 inline-flex items-center gap-1 font-label-sm text-xs font-semibold text-primary transition hover:underline"
         >
           <span>Nâng cấp VIP ({QUOTA.chatPerDay.vip} câu/ngày)</span>
-          <span className="material-symbols-outlined text-[14px]">north_east</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">north_east</span>
         </Link>
       )}
       {!isAuthenticated && (
@@ -59,7 +59,7 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
           className="mt-0.5 inline-flex items-center gap-1 font-label-sm text-xs font-semibold text-primary transition hover:underline"
         >
           <span>Đăng ký để nhận 20 câu/ngày</span>
-          <span className="material-symbols-outlined text-[14px]">north_east</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">north_east</span>
         </Link>
       )}
     </div>

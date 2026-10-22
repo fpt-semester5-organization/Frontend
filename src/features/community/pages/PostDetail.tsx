@@ -96,7 +96,7 @@ const PostDetail: React.FC = () => {
   return (
     <div className={PAGE}>
       {/* Thanh điều hướng quay lại & Breadcrumb */}
-      <nav aria-label="Điều hướng bài viết" className="flex items-center justify-between gap-space-sm pb-1">
+      <nav aria-label="Điều hướng bài viết" className="flex flex-wrap items-center justify-between gap-space-sm pb-1">
         <button
           type="button"
           onClick={handleBack}
@@ -106,16 +106,16 @@ const PostDetail: React.FC = () => {
           <span>Quay lại</span>
         </button>
 
-        <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
-          <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+        <div className="flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap font-label-sm text-label-sm text-on-surface-variant">
+          <Link to={PATHS.HOME} className="shrink-0 hover:text-primary transition-colors">
             Trang chủ
           </Link>
           <Icon name="chevron_right" className="text-[14px] text-outline" />
-          <Link to={PATHS.COMMUNITY.ROOT} className="hover:text-primary transition-colors">
+          <Link to={PATHS.COMMUNITY.ROOT} className="shrink-0 hover:text-primary transition-colors">
             Cộng đồng
           </Link>
           <Icon name="chevron_right" className="text-[14px] text-outline" />
-          <span className="font-semibold text-on-surface truncate max-w-[200px] sm:max-w-[320px]">
+          <span aria-current="page" className="min-w-0 truncate font-semibold text-on-surface sm:max-w-[320px]">
             {data.title}
           </span>
         </div>

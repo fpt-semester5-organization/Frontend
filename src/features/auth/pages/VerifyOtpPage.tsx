@@ -115,7 +115,7 @@ export function VerifyOtpPage() {
     <main className="flex flex-1 flex-col items-center justify-center bg-surface-container-lowest px-margin-sm pb-space-xl pt-[calc(72px+2.5rem)]">
       <div className="flex w-full max-w-[500px] flex-col items-center rounded-2xl border border-surface-container-high bg-surface-container-lowest p-space-lg shadow-sm sm:p-space-xl">
         <div className="mb-space-md flex h-14 w-14 items-center justify-center rounded-full bg-surface-container text-primary-container">
-          <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <span aria-hidden="true" className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
             {isReset ? 'lock_reset' : 'mark_email_read'}
           </span>
         </div>
@@ -127,12 +127,12 @@ export function VerifyOtpPage() {
         </p>
         <div className="mb-space-lg flex w-full items-center justify-between rounded-lg bg-surface-container-low px-space-md py-space-sm">
           <div className="flex min-w-0 items-center gap-space-sm">
-            <span className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
+            <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
             <span className="truncate font-label-md text-label-md text-on-surface">{email}</span>
           </div>
           <Link to={backLink} className="group flex shrink-0 items-center gap-1 font-label-sm text-label-sm text-secondary hover:underline">
             <span>Đổi email</span>
-            <span className="material-symbols-outlined text-[14px]">edit</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[14px]">edit</span>
           </Link>
         </div>
 
@@ -166,7 +166,7 @@ export function VerifyOtpPage() {
           {error && <div className="mb-space-md w-full"><FormAlert>{error}</FormAlert></div>}
           <div className="mb-space-lg flex w-full flex-col items-center justify-between gap-space-sm rounded-lg bg-surface-container-high/60 p-space-sm sm:flex-row">
             <span className="flex items-center gap-1.5 font-label-md text-label-md text-on-surface">
-              <span className="material-symbols-outlined text-[18px] text-secondary">timer</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-secondary">timer</span>
               {remaining > 0 ? `Mã hết hạn sau ${fmt(remaining)}` : 'Mã đã hết hạn'}
             </span>
             <button type="button" onClick={doResend} disabled={resend.isPending || locked || remaining > OTP_TTL_SECONDS - 60} className="font-label-md text-label-md text-secondary hover:underline disabled:cursor-not-allowed disabled:opacity-50">
@@ -174,7 +174,7 @@ export function VerifyOtpPage() {
             </button>
           </div>
           <div className="mb-space-lg flex w-full items-center justify-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
-            <span className="material-symbols-outlined text-[16px] text-secondary">info</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-secondary">info</span>
             <span>
               {locked ? `Đã nhập sai 5 lần, thử lại sau ${fmt(lockLeft)}` : <>Còn lại <strong className="font-semibold text-on-surface">{attemptsLeft ?? 5}/5</strong> lần thử nhập mã</>}
             </span>
@@ -185,7 +185,7 @@ export function VerifyOtpPage() {
             </SubmitButton>
           </div>
           <Link to={backLink} className="mt-space-md flex items-center gap-1 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface">
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_back</span>
             <span>Quay lại</span>
           </Link>
         </form>
