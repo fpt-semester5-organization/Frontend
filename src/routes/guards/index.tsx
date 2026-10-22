@@ -1,6 +1,9 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { ForbiddenPage } from '@/app/ForbiddenPage';
+import { readReturnUrl } from '@/features/auth/hooks/useAuth';
 import { PageLoader } from '@/components/common/PageLoader';
+import { MainLayout } from '@/layouts/MainLayout';
 import { useAuthStore } from '@/stores/auth.store';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 
@@ -28,19 +31,29 @@ export const RequireVip: React.FC = () => {
   return <Outlet />;
 };
 
-/** Quản trị viên (role ADMIN). */
+/**
+ * Quản trị viên (role ADMIN). Khách → đăng nhập kèm returnUrl; đã đăng nhập nhưng không phải ADMIN → trang 403
+ * (trước đây chuyển về đăng nhập rồi bị GuestOnly đẩy về trang chủ, người dùng không biết vì sao).
+ */
 export const RequireAdmin: React.FC = () => {
   const { user, isAuthenticated, sessionStatus } = useAuthStore();
   const loginUrl = useLoginRedirect();
   if (sessionStatus === 'restoring') return <PageLoader />;
-  if (!isAuthenticated || user?.role !== 'ADMIN') return <Navigate to={loginUrl} replace />;
+  if (!isAuthenticated) return <Navigate to={loginUrl} replace />;
+  if (user?.role !== 'ADMIN')
+    return (
+      <MainLayout>
+        <ForbiddenPage />
+      </MainLayout>
+    );
   return <Outlet />;
 };
 
-/** Trang đăng nhập/đăng ký: đã đăng nhập thì về trang chủ. */
+/** Trang đăng nhập/đăng ký: đã đăng nhập thì về returnUrl (nếu có) hoặc trang chủ. */
 export const GuestOnly: React.FC = () => {
   const { isAuthenticated, sessionStatus } = useAuthStore();
+  const location = useLocation();
   if (sessionStatus === 'restoring') return <PageLoader />;
-  if (isAuthenticated) return <Navigate to={PATHS.HOME} replace />;
+  if (isAuthenticated) return <Navigate to={readReturnUrl(location) ?? PATHS.HOME} replace />;
   return <Outlet />;
 };
