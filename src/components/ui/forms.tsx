@@ -47,7 +47,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field({ l
           className={`${INPUT_CLASS} ${icon ? 'pr-10' : ''} ${error ? 'ring-1 ring-error' : ''} ${className}`}
           {...rest}
         />
-        {icon && <span className="material-symbols-outlined pointer-events-none absolute right-3 text-[18px] text-outline">{icon}</span>}
+        {icon && <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-3 text-[18px] text-outline">{icon}</span>}
       </div>
       {hint}
       {error && (
@@ -80,8 +80,9 @@ export const PasswordField = forwardRef<HTMLInputElement, Omit<FieldProps, 'type
           className={`${INPUT_CLASS} pr-10 ${error ? 'ring-1 ring-error' : ''} ${className}`}
           {...rest}
         />
-        <button type="button" aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShow((v) => !v)} className="absolute right-3 flex items-center text-outline transition-colors hover:text-on-surface">
-          <span className="material-symbols-outlined text-[18px]">{show ? 'visibility_off' : 'visibility'}</span>
+        {/* Vùng bấm 32×32 px (WCAG 2.5.8 tối thiểu 24 px). */}
+        <button type="button" aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShow((v) => !v)} className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-md text-outline transition-colors hover:text-on-surface">
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">{show ? 'visibility_off' : 'visibility'}</span>
         </button>
       </div>
       {hint}
@@ -102,9 +103,9 @@ export function SubmitButton({ loading, children, icon = 'arrow_forward', disabl
       disabled={loading || disabled}
       className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary-container px-space-md py-3 font-label-md text-label-md text-on-primary shadow-sm transition-all hover:bg-primary active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {loading ? <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> : null}
+      {loading ? <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> : null}
       <span>{children}</span>
-      {!loading && <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-0.5">{icon}</span>}
+      {!loading && <span aria-hidden="true" className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-0.5">{icon}</span>}
     </button>
   );
 }

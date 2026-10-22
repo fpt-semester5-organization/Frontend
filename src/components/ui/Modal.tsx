@@ -51,7 +51,7 @@ export const Modal: React.FC<ModalProps> = ({
               aria-label="Đóng"
               className="text-on-surface-variant hover:text-on-surface p-1 transition-colors disabled:opacity-40"
             >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
         )}
