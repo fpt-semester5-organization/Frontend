@@ -10,6 +10,7 @@ import { SIGNUP_PROMPT_AT_ITEM, useSignupPromptAtItem } from '@/hooks/useSignupP
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
+import Offcanvas from 'react-bootstrap/Offcanvas';
 import { FeedFilters } from '../components/FeedFilters';
 import { PostCard, PostFeedSkeleton } from '../components/PostCard';
 import { PostListToolbar } from '../components/PostListToolbar';
@@ -36,8 +37,9 @@ const PostFeed: React.FC = () => {
   const { isMember, requireMember } = useRequireMember();
   const promptRef = useSignupPromptAtItem<HTMLElement>();
 
-  // State thu gọn cột trái (Bộ lọc) — mặc định thu gọn khi mở trang
+  // State thu gọn cột trái (Bộ lọc) trên Desktop và Offcanvas trên Mobile
   const [leftOpen, setLeftOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // 1. Đọc toàn bộ tham số tìm kiếm & lọc từ URL
   const type = searchParams.get('type') ?? 'ALL'; // 'ALL' | 'POST' | 'RECIPE'
@@ -173,11 +175,11 @@ const PostFeed: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1240px] px-margin-mobile py-space-lg sm:px-margin">
       <div className={cn('grid gap-space-lg items-start transition-[grid-template-columns] duration-300', gridLayout)}>
-        {/* CỘT TRÁI: Bộ lọc & Điều hướng */}
+        {/* CỘT TRÁI: Bộ lọc & Điều hướng (Desktop) */}
         {leftOpen ? (
           <aside
             aria-label="Tạo nội dung và bộ lọc"
-            className="flex flex-col gap-space-md lg:sticky lg:top-24"
+            className="hidden lg:flex flex-col gap-space-md lg:sticky lg:top-24"
           >
             {/* Header thanh bên trái có nút thu gọn */}
             <div className="flex items-center justify-between px-1">
@@ -300,14 +302,36 @@ const PostFeed: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" onClick={writePost} className="shadow-xs lg:hidden">
+                <Icon name="edit_square" className="text-[18px]" />
+                <span>Viết bài</span>
+              </Button>
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(true)}
+                className="flex lg:hidden items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer"
+              >
+                <Icon name="tune" className="text-[18px]" />
+                <span>Bộ lọc</span>
+                {activeFiltersCount > 0 && (
+                  <span className="rounded-full bg-primary-container px-1.5 py-0.2 text-[10px] font-bold text-on-primary">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
               {!leftOpen && (
                 <button
                   type="button"
                   onClick={() => setLeftOpen(true)}
-                  className="flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer"
+                  className="hidden lg:flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer"
                 >
                   <Icon name="tune" className="text-[18px]" />
                   <span>Bộ lọc</span>
+                  {activeFiltersCount > 0 && (
+                    <span className="rounded-full bg-primary-container px-1.5 py-0.2 text-[10px] font-bold text-on-primary">
+                      {activeFiltersCount}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
@@ -333,20 +357,39 @@ const PostFeed: React.FC = () => {
             />
           ) : feedItems.length === 0 ? (
             keyword || activeFiltersCount > 0 ? (
-              <EmptyState
-                icon="search_off"
-                title="Không tìm thấy nội dung phù hợp"
-                description={`Không có bài viết hoặc công thức nào khớp với các bộ lọc đã chọn.`}
-                action={
-                  <Button
-                    onClick={() => {
-                      setSearchParams(new URLSearchParams());
-                    }}
-                  >
-                    Xóa tất cả bộ lọc
-                  </Button>
-                }
-              />
+              <div className="flex flex-col gap-space-md">
+                <EmptyState
+                  icon="search_off"
+                  title="Không tìm thấy nội dung phù hợp"
+                  description="Không có bài viết hoặc công thức nào khớp với các bộ lọc đã chọn."
+                  action={
+                    <Button
+                      onClick={() => {
+                        setSearchParams(new URLSearchParams());
+                      }}
+                    >
+                      Xóa tất cả bộ lọc
+                    </Button>
+                  }
+                />
+                <div className="rounded-2xl border border-surface-container bg-surface-container-lowest p-space-md text-center shadow-card">
+                  <p className="font-label-sm text-label-sm font-semibold text-on-surface-variant mb-2">
+                    Gợi ý từ khóa tìm kiếm nhanh:
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {['thực dưỡng', 'nấm hương', 'đậu hũ', 'canh chua', 'dinh dưỡng'].map((kw) => (
+                      <button
+                        key={kw}
+                        type="button"
+                        onClick={() => updateParams({ keyword: kw })}
+                        className="rounded-full bg-surface-container px-3 py-1 font-label-sm text-label-sm text-on-surface hover:bg-surface-container-high hover:text-primary transition-colors cursor-pointer"
+                      >
+                        #{kw}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : (
               <EmptyState
                 icon="forum"
@@ -399,6 +442,35 @@ const PostFeed: React.FC = () => {
           )}
         </section>
       </div>
+
+      {/* Offcanvas Drawer Bộ lọc cho màn hình di động (< lg) */}
+      <Offcanvas
+        show={mobileFiltersOpen}
+        onHide={() => setMobileFiltersOpen(false)}
+        placement="start"
+        className="lg:hidden"
+        style={{ maxWidth: '85vw', width: 340 }}
+      >
+        <Offcanvas.Header closeButton closeLabel="Đóng bộ lọc" className="border-b border-surface-container">
+          <Offcanvas.Title as="h2" className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+            <Icon name="tune" className="text-primary text-[20px]" />
+            <span>Bộ lọc cộng đồng</span>
+          </Offcanvas.Title>
+        </Offcanvas.Header>
+        <Offcanvas.Body className="flex flex-col gap-space-md p-space-md overflow-y-auto">
+          <Button size="lg" className="w-full shadow-sm mb-2" onClick={() => { setMobileFiltersOpen(false); writePost(); }}>
+            <Icon name="edit_square" className="text-[20px]" />
+            Viết bài mới
+          </Button>
+          <FeedFilters onFilterChange={() => setMobileFiltersOpen(false)} />
+          <Button
+            className="w-full mt-2"
+            onClick={() => setMobileFiltersOpen(false)}
+          >
+            Xem kết quả ({formatNumber(totalCount)})
+          </Button>
+        </Offcanvas.Body>
+      </Offcanvas>
     </div>
   );
 };

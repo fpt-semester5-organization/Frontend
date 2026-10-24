@@ -22,6 +22,7 @@ interface VoteButtonProps {
  */
 export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVote = true, className }) => {
   const [state, setState] = useState<{ voted: boolean; count: number } | null>(null);
+  const [animating, setAnimating] = useState(false);
   const { isMember, requireMember } = useRequireMember();
   const vote = useVote(target);
 
@@ -33,12 +34,14 @@ export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVo
   const disabled = isMember && !canVote;
 
   const handleClick = () =>
-    requireMember(() =>
+    requireMember(() => {
+      setAnimating(true);
+      setTimeout(() => setAnimating(false), 350);
       vote.mutate(undefined, {
         onSuccess: ({ data }) => setState({ voted: data.voted, count: data.voteCount }),
         onError: notifyApiError,
-      })
-    );
+      });
+    });
 
   return (
     <button
@@ -48,11 +51,18 @@ export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVo
       aria-pressed={voted}
       title={disabled ? `${target.resource === 'recipes' ? 'Công thức' : 'Bài viết'} này chưa thể thả tim` : undefined}
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer',
         className
       )}
     >
-      <Icon name="favorite" filled={voted} className="text-[20px] text-secondary" />
+      <Icon
+        name="favorite"
+        filled={voted}
+        className={cn(
+          'text-[20px] text-secondary transition-transform duration-200',
+          animating && 'scale-125'
+        )}
+      />
       <span>
         {voted ? 'Đã thích' : 'Yêu thích'} ({formatNumber(count)})
       </span>

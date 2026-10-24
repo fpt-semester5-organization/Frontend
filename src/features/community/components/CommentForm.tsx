@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/Button';
 import { FieldError } from '@/components/ui/forms';
+import { Icon } from '@/components/ui/Icon';
 import { applyServerFieldErrors } from '@/lib/formErrors';
 import { notifyApiError } from '@/lib/notify';
 import { cn } from '@/lib/cn';
@@ -81,9 +82,17 @@ export const CommentForm: React.FC<CommentFormProps> = ({
       />
       <FieldError>{errors.content?.message}</FieldError>
       <div id={`${fieldId}-hint`} className="flex flex-wrap items-center justify-between gap-space-sm">
-        <span className="font-label-sm text-label-sm text-on-surface-variant">
-          {length}/{COMMENT_MAX} (tối thiểu {COMMENT_MIN} ký tự)
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-label-sm text-label-sm text-on-surface-variant">
+            {length}/{COMMENT_MAX} (tối thiểu {COMMENT_MIN} ký tự)
+          </span>
+          {coolingDown && (
+            <span className="inline-flex items-center gap-1 rounded bg-secondary-fixed/50 px-2 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed-variant">
+              <Icon name="schedule" className="text-[14px]" />
+              Giãn cách spam: {cooldownSeconds}s
+            </span>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-space-xs">
           {onCancel && (
             <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
@@ -97,7 +106,14 @@ export const CommentForm: React.FC<CommentFormProps> = ({
             disabled={coolingDown}
             className="bg-primary hover:bg-primary-container"
           >
-            {coolingDown ? `Chờ ${cooldownSeconds} giây` : submitLabel}
+            {coolingDown ? (
+              <span className="inline-flex items-center gap-1">
+                <Icon name="hourglass_top" className="text-[15px] animate-spin" />
+                Chờ {cooldownSeconds}s
+              </span>
+            ) : (
+              submitLabel
+            )}
           </Button>
         </div>
       </div>

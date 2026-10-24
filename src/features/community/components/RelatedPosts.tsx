@@ -14,16 +14,18 @@ interface RelatedPostsProps {
 }
 
 const RelatedCard: React.FC<{ post: PostListItem }> = ({ post }) => {
+  const [imgError, setImgError] = React.useState(false);
   const to = PATHS.COMMUNITY.POST_DETAIL(post.postId);
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-surface-container bg-surface-container-low transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:bg-surface-container-lowest hover:shadow-card-hover">
       <Link to={to} tabIndex={-1} aria-hidden="true" className="relative aspect-[16/10] w-full overflow-hidden bg-surface-container">
-        {post.imageUrl ? (
+        {post.imageUrl && !imgError ? (
           <img
             src={post.imageUrl}
             alt=""
             loading="lazy"
+            onError={() => setImgError(true)}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (

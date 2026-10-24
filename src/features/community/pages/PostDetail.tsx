@@ -183,13 +183,21 @@ const PostDetail: React.FC = () => {
 
         <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">
           <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
-          <a
-            href="#comments"
-            className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface no-underline transition-all hover:bg-surface-container"
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('comments');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                const textarea = el.querySelector('textarea');
+                textarea?.focus();
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-space-md py-2 font-label-md text-label-md text-on-surface no-underline transition-all hover:bg-surface-container cursor-pointer"
           >
             <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
-            {formatNumber(data.commentCount)} bình luận
-          </a>
+            <span>{formatNumber(data.commentCount)} bình luận</span>
+          </button>
         </footer>
       </article>
 
