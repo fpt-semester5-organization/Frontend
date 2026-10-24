@@ -79,6 +79,12 @@ export const MainHeader: React.FC = () => {
                     <p className="font-label-md text-label-md text-on-surface">{user.fullName}</p>
                     <p className="font-body-sm text-body-sm text-on-surface-variant">{user.email}</p>
                   </div>
+                  {user.role === 'ADMIN' && (
+                    <Dropdown.Item as={Link} to={PATHS.ADMIN.ROOT} className={cn(menuItemClass, 'text-primary')}>
+                      <Icon name="admin_panel_settings" className="text-[18px]" />
+                      Trang quản trị
+                    </Dropdown.Item>
+                  )}
                   {ACCOUNT_NAV.map((item) => (
                     <Dropdown.Item key={item.to} as={Link} to={item.to} className={menuItemClass}>
                       {item.icon && <Icon name={item.icon} className="text-[18px]" />}
