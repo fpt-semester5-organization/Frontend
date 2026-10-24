@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { toApiError } from '@/lib/apiError';
 import { mergeGuestQuota } from '@/lib/guestQuota';
 import { useAuthStore } from '@/stores/auth.store';
-import { getVenue, listCategories, listNearbyVenues } from '../api/venues.api';
+import { getVenue, listCategories, listNearbyVenues, listRecipeVenues } from '../api/venues.api';
 import type { LatLng, NearbyVenuesParams } from '../types/venues.types';
 
 export const venueKeys = {
@@ -10,6 +10,7 @@ export const venueKeys = {
   nearby: (params: NearbyVenuesParams) => [...venueKeys.all, 'nearby', params] as const,
   categories: () => ['categories'] as const,
   detail: (id: number, coords?: LatLng | null) => [...venueKeys.all, 'detail', id, coords] as const,
+  recipe: (recipeId: number, coords: LatLng | null) => [...venueKeys.all, 'recipe', recipeId, coords] as const,
 };
 
 /** Không thử lại lỗi 4xx (403 hết lượt/ngoài lãnh thổ, 400, 429): mỗi lần gọi của Khách có thể bị tính lượt. */
@@ -63,3 +64,18 @@ export function useVenue(id: number, coords?: LatLng | null) {
   });
 }
 
+
+/**
+ * GET /recipes/{id}/venues — FN-MAP-03 (SCR-20). Chỉ gọi khi đã có vị trí; tọa độ không giữ trong cache sau khi rời trang
+ * (gcTime 0, BR-AUTH-002) và không thử lại lỗi 4xx vì mỗi lần gọi của Khách có thể bị trừ lượt.
+ */
+export function useRecipeVenues(recipeId: number, coords: LatLng | null) {
+  return useQuery({
+    queryKey: venueKeys.recipe(recipeId, coords),
+    queryFn: () => listRecipeVenues(recipeId, coords!),
+    enabled: Number.isInteger(recipeId) && recipeId > 0 && coords !== null,
+    staleTime: 60 * 1000,
+    gcTime: 0,
+    retry: retryServerErrorsOnce,
+  });
+}

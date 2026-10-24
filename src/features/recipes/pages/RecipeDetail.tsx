@@ -214,6 +214,11 @@ const RecipeDetail: React.FC = () => {
                     <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
                     {formatNumber(data.commentCount)} bình luận
                   </a>
+                  {/* SCR-20: gợi ý quán chay gần người dùng có món cùng loại (FN-MAP-03). */}
+                  <Link to={`${PATHS.VENUES.SUGGEST}?recipeId=${recipeId}`} className={`${ACTION} text-primary`}>
+                    <Icon name="storefront" className="text-[20px]" />
+                    Tìm quán có món này
+                  </Link>
                 </>
               )}
               {isOwner && canEditRecipe(status) && (
