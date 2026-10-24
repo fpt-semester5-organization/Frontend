@@ -5,7 +5,8 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
+import { formatServerDateTime } from '@/lib/serverDate';
 import { toApiError } from '@/lib/apiError';
 import { PATHS } from '@/routes/paths';
 import { toast } from '@/stores/ui.store';
@@ -14,11 +15,15 @@ import { useVenue } from '../hooks/useVenues';
 import { formatDistance } from '../lib/geo';
 import type { LatLng, NearbyVenue } from '../types/venues.types';
 
+/** VeganVenues.External_Source (BR-ADM-MAP-001: quán chỉ lấy từ Google Places và HappyCow). */
+const SOURCE_LABEL: Record<string, string> = { GOOGLE_PLACES: 'Google Places', HAPPYCOW: 'HappyCow' };
+
 /**
  * SCR-19 · venues/VenueDetail · `/venues/:id`
  * FN: FN-MAP-02 Xem chi tiết quán chay.
  * Tuyệt đối không fix cứng dữ liệu bịa đặt (giờ mở cửa, tiện ích giả định).
- * Dữ liệu bám sát 100% schema trả về từ Backend API.
+ * Dữ liệu bám sát 100% schema trả về từ Backend API. Màn chỉ đọc: không có nút lưu/báo cáo quán vì API chưa có
+ * (BR-ADM-MAP-001 không có chức năng cộng đồng đề xuất hay đánh giá quán).
  */
 export const VenueDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +40,6 @@ export const VenueDetailPage: React.FC = () => {
   const venueQuery = useVenue(venueId, userCoords);
   const [linkCopied, setLinkCopied] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
 
   if (!Number.isInteger(venueId) || venueId <= 0) {
     return <NotFoundPage />;
@@ -63,6 +67,7 @@ export const VenueDetailPage: React.FC = () => {
   }
 
   const distanceText = formatDistance(venue.distanceKm);
+  const sourceLabel = SOURCE_LABEL[venue.source ?? ''] ?? 'Không rõ nguồn';
   const ratingNum = Number(venue.rating);
   const hasRating = venue.rating !== undefined && venue.rating !== null && !isNaN(ratingNum) && ratingNum > 0;
 
@@ -112,16 +117,6 @@ export const VenueDetailPage: React.FC = () => {
       }
     } catch {
       toast.info('Không thể sao chép địa chỉ');
-    }
-  };
-
-  const handleToggleSave = () => {
-    const next = !isSaved;
-    setIsSaved(next);
-    if (next) {
-      toast.success('Đã lưu quán vào danh sách yêu thích');
-    } else {
-      toast.info('Đã bỏ lưu quán');
     }
   };
 
@@ -196,11 +191,11 @@ export const VenueDetailPage: React.FC = () => {
                 </span>
               )}
               <span className="text-outline">·</span>
-              <span>Nguồn: {venue.source || 'GOOGLE_PLACES'}</span>
+              <span>Nguồn: {sourceLabel}</span>
               {venue.lastSyncedAt && (
                 <>
                   <span className="text-outline">·</span>
-                  <span>Cập nhật {formatDateTime(venue.lastSyncedAt)}</span>
+                  <span>Cập nhật {formatServerDateTime(venue.lastSyncedAt)}</span>
                 </>
               )}
             </div>
@@ -218,20 +213,6 @@ export const VenueDetailPage: React.FC = () => {
             <Icon name="directions" className="text-[19px]" />
             <span>Chỉ đường</span>
           </a>
-
-          <button
-            type="button"
-            onClick={handleToggleSave}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 font-label-md text-label-md font-semibold transition-all active:scale-[0.98]',
-              isSaved
-                ? 'border-secondary/40 bg-secondary-container/50 text-on-secondary-container'
-                : 'border-surface-container-high bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
-            )}
-          >
-            <Icon name="favorite" filled={isSaved} className={cn('text-[18px]', isSaved && 'text-secondary')} />
-            <span>{isSaved ? 'Đã lưu' : 'Lưu quán'}</span>
-          </button>
 
           <button
             type="button"
@@ -328,13 +309,13 @@ export const VenueDetailPage: React.FC = () => {
 
               <div className="flex justify-between items-start gap-2 border-b border-surface-container py-2">
                 <span className="text-on-surface-variant shrink-0">Nguồn dữ liệu</span>
-                <span className="font-semibold text-on-surface">{venue.source || 'GOOGLE_PLACES'}</span>
+                <span className="font-semibold text-on-surface">{sourceLabel}</span>
               </div>
 
               {venue.lastSyncedAt && (
                 <div className="flex justify-between items-start gap-2 py-2">
                   <span className="text-on-surface-variant shrink-0">Đồng bộ gần nhất</span>
-                  <span className="text-on-surface-variant text-right">{formatDateTime(venue.lastSyncedAt)}</span>
+                  <span className="text-on-surface-variant text-right">{formatServerDateTime(venue.lastSyncedAt)}</span>
                 </div>
               )}
             </div>
@@ -357,17 +338,6 @@ export const VenueDetailPage: React.FC = () => {
             </div>
           </section>
 
-          {/* Thẻ 3: Báo cáo thông tin quán */}
-          <div className="text-center pt-1">
-            <button
-              type="button"
-              onClick={() => toast.info('Cảm ơn bạn. Chức năng báo cáo đang được ghi nhận để đối soát dữ liệu.')}
-              className="inline-flex items-center gap-1.5 font-label-sm text-label-sm text-outline transition-colors hover:text-secondary"
-            >
-              <Icon name="flag" className="text-[16px]" />
-              <span>Báo cáo thông tin quán không chính xác</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

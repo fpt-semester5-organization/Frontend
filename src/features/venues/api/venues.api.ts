@@ -28,3 +28,18 @@ export async function listCategories() {
   return res.data.data;
 }
 
+
+/**
+ * GET /recipes/{id}/venues — FN-MAP-03 Gợi ý tối đa 5 quán gần người dùng có danh mục món trùng với công thức.
+ * Khách: bán kính 5 km và trừ 1 lượt tìm quán (BR-GUEST-03); Thành viên: 10 km (BR-USR-11).
+ */
+export async function listRecipeVenues(recipeId: number, coords: LatLng, limit = 5) {
+  const res = await http.get<ApiEnvelope<NearbyVenue[]>>(`/recipes/${recipeId}/venues`, {
+    params: { lat: coords.lat, lng: coords.lng, limit },
+  });
+  return (Array.isArray(res.data.data) ? res.data.data : []).map((venue) => ({
+    ...venue,
+    thumbnailUrl: venue.thumbnailUrl ?? null,
+    distanceKm: venue.distanceKm ?? null,
+  }));
+}
