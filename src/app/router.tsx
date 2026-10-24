@@ -43,6 +43,18 @@ const PricingPage = lazy(() => import('@/features/subscription/pages/PricingPage
 const CheckoutPage = lazy(() => import('@/features/subscription/pages/CheckoutPage'));
 const PaymentResultPage = lazy(() => import('@/features/subscription/pages/PaymentResultPage'));
 const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySubscriptionPage'));
+const SuggestVenuePage = lazy(() => import('@/features/venues/pages/SuggestVenuePage'));
+
+// Khu Admin (SCR-39, 41–45); Suspense nằm trong AdminLayout.
+const AdminHome = lazy(() => import('@/features/admin/pages/AdminHome'));
+const AdminUsersPage = lazy(() => import('@/features/admin/pages/AdminUsersPage'));
+const AdminUserDetailPage = lazy(() => import('@/features/admin/pages/AdminUserDetailPage'));
+const AdminAiPage = lazy(() => import('@/features/admin/pages/AdminAiPage'));
+const AdminDietarySchoolsPage = lazy(() => import('@/features/admin/pages/AdminDietarySchoolsPage'));
+const AdminENumbersPage = lazy(() => import('@/features/admin/pages/AdminENumbersPage'));
+const AdminIngredientsPage = lazy(() => import('@/features/admin/pages/AdminIngredientsPage'));
+const AdminSubscriptionPlansPage = lazy(() => import('@/features/admin/pages/AdminSubscriptionPlansPage'));
+const AdminVenuesPage = lazy(() => import('@/features/admin/pages/AdminVenuesPage'));
 
 const router = createBrowserRouter([
   {
@@ -54,8 +66,9 @@ const router = createBrowserRouter([
         element: <MainLayout />,
         errorElement: <RouteErrorPage withLayout />,
         children: [
-          // Bản đồ quán chay (SCR-18) & Chi tiết quán chay (SCR-19)
+          // Bản đồ quán chay (SCR-18), chi tiết quán (SCR-19), gợi ý quán theo món (SCR-20)
           { path: PATHS.VENUES.ROOT, element: <VenueMap /> },
+          { path: PATHS.VENUES.SUGGEST, element: <SuggestVenuePage /> },
           { path: PATHS.VENUES.DETAIL(':id'), element: <VenueDetailPage /> },
 
           // Trang chủ (SCR-10)
@@ -153,7 +166,19 @@ const router = createBrowserRouter([
         children: [
           {
             element: <AdminLayout />,
-            children: [{ index: true, element: <div className="p-8">Admin Dashboard</div> }],
+            errorElement: <RouteErrorPage />,
+            children: [
+              { index: true, element: <AdminHome /> },
+              { path: PATHS.ADMIN.USERS, element: <AdminUsersPage /> },
+              { path: PATHS.ADMIN.USER_DETAIL(':id'), element: <AdminUserDetailPage /> },
+              { path: PATHS.ADMIN.AI, element: <AdminAiPage /> },
+              { path: PATHS.ADMIN.DIETARY_SCHOOLS, element: <AdminDietarySchoolsPage /> },
+              { path: PATHS.ADMIN.E_NUMBERS, element: <AdminENumbersPage /> },
+              { path: PATHS.ADMIN.INGREDIENTS, element: <AdminIngredientsPage /> },
+              { path: PATHS.ADMIN.SUBSCRIPTION_PLANS, element: <AdminSubscriptionPlansPage /> },
+              { path: PATHS.ADMIN.VENUES, element: <AdminVenuesPage /> },
+              { path: '*', element: <NotFoundPage /> },
+            ],
           },
         ],
       },
