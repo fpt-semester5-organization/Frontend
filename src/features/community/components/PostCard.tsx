@@ -33,6 +33,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
     const authorAvatarUrl = item?.authorAvatarUrl ?? post?.authorAvatarUrl ?? (isRecipe ? '/logo.png' : null);
     const imageUrl = item?.imageUrl ?? post?.imageUrl;
     const createdAt = item?.createdAt ?? post?.createdAt;
+    const [imgError, setImgError] = React.useState(false);
     const voteCount = item?.voteCount ?? post?.voteCount ?? 0;
     const commentCount = item?.commentCount ?? post?.commentCount ?? 0;
 
@@ -90,7 +91,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
           </div>
         </header>
 
-        {imageUrl ? (
+        {imageUrl && !imgError ? (
           <>
             <h2 className="px-4 pb-2.5">
               <Link
@@ -110,6 +111,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
                 src={imageUrl}
                 alt={title}
                 loading="lazy"
+                onError={() => setImgError(true)}
                 className="h-full w-full object-cover transition-transform duration-300 hover:scale-102"
               />
               {/* Chips công thức đè góc ảnh */}
