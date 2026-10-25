@@ -34,13 +34,36 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     <Modal show={slot !== null} onHide={onCancel} title="Đổi món" locked={submitting}>
       {slot && (
         <div className="flex flex-col gap-space-md p-space-lg">
-          <div className="flex items-center gap-space-sm rounded-lg bg-surface-container-low p-space-sm">
-            <Icon name="restaurant" className="text-[22px] text-primary" />
-            <div className="min-w-0">
+          <div className="flex items-center gap-space-sm rounded-lg bg-surface-container-low p-space-sm border border-surface-container">
+            {slot.recipe.imageUrl ? (
+              <img
+                src={slot.recipe.imageUrl}
+                alt={slot.recipe.title}
+                className="h-14 w-14 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-surface-container text-primary">
+                <Icon name="restaurant" className="text-[24px]" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
               <p className="font-label-sm text-label-sm text-on-surface-variant">
                 {MEAL_LABEL[slot.mealType]} · {DAY_LABEL[slot.dayOfWeek]}
               </p>
-              <p className="truncate font-label-lg text-label-lg text-on-surface">{slot.recipe.title}</p>
+              <p className="truncate font-label-lg text-label-lg font-bold text-on-surface">{slot.recipe.title}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-3 font-label-sm text-label-sm text-on-surface-variant">
+                <span className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+                  <Icon name="local_fire_department" className="text-[15px] text-amber-600" />
+                  {Math.round(slot.recipe.caloriesKcal)} kcal
+                </span>
+                <span className="flex items-center gap-1">
+                  <Icon name="schedule" className="text-[15px] text-outline" />
+                  {slot.recipe.cookTimeMinutes && slot.recipe.cookTimeMinutes > 0
+                    ? slot.recipe.cookTimeMinutes
+                    : (slot.mealType === 'BREAKFAST' ? 15 : 25)}{' '}
+                  phút
+                </span>
+              </div>
             </div>
           </div>
 
@@ -69,11 +92,24 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
             ))}
           </fieldset>
 
-          <p className="flex items-start gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
-            <Icon name="info" className="mt-0.5 text-[16px]" />
-            Món mới cùng trường phái, không chứa chất gây dị ứng của bạn và chênh không quá 15% calo. Còn {remaining}/
-            {limit} lần đổi.
-          </p>
+          <div className="rounded-lg bg-surface-container-low p-3 border border-surface-container text-body-sm font-body-sm text-on-surface-variant flex flex-col gap-1.5">
+            <p className="flex items-center gap-1.5 font-medium text-on-surface">
+              <Icon name="info" className="text-[16px] text-primary" />
+              Tiêu chuẩn món thay thế (FN-MEAL-03):
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-xs text-on-surface-variant">
+              <li>Cùng trường phái món chay và không chứa thành phần gây dị ứng của bạn.</li>
+              <li>
+                Lượng calo món mới chênh lệch <strong>không quá 15%</strong> so với món ban đầu ({Math.round(slot.recipe.caloriesKcal)} kcal): nằm trong khoảng{' '}
+                <strong className="text-on-surface">
+                  {Math.round(slot.recipe.caloriesKcal * 0.85)} – {Math.round(slot.recipe.caloriesKcal * 1.15)} kcal
+                </strong>.
+              </li>
+              <li>
+                Còn <strong>{remaining}/{limit}</strong> lần đổi món.
+              </li>
+            </ul>
+          </div>
 
           {error && <FormAlert tone="warning">{error}</FormAlert>}
 

@@ -3167,6 +3167,8 @@ export interface components {
                         title?: string;
                         caloriesKcal?: number;
                         imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
                     };
                 }[];
                 edits?: {
@@ -3211,6 +3213,8 @@ export interface components {
                         title?: string;
                         caloriesKcal?: number;
                         imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
                     };
                 };
                 swapsRemaining?: number;

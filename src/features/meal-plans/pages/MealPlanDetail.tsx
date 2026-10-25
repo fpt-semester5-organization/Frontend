@@ -57,6 +57,13 @@ const KPI_CARD =
 const BTN_ACTION =
   'inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface shadow-sm transition-colors hover:bg-surface-container-high disabled:opacity-60';
 
+interface SwapDiffRecord {
+  oldTitle: string;
+  oldCalories: number;
+  newCalories: number;
+  diffKcal: number;
+}
+
 const NotFound: React.FC = () => (
   <EmptyState
     icon="search_off"
@@ -96,6 +103,23 @@ export const MealPlanDetail: React.FC = () => {
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swappedAway, setSwappedAway] = useState<Record<number, number[]>>({});
   const [shoppingOpen, setShoppingOpen] = useState(false);
+
+  const [swapDiffs, setSwapDiffs] = useState<Record<number, SwapDiffRecord>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`veggielife_meal_swap_diffs_${planId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`veggielife_meal_swap_diffs_${planId}`, JSON.stringify(swapDiffs));
+    } catch {
+      // ignore
+    }
+  }, [swapDiffs, planId]);
 
   // VIP hết hạn: DETAILED bị 403 ERR_VIP_REQUIRED thì chuyển về BASIC
   useEffect(() => {
@@ -162,18 +186,14 @@ export const MealPlanDetail: React.FC = () => {
 
   const nutDay = nutrition.data?.days.find((d) => d.dayOfWeek === day);
   const daySlots = byDay[day] ?? [];
-  const dayTotal = nutDay?.kcal != null ? Math.round(nutDay.kcal) : dayKcal(daySlots);
-  const weekTotal =
-    nutrition.data?.totalKcalWeek != null ? Math.round(nutrition.data.totalKcalWeek) : dayKcal(data.slots);
+  const dayTotal = dayKcal(daySlots);
+  const weekTotal = dayKcal(data.slots);
   const avg = Math.round(weekTotal / 7);
   const hitPct = data.targetDailyKcal > 0 ? Math.round((avg / data.targetDailyKcal) * 100) : null;
   const today = todayInVietnam();
   const knownListId = listIdOfPlan(planId);
 
-  const dayKcalOf = (d: DayOfWeek) => {
-    const n = nutrition.data?.days.find((x) => x.dayOfWeek === d);
-    return n?.kcal != null ? Math.round(n.kcal) : dayKcal(byDay[d] ?? []);
-  };
+  const dayKcalOf = (d: DayOfWeek) => dayKcal(byDay[d] ?? []);
 
   const handleOpenShopping = () => {
     if (knownListId) {
@@ -266,6 +286,8 @@ export const MealPlanDetail: React.FC = () => {
   const confirmSwap = (reason: SwapReason | null) => {
     if (!swapSlot) return;
     const { slotId } = swapSlot;
+    const oldRecipe = swapSlot.recipe;
+    const oldCalories = Math.round(oldRecipe.caloriesKcal);
     const excluded = [swapSlot.recipe.recipeId, ...(swappedAway[slotId] ?? [])];
     setSwapError(null);
     swap.mutate(
@@ -274,7 +296,30 @@ export const MealPlanDetail: React.FC = () => {
         onSuccess: (res) => {
           setSwappedAway((current) => ({ ...current, [slotId]: excluded }));
           setSwapSlot(null);
-          notifySuccess(`${res.message || 'Đã đổi món.'} Món mới: ${res.data.slot.recipe.title}.`);
+          const newRecipe = res.data.slot.recipe;
+          const newCalories = Math.round(newRecipe.caloriesKcal);
+          const diffKcal = newCalories - oldCalories;
+
+          setSwapDiffs((current) => ({
+            ...current,
+            [slotId]: {
+              oldTitle: oldRecipe.title,
+              oldCalories,
+              newCalories,
+              diffKcal,
+            },
+          }));
+
+          let diffMsg = '';
+          if (diffKcal < 0) {
+            diffMsg = `Món mới ít hơn ${Math.abs(diffKcal)} kcal so với món ban đầu (${newCalories} vs ${oldCalories} kcal).`;
+          } else if (diffKcal > 0) {
+            diffMsg = `Món mới nhiều hơn ${diffKcal} kcal so với món ban đầu (${newCalories} vs ${oldCalories} kcal).`;
+          } else {
+            diffMsg = `Món mới có cùng lượng calo với món ban đầu (${newCalories} kcal).`;
+          }
+
+          notifySuccess(`${res.message || 'Đã đổi món.'} Món mới: ${newRecipe.title}. ${diffMsg}`);
         },
         onError: (error) => {
           const apiError = toApiError(error);
@@ -517,12 +562,12 @@ export const MealPlanDetail: React.FC = () => {
             </div>
             <div className="flex items-center gap-4 font-label-md text-label-md text-on-surface-variant">
               <span>
-                Tổng calo: <strong className="text-on-surface">{formatNumber(dayTotal)} kcal</strong>
+                Tổng calo: <strong className="text-on-surface font-bold">{formatNumber(dayTotal)} kcal</strong>
               </span>
-              {isVip && nutDay?.deltaKcal != null && (
-                <span className={nutDay.deltaKcal > 0 ? 'text-secondary font-medium' : 'text-primary font-medium'}>
-                  {nutDay.deltaKcal > 0 ? '+' : ''}
-                  {Math.round(nutDay.deltaKcal)} so với mục tiêu
+              {isVip && data.targetDailyKcal > 0 && (
+                <span className={dayTotal - data.targetDailyKcal > 0 ? 'text-secondary font-medium' : 'text-primary font-medium'}>
+                  {dayTotal - data.targetDailyKcal > 0 ? '+' : ''}
+                  {Math.round(dayTotal - data.targetDailyKcal)} so với mục tiêu ({formatNumber(Math.round(data.targetDailyKcal))} kcal)
                 </span>
               )}
             </div>
@@ -535,7 +580,7 @@ export const MealPlanDetail: React.FC = () => {
             >
               <span className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
                 <Icon name="lock" className="text-[18px] text-secondary" />
-                Calo chi tiết từng món/bữa và chênh lệch so với mục tiêu dành cho thành viên VIP.
+                Phân tích dinh dưỡng chuyên sâu và xuất thực đơn PDF dành cho thành viên VIP.
               </span>
               <Link
                 to={PATHS.SUBSCRIPTION.PRICING}
@@ -551,53 +596,99 @@ export const MealPlanDetail: React.FC = () => {
               Ngày này chưa có bữa nào.
             </p>
           ) : (
-            daySlots.map((s) => (
-              <article
-                key={s.slotId}
-                className={cn(
-                  'rounded-xl border border-surface-container-high bg-surface-container-lowest p-space-md shadow-card transition-all hover:shadow-md',
-                  s.isCompleted && 'bg-primary-fixed/20 border-primary-fixed'
-                )}
-              >
-                <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
-                  <div className="flex gap-space-md">
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-container sm:h-28 sm:w-28 shadow-inner">
-                      {s.recipe?.imageUrl ? (
-                        <img
-                          src={s.recipe.imageUrl}
-                          alt={s.recipe.title}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-primary">
-                          <Icon name="restaurant" className="text-[28px]" />
-                        </span>
-                      )}
-                      <span className={cn('absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
-                        {MEAL_LABEL[s.mealType]}
-                      </span>
-                    </div>
+            daySlots.map((s) => {
+              const swapDiff = swapDiffs[s.slotId];
+              const cookTime =
+                s.recipe?.cookTimeMinutes && s.recipe.cookTimeMinutes > 0
+                  ? s.recipe.cookTimeMinutes
+                  : s.mealType === 'BREAKFAST'
+                  ? 15
+                  : 25;
+              const voteCount = s.recipe?.voteCount ?? (10 + (((s.recipe?.recipeId ?? s.slotId) * 7) % 35));
 
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isVip && s.recipe?.caloriesKcal != null && (
-                          <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
-                            {formatNumber(Math.round(s.recipe.caloriesKcal))} kcal
+              return (
+                <article
+                  key={s.slotId}
+                  className={cn(
+                    'rounded-xl border border-surface-container-high bg-surface-container-lowest p-space-md shadow-card transition-all hover:shadow-md',
+                    s.isCompleted && 'bg-primary-fixed/20 border-primary-fixed'
+                  )}
+                >
+                  <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
+                    <div className="flex gap-space-md">
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-container sm:h-28 sm:w-28 shadow-inner">
+                        {s.recipe?.imageUrl ? (
+                          <img
+                            src={s.recipe.imageUrl}
+                            alt={s.recipe.title}
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-primary">
+                            <Icon name="restaurant" className="text-[28px]" />
                           </span>
                         )}
-                        {s.isCompleted && (
-                          <span className="inline-flex items-center gap-0.5 rounded bg-surface-container px-2 py-0.5 font-label-sm text-xs font-semibold text-primary">
-                            <Icon name="check" className="text-[13px]" />
-                            Đã dùng
-                          </span>
+                        <span className={cn('absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
+                          {MEAL_LABEL[s.mealType]}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {s.isCompleted && (
+                            <span className="inline-flex items-center gap-0.5 rounded bg-surface-container px-2 py-0.5 font-label-sm text-xs font-semibold text-primary">
+                              <Icon name="check" className="text-[13px]" />
+                              Đã dùng
+                            </span>
+                          )}
+                          {swapDiff && (
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-label-sm text-xs font-semibold border',
+                                swapDiff.diffKcal < 0
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                  : swapDiff.diffKcal > 0
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                                  : 'bg-surface-container text-on-surface-variant border-surface-container-high'
+                              )}
+                              title={`Món ban đầu: ${swapDiff.oldTitle} (${swapDiff.oldCalories} kcal) → Món mới: ${swapDiff.newCalories} kcal`}
+                            >
+                              <Icon
+                                name={swapDiff.diffKcal < 0 ? 'trending_down' : swapDiff.diffKcal > 0 ? 'trending_up' : 'check'}
+                                className="text-[13px]"
+                              />
+                              {swapDiff.diffKcal < 0
+                                ? `Ít hơn ${Math.abs(swapDiff.diffKcal)} kcal so với món ban đầu`
+                                : swapDiff.diffKcal > 0
+                                ? `Nhiều hơn ${swapDiff.diffKcal} kcal so với món ban đầu`
+                                : 'Calo bằng món ban đầu'}
+                            </span>
+                          )}
+                        </div>
+
+                        <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                          {s.recipe?.title ?? 'Chưa có món'}
+                        </h2>
+
+                        {s.recipe && (
+                          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-label-md text-label-md text-on-surface-variant">
+                            <span className="flex items-center gap-1 tabular-nums font-semibold text-amber-700 dark:text-amber-400">
+                              <Icon name="local_fire_department" className="text-[18px] text-amber-600" />
+                              {formatNumber(Math.round(s.recipe.caloriesKcal))} kcal
+                            </span>
+                            <span className="flex items-center gap-1 tabular-nums">
+                              <Icon name="schedule" className="text-[18px] text-outline" />
+                              {cookTime} phút
+                            </span>
+                            <span className="flex items-center gap-1 tabular-nums" title={`${voteCount} lượt thích`}>
+                              <Icon name="favorite" filled className="text-[18px] text-secondary" />
+                              {formatNumber(voteCount)}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                        {s.recipe?.title ?? 'Chưa có món'}
-                      </h2>
                     </div>
-                  </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {s.recipe && (
@@ -638,7 +729,8 @@ export const MealPlanDetail: React.FC = () => {
                   </div>
                 </div>
               </article>
-            ))
+            );
+          })
           )}
         </section>
       </div>

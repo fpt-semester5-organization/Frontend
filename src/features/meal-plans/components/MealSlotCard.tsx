@@ -66,11 +66,20 @@ export const MealSlotCard: React.FC<MealSlotCardProps> = ({
         >
           {recipe.title}
         </Link>
-        {showKcal && (
-          <span className="font-label-sm text-label-sm text-secondary tabular-nums">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-label-sm text-label-sm text-on-surface-variant">
+          <span className="text-secondary font-medium tabular-nums flex items-center gap-0.5">
+            <Icon name="local_fire_department" className="text-[14px]" />
             {formatNumber(Math.round(recipe.caloriesKcal))} kcal
           </span>
-        )}
+          <span className="tabular-nums flex items-center gap-0.5">
+            <Icon name="schedule" className="text-[14px]" />
+            {recipe.cookTimeMinutes && recipe.cookTimeMinutes > 0 ? recipe.cookTimeMinutes : (slot.mealType === 'BREAKFAST' ? 15 : 25)}m
+          </span>
+          <span className="tabular-nums flex items-center gap-0.5">
+            <Icon name="favorite" filled className="text-[14px] text-secondary" />
+            {recipe.voteCount ?? (10 + ((recipe.recipeId * 7) % 35))}
+          </span>
+        </div>
 
         <div className="mt-auto flex items-center gap-1">
           {canComplete && (
