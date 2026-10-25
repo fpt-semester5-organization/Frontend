@@ -3170,6 +3170,23 @@ export interface components {
                         cookTimeMinutes?: number;
                         voteCount?: number;
                     };
+                    swapCount?: number;
+                    previousRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    originalRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
                 }[];
                 edits?: {
                     preDeployUsed?: number;
@@ -3209,6 +3226,23 @@ export interface components {
                     mealType?: "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
                     isCompleted?: boolean;
                     recipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    swapCount?: number;
+                    previousRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    originalRecipe?: {
                         recipeId?: number;
                         title?: string;
                         caloriesKcal?: number;
