@@ -14,7 +14,7 @@ import type {
 
 // Nhãn tiếng Việt cho các giá trị enum (docs/10 mục 4). Giao diện không hiện mã thô (UI-4).
 
-export type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+export type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'ok' | 'wait' | 'warn' | 'bad';
 
 export const ACCOUNT_STATUS: Record<AccountStatus, { label: string; tone: Tone }> = {
   PENDING_ACTIVATION: { label: 'Chưa kích hoạt', tone: 'neutral' },
@@ -165,4 +165,81 @@ export const TONE_CLASS: Record<Tone, string> = {
   error: 'bg-error-container text-on-error-container',
   info: 'bg-info-container text-info',
   neutral: 'bg-surface-container text-on-surface-variant',
+  ok: 'bg-primary-fixed text-on-primary-fixed',
+  wait: 'bg-secondary-fixed text-on-secondary-fixed',
+  warn: 'bg-secondary-container/50 text-on-secondary-fixed',
+  bad: 'bg-error-container text-on-error-container',
 };
+
+// ---------- Nhãn bổ trợ Kiểm duyệt, Danh mục & Xác minh (SCR-34…38, 40) ----------
+
+export const TARGET_LABEL: Record<string, string> = {
+  POST: 'Bài viết',
+  RECIPE: 'Công thức',
+  VIDEO: 'Video',
+  COMMENT: 'Bình luận',
+};
+
+export const SOURCE_LABEL: Record<string, string> = {
+  AI_SCAN: 'AI quét',
+  USER_REPORT: 'Người dùng báo cáo',
+};
+
+export const VIOLATION_LABEL: Record<string, string> = {
+  VIO_MEAT: 'Chứa nguyên liệu động vật',
+  VIO_LABEL: 'Sai nhãn chay',
+  VIO_HATE: 'Xúc phạm / thù ghét',
+  VIO_SPAM: 'Spam / quảng cáo',
+};
+
+export const ACCOUNT_STATUS_LABEL: Record<string, { text: string; tone: Tone }> = {
+  PENDING_ACTIVATION: { text: 'Chờ kích hoạt', tone: 'wait' },
+  ACTIVE: { text: 'Hoạt động', tone: 'ok' },
+  QUARANTINED: { text: 'Hạn chế bình luận', tone: 'warn' },
+  SUSPENDED: { text: 'Tạm khóa', tone: 'warn' },
+  BANNED: { text: 'Cấm vĩnh viễn', tone: 'bad' },
+  SOFT_DELETED: { text: 'Chờ xóa (ân hạn)', tone: 'wait' },
+  ANONYMIZED_DELETED: { text: 'Đã ẩn danh', tone: 'neutral' },
+};
+
+export const ROLE_LABEL: Record<string, string> = {
+  MEMBER: 'Thành viên',
+  VIP: 'VIP',
+  ADMIN: 'Quản trị',
+};
+
+export const ACTION_LABEL: Record<string, string> = {
+  WARN: 'Cảnh cáo',
+  RESTRICT_COMMENT: 'Hạn chế bình luận',
+  SUSPEND: 'Tạm khóa',
+  BAN: 'Cấm vĩnh viễn',
+  REACTIVATE: 'Mở lại tài khoản',
+};
+
+export const VEGAN_LABEL: Record<string, { text: string; tone: Tone }> = {
+  VEGAN: { text: 'Thuần chay', tone: 'ok' },
+  DOUBTFUL: { text: 'Cần kiểm tra', tone: 'warn' },
+  NON_VEGAN: { text: 'Không chay', tone: 'bad' },
+};
+
+export const SOURCE_VENUE_LABEL: Record<string, string> = {
+  HAPPYCOW: 'HappyCow',
+  GOOGLE_PLACES: 'Google Places',
+};
+
+export const CRITERIA_HINT =
+  'Cần đủ 4 tiêu chí (BR-ADM-MAS-003): đủ định lượng và thời gian từng bước, đã qua kiểm duyệt không vi phạm, ≥ 10 lượt thả tim, không còn báo cáo chờ xử lý.';
+
+/** Đường dẫn công khai của đối tượng bị báo cáo; bình luận không có route riêng. */
+export function targetLink(type: string, id: number): string | null {
+  switch (type) {
+    case 'RECIPE':
+      return `/recipes/${id}`;
+    case 'POST':
+      return `/community/posts/${id}`;
+    case 'VIDEO':
+      return `/videos/${id}`;
+    default:
+      return null;
+  }
+}

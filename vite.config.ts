@@ -20,6 +20,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/swagger': {
+        target: 'http://localhost:5137',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
