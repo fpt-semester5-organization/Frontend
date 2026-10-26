@@ -54,6 +54,7 @@ export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes' |
   };
   videos: PostVideoAttachment[];
   recipes: PostRecipeAttachment[];
+  createdAt?: string;
 };
 
 type PostCommentRaw = DeepRequired<Schemas['ListPostCommentsResponse']['data'][number]>;

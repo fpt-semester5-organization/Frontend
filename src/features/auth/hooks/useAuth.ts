@@ -43,7 +43,13 @@ export function useAfterLogin() {
     useGuestStore.getState().reset();
     void qc.invalidateQueries(); // dữ liệu tải khi còn là Khách (memberActions…) được làm mới theo vai trò mới
     const returnUrl = readReturnUrl(loc);
-    const target = returnUrl ?? mapRedirectUrl((result as VerifyOtpResult).redirectUrl) ?? (result.user.role === 'ADMIN' ? PATHS.ADMIN.ROOT : PATHS.HOME);
+    // Tài khoản ADMIN khi đăng nhập bắt buộc chuyển thẳng vào khu vực quản trị /admin (trừ khi có returnUrl cụ thể thuộc /admin)
+    const target =
+      result.user.role === 'ADMIN'
+        ? returnUrl && returnUrl.startsWith('/admin')
+          ? returnUrl
+          : PATHS.ADMIN.ROOT
+        : returnUrl ?? mapRedirectUrl((result as VerifyOtpResult).redirectUrl) ?? PATHS.HOME;
     navigate(target, { replace: true });
   };
 }

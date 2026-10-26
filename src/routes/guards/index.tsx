@@ -49,11 +49,17 @@ export const RequireAdmin: React.FC = () => {
   return <Outlet />;
 };
 
-/** Trang đăng nhập/đăng ký: đã đăng nhập thì về returnUrl (nếu có) hoặc trang chủ. */
+/** Trang đăng nhập/đăng ký: đã đăng nhập thì về returnUrl (nếu có) hoặc trang chủ; tài khoản ADMIN bắt buộc về /admin. */
 export const GuestOnly: React.FC = () => {
-  const { isAuthenticated, sessionStatus } = useAuthStore();
+  const { user, isAuthenticated, sessionStatus } = useAuthStore();
   const location = useLocation();
   if (sessionStatus === 'restoring') return <PageLoader />;
-  if (isAuthenticated) return <Navigate to={readReturnUrl(location) ?? PATHS.HOME} replace />;
+  if (isAuthenticated) {
+    if (user?.role === 'ADMIN') {
+      const returnUrl = readReturnUrl(location);
+      return <Navigate to={returnUrl && returnUrl.startsWith('/admin') ? returnUrl : PATHS.ADMIN.ROOT} replace />;
+    }
+    return <Navigate to={readReturnUrl(location) ?? PATHS.HOME} replace />;
+  }
   return <Outlet />;
 };

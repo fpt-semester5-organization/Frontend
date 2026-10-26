@@ -1,7 +1,14 @@
+import React, { Suspense, lazy } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Logo } from '@/components/common/Logo';
 import { ServiceBanner } from '@/components/common/ServiceBanner';
 import { PATHS } from '@/routes/paths';
+
+// Bảng chọn vai trò giả lập chỉ có khi chạy dữ liệu giả (VITE_ENABLE_MOCKS=true), không vào bản build.
+const MockSessionPanel =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === 'true'
+    ? lazy(() => import('@/mocks/MockSessionPanel'))
+    : null;
 
 /** Layout cho SCR-01 … SCR-05 (đăng nhập, đăng ký, OTP, quên/đặt lại mật khẩu). */
 export function AuthLayout() {
@@ -33,6 +40,11 @@ export function AuthLayout() {
       <footer className="w-full border-t border-surface-container-high bg-transparent py-space-md text-center">
         <p className="font-body-sm text-body-sm text-on-surface-variant">© 2026 VeggieLife</p>
       </footer>
+      {MockSessionPanel && (
+        <Suspense fallback={null}>
+          <MockSessionPanel />
+        </Suspense>
+      )}
     </div>
   );
 }

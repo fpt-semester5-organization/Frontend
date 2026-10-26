@@ -144,6 +144,18 @@ export const MainHeader: React.FC = () => {
               </NavLink>
             ))}
           </nav>
+          {sessionStatus !== 'restoring' && user?.role === 'ADMIN' && (
+            <div className="mt-space-md border-t border-surface-container pt-space-md">
+              <Link
+                to={PATHS.ADMIN.ROOT}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-lg bg-surface-container-high px-space-md py-2.5 font-label-md text-label-md font-semibold text-primary no-underline hover:bg-surface-container-highest"
+              >
+                <Icon name="admin_panel_settings" className="text-[20px]" />
+                <span>Trang Quản trị viên</span>
+              </Link>
+            </div>
+          )}
           {sessionStatus !== 'restoring' && !user && (
             <div className="mt-space-md flex flex-col gap-space-sm border-t border-surface-container pt-space-md">
               <Link
