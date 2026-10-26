@@ -6,7 +6,7 @@
  * Chuẩn hóa 100% theo bản mẫu Prototype & Stich AI UI Screen Spec (4 Thẻ KPI + Thanh Tab 7 ngày + 3 Bữa ăn lớn).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -82,7 +82,9 @@ const MealPlanSlotCard: React.FC<{
   completePending: boolean;
   onToggleComplete: () => void;
   onOpenSwap: () => void;
-}> = ({ slot: s, swapInfo, isActive, editable, completePending, onToggleComplete, onOpenSwap }) => {
+  planId: number;
+  currentDay: DayOfWeek;
+}> = ({ slot: s, swapInfo, isActive, editable, completePending, onToggleComplete, onOpenSwap, planId, currentDay }) => {
   // Kết nối API chi tiết món ăn (/recipes/{id}) qua useRecipe để số kcal, số tim, thời gian nấu
   // luôn 100% giống hệt khi bấm qua xem chi tiết công thức (RecipeDetail)
   const recipeQuery = useRecipe(s.recipe?.recipeId ?? 0);
@@ -111,21 +113,21 @@ const MealPlanSlotCard: React.FC<{
       )}
     >
       <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
-        <div className="flex gap-space-md flex-1 min-w-0">
-          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-container sm:h-28 sm:w-28 shadow-inner">
+        <div className="flex gap-space-md flex-1 min-w-0 items-stretch">
+          <div className="relative w-28 shrink-0 overflow-hidden rounded-lg bg-surface-container shadow-inner self-stretch min-h-[104px] sm:w-36 sm:min-h-[120px]">
             {imageUrl ? (
               <img
                 src={imageUrl}
                 alt={title}
                 loading="lazy"
-                className="h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             ) : (
-              <span className="flex h-full w-full items-center justify-center text-primary">
+              <span className="absolute inset-0 flex h-full w-full items-center justify-center text-primary">
                 <Icon name="restaurant" className="text-[28px]" />
               </span>
             )}
-            <span className={cn('absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
+            <span className={cn('absolute left-1.5 top-1.5 z-10 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
               {MEAL_LABEL[s.mealType]}
             </span>
           </div>
@@ -173,6 +175,7 @@ const MealPlanSlotCard: React.FC<{
                   <span className="font-medium text-on-surface">Món trước khi đổi:</span>
                   <Link
                     to={PATHS.RECIPES.DETAIL(previousRecipe.recipeId)}
+                    state={{ fromPlanId: planId, fromDay: currentDay }}
                     className="font-semibold text-primary hover:underline"
                     title="Bấm để xem công thức trước khi đổi"
                   >
@@ -209,6 +212,7 @@ const MealPlanSlotCard: React.FC<{
           {s.recipe && (
             <Link
               to={PATHS.RECIPES.DETAIL(s.recipe.recipeId)}
+              state={{ fromPlanId: planId, fromDay: currentDay }}
               className="rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container-high"
             >
               Xem công thức
@@ -277,8 +281,74 @@ export const MealPlanDetail: React.FC = () => {
   const swap = useSwapMealSlot(planId);
   const complete = useCompleteMealSlot(planId);
   const exportPdf = useExportPdf(planId);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramDay = searchParams.get('day');
+  const sessionDayKey = `veggielife_meal_plan_day_${planId}`;
 
-  const [day, setDay] = useState<DayOfWeek>('MON');
+  const [day, setDayState] = useState<DayOfWeek>(() => {
+    if (paramDay && (DAYS as readonly string[]).includes(paramDay)) {
+      return paramDay as DayOfWeek;
+    }
+    try {
+      const saved = sessionStorage.getItem(sessionDayKey);
+      if (saved && (DAYS as readonly string[]).includes(saved)) {
+        return saved as DayOfWeek;
+      }
+    } catch {
+      // ignore
+    }
+    return 'MON';
+  });
+
+  const handleSelectDay = (newDay: DayOfWeek) => {
+    setDayState(newDay);
+    try {
+      sessionStorage.setItem(sessionDayKey, newDay);
+    } catch {
+      // ignore
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('day', newDay);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  // Đồng bộ khi URL search param thay đổi (ví dụ bấm Back/Forward trên trình duyệt)
+  useEffect(() => {
+    const d = searchParams.get('day');
+    if (d && (DAYS as readonly string[]).includes(d) && d !== day) {
+      setDayState(d as DayOfWeek);
+      try {
+        sessionStorage.setItem(sessionDayKey, d);
+      } catch {
+        // ignore
+      }
+    }
+  }, [searchParams]);
+
+  // Luôn đảm bảo URL có param ?day= khi load trang
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(sessionDayKey, day);
+    } catch {
+      // ignore
+    }
+    if (searchParams.get('day') !== day) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('day', day);
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [day, planId, sessionDayKey]);
+
   const [confirmActivate, setConfirmActivate] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
   const [upsell, setUpsell] = useState<{ title: string; message: string } | null>(null);
@@ -314,15 +384,24 @@ export const MealPlanDetail: React.FC = () => {
   const data = plan.data;
   const byDay = useMemo(() => (data ? slotsByDay(data.slots) : null), [data]);
 
-  // Mặc định chọn hôm nay nếu nằm trong tuần của thực đơn
+  // Mặc định chọn hôm nay nếu nằm trong tuần của thực đơn và người dùng chưa từng chọn ngày cụ thể
   useEffect(() => {
     if (!data) return;
+    const hasParamDay = Boolean(paramDay && (DAYS as readonly string[]).includes(paramDay));
+    let hasSessionDay = false;
+    try {
+      hasSessionDay = Boolean(sessionStorage.getItem(sessionDayKey));
+    } catch {
+      // ignore
+    }
+    if (hasParamDay || hasSessionDay) return;
+
     const today = todayInVietnam();
     const hit = DAYS.find((d) => {
       const dt = dateOfDay(data.startDate, d);
       return dt === today;
     });
-    if (hit) setDay(hit);
+    if (hit) handleSelectDay(hit);
   }, [data?.planId, data?.startDate]);
 
   if (!validId) return <NotFound />;
@@ -727,7 +806,7 @@ export const MealPlanDetail: React.FC = () => {
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setDay(d)}
+                  onClick={() => handleSelectDay(d)}
                   className={cn(
                     'flex flex-col items-center justify-center rounded-lg px-2 py-2.5 transition-all',
                     active
@@ -800,9 +879,11 @@ export const MealPlanDetail: React.FC = () => {
                 swapInfo={swapHistories[s.slotId]}
                 isActive={isActive}
                 editable={editable}
-                completePending={complete.isPending}
+                completePending={complete.isPending && complete.variables?.slotId === s.slotId}
                 onToggleComplete={() => toggleComplete(s)}
                 onOpenSwap={() => openSwap(s)}
+                planId={planId}
+                currentDay={day}
               />
             ))
           )}
