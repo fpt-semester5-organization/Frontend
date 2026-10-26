@@ -45,7 +45,13 @@ const PaymentResultPage = lazy(() => import('@/features/subscription/pages/Payme
 const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySubscriptionPage'));
 const SuggestVenuePage = lazy(() => import('@/features/venues/pages/SuggestVenuePage'));
 
-// Khu Admin (SCR-39, 41–45); Suspense nằm trong AdminLayout.
+// Khu Admin (SCR-34…45); Suspense nằm trong AdminLayout.
+const AdminDashboard = lazy(() => import('@/features/admin/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const AdminModerationQueue = lazy(() => import('@/features/admin/pages/AdminModerationQueuePage').then((m) => ({ default: m.AdminModerationQueuePage })));
+const AdminCommentModeration = lazy(() => import('@/features/admin/pages/CommentModerationPage').then((m) => ({ default: m.CommentModerationPage })));
+const AdminCategories = lazy(() => import('@/features/admin/pages/CategoriesPage').then((m) => ({ default: m.CategoriesPage })));
+const AdminRecipeVerification = lazy(() => import('@/features/admin/pages/RecipeVerificationPage').then((m) => ({ default: m.RecipeVerificationPage })));
+const AdminAuditLogs = lazy(() => import('@/features/admin/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
 const AdminHome = lazy(() => import('@/features/admin/pages/AdminHome'));
 const AdminUsersPage = lazy(() => import('@/features/admin/pages/AdminUsersPage'));
 const AdminUserDetailPage = lazy(() => import('@/features/admin/pages/AdminUserDetailPage'));
@@ -161,14 +167,19 @@ const router = createBrowserRouter([
         ],
       },
       {
-        path: PATHS.ADMIN.DASHBOARD,
+        path: PATHS.ADMIN.ROOT,
         element: <RequireAdmin />,
         children: [
           {
             element: <AdminLayout />,
             errorElement: <RouteErrorPage />,
             children: [
-              { index: true, element: <AdminHome /> },
+              { index: true, element: <AdminDashboard /> },
+              { path: 'home', element: <AdminHome /> },
+              { path: PATHS.ADMIN.MODERATION, element: <AdminModerationQueue /> },
+              { path: PATHS.ADMIN.COMMENT_MODERATION, element: <AdminCommentModeration /> },
+              { path: PATHS.ADMIN.RECIPE_VERIFICATION, element: <AdminRecipeVerification /> },
+              { path: PATHS.ADMIN.CATEGORIES, element: <AdminCategories /> },
               { path: PATHS.ADMIN.USERS, element: <AdminUsersPage /> },
               { path: PATHS.ADMIN.USER_DETAIL(':id'), element: <AdminUserDetailPage /> },
               { path: PATHS.ADMIN.AI, element: <AdminAiPage /> },
@@ -177,6 +188,7 @@ const router = createBrowserRouter([
               { path: PATHS.ADMIN.INGREDIENTS, element: <AdminIngredientsPage /> },
               { path: PATHS.ADMIN.SUBSCRIPTION_PLANS, element: <AdminSubscriptionPlansPage /> },
               { path: PATHS.ADMIN.VENUES, element: <AdminVenuesPage /> },
+              { path: PATHS.ADMIN.AUDIT_LOGS, element: <AdminAuditLogs /> },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

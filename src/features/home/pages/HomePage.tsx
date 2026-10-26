@@ -4,7 +4,9 @@
  * Bảng tin công thức & video, ô tìm kiếm, khối cộng đồng; Khách lướt tới mục thứ 5 thì mời đăng ký (BR-GUEST-01).
  */
 import React, { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth.store';
+import { PATHS } from '@/routes/paths';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +17,6 @@ import { useDietarySchools } from '@/features/recipes/hooks/useRecipes';
 import type { RecipeContentType, RecipeSort } from '@/features/recipes/types/recipe.types';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
-import { PATHS } from '@/routes/paths';
 import { HomeHero } from '../components/HomeHero';
 import { HomeSearchFilter } from '../components/HomeSearchFilter';
 import { TrialCards } from '../components/TrialCards';
@@ -35,6 +36,7 @@ const SORTS: { value: RecipeSort; label: string }[] = [
 ];
 
 const HomePage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
   const [search, setSearch] = useSearchParams();
   const filters = useMemo(() => parseFilters(search), [search]);
   const recipeParams = useMemo(() => toRecipeParams(filters), [filters]);
@@ -51,6 +53,10 @@ const HomePage: React.FC = () => {
   const { promptIndex, promptRef } = useBrowsePrompt(firstMeta?.signUpPromptAtItem);
   const filtered = hasActiveFilters(filters);
   const refreshing = feed.isFetching && !feed.isFetchingNextPage && !feed.isPending;
+
+  if (user?.role === 'ADMIN') {
+    return <Navigate to={PATHS.ADMIN.ROOT} replace />;
+  }
 
   return (
     <div className="flex flex-col">

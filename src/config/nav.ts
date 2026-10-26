@@ -37,6 +37,8 @@ export const ACCOUNT_NAV: NavItem[] = [
   { label: 'Đổi mật khẩu', to: PATHS.AUTH.CHANGE_PASSWORD, icon: 'lock_reset' },
 ];
 
+export { ADMIN_NAV, type AdminNavItem } from './adminNav';
+
 export const isNavActive = (item: NavItem, pathname: string): boolean => {
   if (item.end) return pathname === item.to;
   const match = (path: string) => pathname === path || pathname.startsWith(`${path}/`);

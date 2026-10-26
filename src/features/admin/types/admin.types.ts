@@ -72,6 +72,7 @@ export type ENumber = DeepRequired<Row<Schemas['ListAdminENumbersResponse']['dat
 export type ENumberFilters = Query<'listAdminENumbers'>;
 export type CreateENumberBody = Schemas['CreateAdminENumberRequest'];
 export type UpdateENumberBody = Schemas['UpdateAdminENumberRequest'];
+export type ENumberUpdateBody = UpdateENumberBody;
 
 // ---------- Nguyên liệu & dị ứng (SCR-43: FN-ADM-12) ----------
 
@@ -131,3 +132,223 @@ export type KnowledgeStatus = Omit<DeepRequired<Schemas['ListAdminKnowledgeStatu
   lastIndexedAt: string | null;
   bySource: Partial<Record<KnowledgeSource, number>>;
 };
+
+// ---------- Kiểm duyệt vi phạm & bình luận (SCR-34/35: FN-ADM-04/05/06) ----------
+
+export type ModerationTargetType = 'POST' | 'RECIPE' | 'VIDEO' | 'COMMENT';
+export type ReportSource = 'AI_SCAN' | 'USER_REPORT';
+export type ViolationType = 'VIO_MEAT' | 'VIO_LABEL' | 'VIO_HATE' | 'VIO_SPAM';
+
+export interface ModerationItem {
+  reportId: number;
+  targetType: ModerationTargetType;
+  targetId: number;
+  violationType: ViolationType;
+  reportSource: ReportSource;
+  evidenceSummary?: string;
+  status?: string;
+  createdAt: string;
+}
+
+export interface ModerationQuery {
+  reportSource?: ReportSource;
+  violationType?: ViolationType;
+  targetType?: ModerationTargetType;
+  page: number;
+  size: number;
+}
+
+export interface ModerationDecisionBody {
+  decision: 'UPHOLD' | 'DISMISS';
+  note: string;
+  applySanction?: boolean;
+}
+
+export interface ModerationDecisionResult {
+  reportId: number;
+  status: string;
+  targetStatus?: string;
+}
+
+export interface CommentDeleteResult {
+  deleted: number;
+}
+
+// ---------- Thao tác kỷ luật & người dùng bổ trợ (SCR-39 bổ sung) ----------
+
+export type UserSanctionAction = 'WARN' | 'RESTRICT_COMMENT' | 'SUSPEND' | 'BAN' | 'REACTIVATE';
+
+export interface AdminUserQuery {
+  keyword?: string;
+  accountStatus?: AccountStatus;
+  role?: 'MEMBER' | 'ADMIN';
+  dietarySchoolId?: number;
+  page: number;
+  size: number;
+}
+
+export interface UserStatusBody {
+  action: UserSanctionAction;
+  durationDays?: number;
+  reason: string;
+}
+
+export interface UserStatusResult {
+  userId: number;
+  accountStatus: AccountStatus;
+  lockedUntil?: string | null;
+  violationCount?: number;
+}
+
+export interface UserContentItem {
+  type: string;
+  id: number;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface UserContents {
+  violationSummary?: { resolved?: number; dismissed?: number };
+  items: UserContentItem[];
+}
+
+// ---------- Danh mục & Xác minh công thức (SCR-36/37: FN-ADM-07/08/09) ----------
+
+export interface Category {
+  categoryId: number;
+  categoryName: string;
+  isCore?: boolean;
+}
+
+export interface CategoryCreateBody {
+  categoryName: string;
+  description?: string;
+}
+
+export interface CategoryUpdateBody {
+  categoryName?: string;
+  isActive?: boolean;
+}
+
+export interface CategoryDeleteResult {
+  migratedRecipes?: number;
+  migratedVenues?: number;
+}
+
+export interface RecipeSummary {
+  recipeId: number;
+  type?: string;
+  title: string;
+  imageUrl?: string;
+  dietarySchool?: string;
+  cookTimeMinutes?: number;
+  caloriesKcal?: number;
+  voteCount?: number;
+  isVerified?: boolean;
+}
+
+export interface RecipeQuery {
+  keyword?: string;
+  categoryId?: number;
+  page: number;
+  size: number;
+}
+
+export interface VerifyResult {
+  recipeId: number;
+  isVerified: boolean;
+}
+
+// ---------- Bổ trợ Dữ liệu gốc & Gói VIP ----------
+
+export interface DietarySchoolUpdateBody {
+  schoolName?: string;
+  forbiddenFoodRules?: { forbiddenFoodGroups?: string[]; forbidAllium?: boolean };
+}
+
+export interface ENumberQuery {
+  veganStatus?: VeganStatus;
+  keyword?: string;
+  page: number;
+  size: number;
+}
+
+export interface ENumberCreateBody {
+  code: string;
+  name: string;
+  veganStatus: VeganStatus;
+  originSource: string;
+  categoryType?: string;
+  healthRiskNotes?: string;
+}
+
+export interface IngredientQuery {
+  keyword?: string;
+  allergenId?: number;
+  page: number;
+  size: number;
+}
+
+export interface IngredientCreateBody {
+  name: string;
+  standardUnit?: string;
+  defaultStallType: StallType;
+  foodGroup?: FoodGroup;
+  caloriesPer100g: number;
+  isAllium?: boolean;
+}
+
+export interface AllergenCreateBody {
+  allergenName: string;
+  code: string;
+  description?: string;
+}
+
+export type PlanCreateBody = CreatePlanBody;
+export type PlanUpdateBody = UpdatePlanBody;
+
+export interface VenueQuery {
+  isActive?: boolean;
+  source?: VenueSource;
+  keyword?: string;
+  page: number;
+  size: number;
+}
+
+// ---------- Nhật ký kiểm toán & Thống kê tổng quan (SCR-38/40: FN-ADM-17/18) ----------
+
+export interface AuditLog {
+  auditId: number;
+  actorUserId?: number | null;
+  actorRole?: string;
+  action: string;
+  targetTable?: string;
+  targetId?: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface AuditQuery {
+  actorUserId?: number;
+  action?: string;
+  targetTable?: string;
+  targetId?: string;
+  from?: string;
+  to?: string;
+  page: number;
+  size: number;
+}
+
+export interface AnalyticsOverview {
+  users?: { total?: number; newInPeriod?: number; byStatus?: Record<string, number> };
+  content?: { recipes?: number; posts?: number; videos?: number };
+  vip?: { active?: number; revenueVnd?: number };
+  moderationQueue?: number;
+  aiCostUsd?: number;
+}
+
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
