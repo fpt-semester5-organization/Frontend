@@ -3167,6 +3167,25 @@ export interface components {
                         title?: string;
                         caloriesKcal?: number;
                         imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    swapCount?: number;
+                    previousRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    originalRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
                     };
                 }[];
                 edits?: {
@@ -3211,6 +3230,25 @@ export interface components {
                         title?: string;
                         caloriesKcal?: number;
                         imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    swapCount?: number;
+                    previousRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
+                    };
+                    originalRecipe?: {
+                        recipeId?: number;
+                        title?: string;
+                        caloriesKcal?: number;
+                        imageUrl?: string;
+                        cookTimeMinutes?: number;
+                        voteCount?: number;
                     };
                 };
                 swapsRemaining?: number;

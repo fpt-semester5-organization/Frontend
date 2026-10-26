@@ -192,7 +192,14 @@ const shoppingLists: MockShoppingList[] = [];
 // --- DTO theo đúng response mẫu ---
 const recipeDto = (recipeId: number) => {
   const recipe = recipeById(recipeId);
-  return { recipeId, title: recipe.title, caloriesKcal: recipe.kcal, imageUrl: recipe.imageUrl };
+  return {
+    recipeId,
+    title: recipe.title,
+    caloriesKcal: recipe.kcal,
+    imageUrl: recipe.imageUrl,
+    cookTimeMinutes: recipe.mealType === 'BREAKFAST' ? 15 : 25,
+    voteCount: 12 + ((recipeId * 7) % 35),
+  };
 };
 const slotDto = (slot: MockSlot) => ({
   slotId: slot.slotId,

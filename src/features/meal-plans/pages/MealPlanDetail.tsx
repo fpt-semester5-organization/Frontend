@@ -6,7 +6,7 @@
  * Chuẩn hóa 100% theo bản mẫu Prototype & Stich AI UI Screen Spec (4 Thẻ KPI + Thanh Tab 7 ngày + 3 Bữa ăn lớn).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -24,6 +24,7 @@ import { formatNumber } from '@/lib/format';
 import { getErrorMessage, notifyApiError, notifySuccess } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
+import { useRecipe } from '@/features/recipes/hooks/useRecipes';
 import { SwapMealDialog } from '../components/SwapMealDialog';
 import { useExportPdf } from '../hooks/useExportPdf';
 import {
@@ -57,6 +58,199 @@ const KPI_CARD =
 const BTN_ACTION =
   'inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface shadow-sm transition-colors hover:bg-surface-container-high disabled:opacity-60';
 
+interface SlotSwapInfo {
+  swapCount: number;
+  previousRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl?: string;
+  };
+  originalRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl?: string;
+  };
+}
+
+const MealPlanSlotCard: React.FC<{
+  slot: MealSlot;
+  swapInfo?: SlotSwapInfo;
+  isActive: boolean;
+  editable: boolean;
+  completePending: boolean;
+  onToggleComplete: () => void;
+  onOpenSwap: () => void;
+  planId: number;
+  currentDay: DayOfWeek;
+}> = ({ slot: s, swapInfo, isActive, editable, completePending, onToggleComplete, onOpenSwap, planId, currentDay }) => {
+  // Kết nối API chi tiết món ăn (/recipes/{id}) qua useRecipe để số kcal, số tim, thời gian nấu
+  // luôn 100% giống hệt khi bấm qua xem chi tiết công thức (RecipeDetail)
+  const recipeQuery = useRecipe(s.recipe?.recipeId ?? 0);
+  const detail = recipeQuery.data;
+
+  const title = detail?.title ?? s.recipe?.title ?? 'Chưa có món';
+  const imageUrl = detail?.imageUrl ?? s.recipe?.imageUrl;
+  const caloriesKcal = detail?.caloriesKcal ?? s.recipe?.caloriesKcal ?? 0;
+  const cookTimeMinutes = detail?.cookTimeMinutes ?? s.recipe?.cookTimeMinutes ?? 0;
+  const voteCount = detail?.voteCount ?? s.recipe?.voteCount ?? 0;
+
+  // Lấy lịch sử đổi món: ưu tiên từ API backend (s.swapCount, s.previousRecipe), fallback vào swapInfo
+  const rawSlot = s as unknown as { swapCount?: number; previousRecipe?: SlotSwapInfo['previousRecipe'] };
+  const swapCount = rawSlot.swapCount || swapInfo?.swapCount || 0;
+  const previousRecipe = rawSlot.previousRecipe || swapInfo?.previousRecipe;
+
+  const diffFromPrev = previousRecipe
+    ? Math.round(caloriesKcal) - Math.round(previousRecipe.caloriesKcal)
+    : 0;
+
+  return (
+    <article
+      className={cn(
+        'rounded-xl border border-surface-container-high bg-surface-container-lowest p-space-md shadow-card transition-all hover:shadow-md',
+        s.isCompleted && 'bg-primary-fixed/20 border-primary-fixed'
+      )}
+    >
+      <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
+        <div className="flex gap-space-md flex-1 min-w-0 items-stretch">
+          <div className="relative w-28 shrink-0 overflow-hidden rounded-lg bg-surface-container shadow-inner self-stretch min-h-[104px] sm:w-36 sm:min-h-[120px]">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={title}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <span className="absolute inset-0 flex h-full w-full items-center justify-center text-primary">
+                <Icon name="restaurant" className="text-[28px]" />
+              </span>
+            )}
+            <span className={cn('absolute left-1.5 top-1.5 z-10 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
+              {MEAL_LABEL[s.mealType]}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {s.isCompleted && (
+                <span className="inline-flex items-center gap-0.5 rounded bg-surface-container px-2 py-0.5 font-label-sm text-xs font-semibold text-primary">
+                  <Icon name="check" className="text-[13px]" />
+                  Đã dùng
+                </span>
+              )}
+              {swapCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed/70 px-2.5 py-0.5 font-label-sm text-xs font-semibold text-primary border border-primary/20">
+                  <Icon name="history" className="text-[13px]" />
+                  Đã đổi {swapCount} lần
+                </span>
+              )}
+            </div>
+
+            <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+              {title}
+            </h2>
+
+            {/* Thông số sơ bộ: kcal, thời gian nấu, số tim — lấy trực tiếp từ API đồng bộ 100% với RecipeDetail */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-label-md text-label-md text-on-surface-variant">
+              <span className="flex items-center gap-1 tabular-nums font-semibold text-amber-700 dark:text-amber-400">
+                <Icon name="local_fire_department" className="text-[18px] text-amber-600" />
+                {formatNumber(Math.round(caloriesKcal))} kcal
+              </span>
+              <span className="flex items-center gap-1 tabular-nums">
+                <Icon name="schedule" className="text-[18px] text-outline" />
+                {cookTimeMinutes > 0 ? `${cookTimeMinutes} phút` : '20 phút'}
+              </span>
+              <span className="flex items-center gap-1 tabular-nums" title={`${formatNumber(voteCount)} lượt thích`}>
+                <Icon name="favorite" filled className="text-[18px] text-secondary" />
+                {formatNumber(voteCount)}
+              </span>
+            </div>
+
+            {/* Thông tin công thức trước khi đổi và so sánh calo */}
+            {swapCount > 0 && previousRecipe && (
+              <div className="mt-2 rounded-lg bg-surface-container-low p-2.5 border border-surface-container text-xs text-on-surface-variant flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium text-on-surface">Món trước khi đổi:</span>
+                  <Link
+                    to={PATHS.RECIPES.DETAIL(previousRecipe.recipeId)}
+                    state={{ fromPlanId: planId, fromDay: currentDay }}
+                    className="font-semibold text-primary hover:underline"
+                    title="Bấm để xem công thức trước khi đổi"
+                  >
+                    {previousRecipe.title}
+                  </Link>
+                  <span className="tabular-nums font-medium">({Math.round(previousRecipe.caloriesKcal)} kcal)</span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-0.5 rounded px-2 py-0.5 font-semibold text-[11px] border',
+                      diffFromPrev < 0
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                        : diffFromPrev > 0
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                        : 'bg-surface-container text-on-surface-variant border-surface-container-high'
+                    )}
+                  >
+                    <Icon
+                      name={diffFromPrev < 0 ? 'trending_down' : diffFromPrev > 0 ? 'trending_up' : 'check'}
+                      className="text-[12px]"
+                    />
+                    {diffFromPrev < 0
+                      ? `Ít hơn ${Math.abs(diffFromPrev)} kcal`
+                      : diffFromPrev > 0
+                      ? `Nhiều hơn ${diffFromPrev} kcal`
+                      : 'Calo bằng nhau'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:self-start">
+          {s.recipe && (
+            <Link
+              to={PATHS.RECIPES.DETAIL(s.recipe.recipeId)}
+              state={{ fromPlanId: planId, fromDay: currentDay }}
+              className="rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container-high"
+            >
+              Xem công thức
+            </Link>
+          )}
+          {isActive && (
+            <button
+              type="button"
+              disabled={completePending}
+              onClick={onToggleComplete}
+              aria-pressed={s.isCompleted}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg px-3.5 py-2 font-label-md text-label-md transition-colors',
+                s.isCompleted
+                  ? 'bg-primary-fixed text-on-primary-fixed font-semibold'
+                  : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+              )}
+            >
+              <Icon name={s.isCompleted ? 'check_circle' : 'radio_button_unchecked'} className="text-[16px]" />
+              {s.isCompleted ? 'Đã ăn' : 'Đánh dấu đã ăn'}
+            </button>
+          )}
+          {editable && (
+            <button
+              type="button"
+              onClick={onOpenSwap}
+              className="inline-flex items-center gap-1 rounded-lg bg-primary-container px-3.5 py-2 font-label-md text-label-md text-on-primary transition-opacity hover:opacity-90"
+            >
+              <Icon name="swap_horiz" className="text-[16px]" />
+              Đổi món
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+};
+
 const NotFound: React.FC = () => (
   <EmptyState
     icon="search_off"
@@ -87,8 +281,74 @@ export const MealPlanDetail: React.FC = () => {
   const swap = useSwapMealSlot(planId);
   const complete = useCompleteMealSlot(planId);
   const exportPdf = useExportPdf(planId);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramDay = searchParams.get('day');
+  const sessionDayKey = `veggielife_meal_plan_day_${planId}`;
 
-  const [day, setDay] = useState<DayOfWeek>('MON');
+  const [day, setDayState] = useState<DayOfWeek>(() => {
+    if (paramDay && (DAYS as readonly string[]).includes(paramDay)) {
+      return paramDay as DayOfWeek;
+    }
+    try {
+      const saved = sessionStorage.getItem(sessionDayKey);
+      if (saved && (DAYS as readonly string[]).includes(saved)) {
+        return saved as DayOfWeek;
+      }
+    } catch {
+      // ignore
+    }
+    return 'MON';
+  });
+
+  const handleSelectDay = (newDay: DayOfWeek) => {
+    setDayState(newDay);
+    try {
+      sessionStorage.setItem(sessionDayKey, newDay);
+    } catch {
+      // ignore
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('day', newDay);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  // Đồng bộ khi URL search param thay đổi (ví dụ bấm Back/Forward trên trình duyệt)
+  useEffect(() => {
+    const d = searchParams.get('day');
+    if (d && (DAYS as readonly string[]).includes(d) && d !== day) {
+      setDayState(d as DayOfWeek);
+      try {
+        sessionStorage.setItem(sessionDayKey, d);
+      } catch {
+        // ignore
+      }
+    }
+  }, [searchParams]);
+
+  // Luôn đảm bảo URL có param ?day= khi load trang
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(sessionDayKey, day);
+    } catch {
+      // ignore
+    }
+    if (searchParams.get('day') !== day) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('day', day);
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [day, planId, sessionDayKey]);
+
   const [confirmActivate, setConfirmActivate] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
   const [upsell, setUpsell] = useState<{ title: string; message: string } | null>(null);
@@ -96,6 +356,23 @@ export const MealPlanDetail: React.FC = () => {
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swappedAway, setSwappedAway] = useState<Record<number, number[]>>({});
   const [shoppingOpen, setShoppingOpen] = useState(false);
+
+  const [swapHistories, setSwapHistories] = useState<Record<number, SlotSwapInfo>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`veggielife_meal_swap_histories_${planId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`veggielife_meal_swap_histories_${planId}`, JSON.stringify(swapHistories));
+    } catch {
+      // ignore
+    }
+  }, [swapHistories, planId]);
 
   // VIP hết hạn: DETAILED bị 403 ERR_VIP_REQUIRED thì chuyển về BASIC
   useEffect(() => {
@@ -107,15 +384,24 @@ export const MealPlanDetail: React.FC = () => {
   const data = plan.data;
   const byDay = useMemo(() => (data ? slotsByDay(data.slots) : null), [data]);
 
-  // Mặc định chọn hôm nay nếu nằm trong tuần của thực đơn
+  // Mặc định chọn hôm nay nếu nằm trong tuần của thực đơn và người dùng chưa từng chọn ngày cụ thể
   useEffect(() => {
     if (!data) return;
+    const hasParamDay = Boolean(paramDay && (DAYS as readonly string[]).includes(paramDay));
+    let hasSessionDay = false;
+    try {
+      hasSessionDay = Boolean(sessionStorage.getItem(sessionDayKey));
+    } catch {
+      // ignore
+    }
+    if (hasParamDay || hasSessionDay) return;
+
     const today = todayInVietnam();
     const hit = DAYS.find((d) => {
       const dt = dateOfDay(data.startDate, d);
       return dt === today;
     });
-    if (hit) setDay(hit);
+    if (hit) handleSelectDay(hit);
   }, [data?.planId, data?.startDate]);
 
   if (!validId) return <NotFound />;
@@ -162,18 +448,14 @@ export const MealPlanDetail: React.FC = () => {
 
   const nutDay = nutrition.data?.days.find((d) => d.dayOfWeek === day);
   const daySlots = byDay[day] ?? [];
-  const dayTotal = nutDay?.kcal != null ? Math.round(nutDay.kcal) : dayKcal(daySlots);
-  const weekTotal =
-    nutrition.data?.totalKcalWeek != null ? Math.round(nutrition.data.totalKcalWeek) : dayKcal(data.slots);
+  const dayTotal = dayKcal(daySlots);
+  const weekTotal = dayKcal(data.slots);
   const avg = Math.round(weekTotal / 7);
   const hitPct = data.targetDailyKcal > 0 ? Math.round((avg / data.targetDailyKcal) * 100) : null;
   const today = todayInVietnam();
   const knownListId = listIdOfPlan(planId);
 
-  const dayKcalOf = (d: DayOfWeek) => {
-    const n = nutrition.data?.days.find((x) => x.dayOfWeek === d);
-    return n?.kcal != null ? Math.round(n.kcal) : dayKcal(byDay[d] ?? []);
-  };
+  const dayKcalOf = (d: DayOfWeek) => dayKcal(byDay[d] ?? []);
 
   const handleOpenShopping = () => {
     if (knownListId) {
@@ -266,6 +548,8 @@ export const MealPlanDetail: React.FC = () => {
   const confirmSwap = (reason: SwapReason | null) => {
     if (!swapSlot) return;
     const { slotId } = swapSlot;
+    const oldRecipe = swapSlot.recipe;
+    const oldCalories = Math.round(oldRecipe.caloriesKcal);
     const excluded = [swapSlot.recipe.recipeId, ...(swappedAway[slotId] ?? [])];
     setSwapError(null);
     swap.mutate(
@@ -274,7 +558,44 @@ export const MealPlanDetail: React.FC = () => {
         onSuccess: (res) => {
           setSwappedAway((current) => ({ ...current, [slotId]: excluded }));
           setSwapSlot(null);
-          notifySuccess(`${res.message || 'Đã đổi món.'} Món mới: ${res.data.slot.recipe.title}.`);
+          const newRecipe = res.data.slot.recipe;
+          const newCalories = Math.round(newRecipe.caloriesKcal);
+          const diffKcal = newCalories - oldCalories;
+
+          const slotFromRes = res.data.slot as unknown as { swapCount?: number; previousRecipe?: SlotSwapInfo['previousRecipe']; originalRecipe?: SlotSwapInfo['originalRecipe'] };
+          setSwapHistories((current) => {
+            const existing = current[slotId];
+            const newCount = slotFromRes?.swapCount || (existing?.swapCount ?? 0) + 1;
+            return {
+              ...current,
+              [slotId]: {
+                swapCount: newCount,
+                previousRecipe: slotFromRes?.previousRecipe ?? {
+                  recipeId: oldRecipe.recipeId,
+                  title: oldRecipe.title,
+                  caloriesKcal: oldRecipe.caloriesKcal,
+                  imageUrl: oldRecipe.imageUrl,
+                },
+                originalRecipe: slotFromRes?.originalRecipe ?? existing?.originalRecipe ?? {
+                  recipeId: oldRecipe.recipeId,
+                  title: oldRecipe.title,
+                  caloriesKcal: oldRecipe.caloriesKcal,
+                  imageUrl: oldRecipe.imageUrl,
+                },
+              },
+            };
+          });
+
+          let diffMsg = '';
+          if (diffKcal < 0) {
+            diffMsg = `Món mới ít hơn ${Math.abs(diffKcal)} kcal so với món trước khi đổi (${newCalories} vs ${oldCalories} kcal).`;
+          } else if (diffKcal > 0) {
+            diffMsg = `Món mới nhiều hơn ${diffKcal} kcal so với món trước khi đổi (${newCalories} vs ${oldCalories} kcal).`;
+          } else {
+            diffMsg = `Món mới có cùng lượng calo với món trước khi đổi (${newCalories} kcal).`;
+          }
+
+          notifySuccess(`${res.message || 'Đã đổi món.'} Món mới: ${newRecipe.title}. ${diffMsg}`);
         },
         onError: (error) => {
           const apiError = toApiError(error);
@@ -485,7 +806,7 @@ export const MealPlanDetail: React.FC = () => {
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setDay(d)}
+                  onClick={() => handleSelectDay(d)}
                   className={cn(
                     'flex flex-col items-center justify-center rounded-lg px-2 py-2.5 transition-all',
                     active
@@ -517,12 +838,12 @@ export const MealPlanDetail: React.FC = () => {
             </div>
             <div className="flex items-center gap-4 font-label-md text-label-md text-on-surface-variant">
               <span>
-                Tổng calo: <strong className="text-on-surface">{formatNumber(dayTotal)} kcal</strong>
+                Tổng calo: <strong className="text-on-surface font-bold">{formatNumber(dayTotal)} kcal</strong>
               </span>
-              {isVip && nutDay?.deltaKcal != null && (
-                <span className={nutDay.deltaKcal > 0 ? 'text-secondary font-medium' : 'text-primary font-medium'}>
-                  {nutDay.deltaKcal > 0 ? '+' : ''}
-                  {Math.round(nutDay.deltaKcal)} so với mục tiêu
+              {isVip && data.targetDailyKcal > 0 && (
+                <span className={dayTotal - data.targetDailyKcal > 0 ? 'text-secondary font-medium' : 'text-primary font-medium'}>
+                  {dayTotal - data.targetDailyKcal > 0 ? '+' : ''}
+                  {Math.round(dayTotal - data.targetDailyKcal)} so với mục tiêu ({formatNumber(Math.round(data.targetDailyKcal))} kcal)
                 </span>
               )}
             </div>
@@ -535,7 +856,7 @@ export const MealPlanDetail: React.FC = () => {
             >
               <span className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
                 <Icon name="lock" className="text-[18px] text-secondary" />
-                Calo chi tiết từng món/bữa và chênh lệch so với mục tiêu dành cho thành viên VIP.
+                Phân tích dinh dưỡng chuyên sâu và xuất thực đơn PDF dành cho thành viên VIP.
               </span>
               <Link
                 to={PATHS.SUBSCRIPTION.PRICING}
@@ -552,92 +873,18 @@ export const MealPlanDetail: React.FC = () => {
             </p>
           ) : (
             daySlots.map((s) => (
-              <article
+              <MealPlanSlotCard
                 key={s.slotId}
-                className={cn(
-                  'rounded-xl border border-surface-container-high bg-surface-container-lowest p-space-md shadow-card transition-all hover:shadow-md',
-                  s.isCompleted && 'bg-primary-fixed/20 border-primary-fixed'
-                )}
-              >
-                <div className="flex flex-col justify-between gap-space-md sm:flex-row sm:items-start">
-                  <div className="flex gap-space-md">
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-container sm:h-28 sm:w-28 shadow-inner">
-                      {s.recipe?.imageUrl ? (
-                        <img
-                          src={s.recipe.imageUrl}
-                          alt={s.recipe.title}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-primary">
-                          <Icon name="restaurant" className="text-[28px]" />
-                        </span>
-                      )}
-                      <span className={cn('absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 font-label-sm text-xs font-semibold shadow-xs', MEAL_BADGE[s.mealType])}>
-                        {MEAL_LABEL[s.mealType]}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isVip && s.recipe?.caloriesKcal != null && (
-                          <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
-                            {formatNumber(Math.round(s.recipe.caloriesKcal))} kcal
-                          </span>
-                        )}
-                        {s.isCompleted && (
-                          <span className="inline-flex items-center gap-0.5 rounded bg-surface-container px-2 py-0.5 font-label-sm text-xs font-semibold text-primary">
-                            <Icon name="check" className="text-[13px]" />
-                            Đã dùng
-                          </span>
-                        )}
-                      </div>
-                      <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                        {s.recipe?.title ?? 'Chưa có món'}
-                      </h2>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {s.recipe && (
-                      <Link
-                        to={PATHS.RECIPES.DETAIL(s.recipe.recipeId)}
-                        className="rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container-high"
-                      >
-                        Xem công thức
-                      </Link>
-                    )}
-                    {isActive && (
-                      <button
-                        type="button"
-                        disabled={complete.isPending}
-                        onClick={() => toggleComplete(s)}
-                        aria-pressed={s.isCompleted}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-lg px-3.5 py-2 font-label-md text-label-md transition-colors',
-                          s.isCompleted
-                            ? 'bg-primary-fixed text-on-primary-fixed font-semibold'
-                            : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                        )}
-                      >
-                        <Icon name={s.isCompleted ? 'check_circle' : 'radio_button_unchecked'} className="text-[16px]" />
-                        {s.isCompleted ? 'Đã ăn' : 'Đánh dấu đã ăn'}
-                      </button>
-                    )}
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={() => openSwap(s)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-primary-container px-3.5 py-2 font-label-md text-label-md text-on-primary transition-opacity hover:opacity-90"
-                      >
-                        <Icon name="swap_horiz" className="text-[16px]" />
-                        Đổi món
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </article>
+                slot={s}
+                swapInfo={swapHistories[s.slotId]}
+                isActive={isActive}
+                editable={editable}
+                completePending={complete.isPending && complete.variables?.slotId === s.slotId}
+                onToggleComplete={() => toggleComplete(s)}
+                onOpenSwap={() => openSwap(s)}
+                planId={planId}
+                currentDay={day}
+              />
             ))
           )}
         </section>
@@ -649,6 +896,8 @@ export const MealPlanDetail: React.FC = () => {
         slot={swapSlot}
         remaining={editsLeft}
         limit={edits.limit}
+        swapCount={(swapSlot as unknown as { swapCount?: number })?.swapCount || swapHistories[swapSlot?.slotId ?? 0]?.swapCount}
+        previousRecipe={(swapSlot as unknown as { previousRecipe?: SlotSwapInfo['previousRecipe'] })?.previousRecipe || swapHistories[swapSlot?.slotId ?? 0]?.previousRecipe}
         submitting={swap.isPending}
         error={swapError}
         onCancel={() => setSwapSlot(null)}

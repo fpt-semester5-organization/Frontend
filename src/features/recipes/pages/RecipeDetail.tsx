@@ -4,7 +4,7 @@
  * Chi tiết công thức hiển thị đầy đủ cho cả Khách; thả tim, bình luận, báo cáo dùng chung với Cộng đồng (FN-COMM-01..05).
  */
 import React, { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { FormAlert } from '@/components/ui/forms';
@@ -105,11 +105,17 @@ const RecipeDetail: React.FC = () => {
   const isPublic = status === 'APPROVED_ACTIVE';
   const canReport = isPublic && !isOwner && (!isMember || data.memberActions.canReport);
 
+  const location = useLocation();
   const handleBack = () => {
     if (window.history.state && window.history.state.idx > 0) {
       navigate(-1);
     } else {
-      navigate(PATHS.RECIPES.ROOT);
+      const state = location.state as { fromPlanId?: number; fromDay?: string } | null;
+      if (state?.fromPlanId && state?.fromDay) {
+        navigate(`${PATHS.MEAL_PLANS.DETAIL(state.fromPlanId)}?day=${state.fromDay}`);
+      } else {
+        navigate(PATHS.RECIPES.ROOT);
+      }
     }
   };
 
