@@ -46,6 +46,8 @@ const MOCK_SCAN_RESPONSE: FridgeScanResponse = {
         ingredientId: 12,
         name: 'Cà chua Đà Lạt',
         quantity: '4 quả (~400g)',
+        amount: 4,
+        unit: 'quả',
         freshnessStatus: 'FRESH',
         confidence: 0.96,
         box2d: [120, 150, 420, 480],
@@ -54,28 +56,34 @@ const MOCK_SCAN_RESPONSE: FridgeScanResponse = {
       {
         inventoryId: 102,
         ingredientId: 15,
-        name: 'Bắp cải thảo',
-        quantity: '1 bắp (~1kg)',
+        name: 'Bí đỏ',
+        quantity: 'nửa trái',
+        amount: 0.5,
+        unit: 'trái',
         freshnessStatus: 'FRESH',
-        confidence: 0.93,
+        confidence: 0.95,
         box2d: [150, 520, 580, 890],
-        foodGroup: 'Rau xanh',
+        foodGroup: 'Rau củ',
       },
       {
         inventoryId: 103,
         ingredientId: 28,
         name: 'Nấm đùi gà',
         quantity: '3 cây (~300g)',
+        amount: 3,
+        unit: 'cây',
         freshnessStatus: 'FRESH',
         confidence: 0.89,
         box2d: [520, 110, 830, 450],
-        foodGroup: 'Nấm & Đậu',
+        foodGroup: 'Nấm',
       },
       {
         inventoryId: 104,
         ingredientId: 34,
         name: 'Cà rốt tươi',
         quantity: '3 củ (~350g)',
+        amount: 3,
+        unit: 'củ',
         freshnessStatus: 'FRESH',
         confidence: 0.95,
         box2d: [480, 490, 780, 720],
@@ -86,6 +94,8 @@ const MOCK_SCAN_RESPONSE: FridgeScanResponse = {
         ingredientId: 41,
         name: 'Rau muống',
         quantity: '1 bó (~500g)',
+        amount: 1,
+        unit: 'bó',
         freshnessStatus: 'NON-FRESH',
         confidence: 0.84,
         box2d: [620, 700, 920, 950],
@@ -94,12 +104,28 @@ const MOCK_SCAN_RESPONSE: FridgeScanResponse = {
       {
         inventoryId: 106,
         ingredientId: 56,
-        name: 'Đậu hũ trắng',
+        name: 'Đậu hũ non',
         quantity: '2 miếng (~400g)',
+        amount: 2,
+        unit: 'miếng',
         freshnessStatus: 'FRESH',
         confidence: 0.91,
         box2d: [200, 320, 460, 580],
-        foodGroup: 'Chế phẩm đậu nành',
+        foodGroup: 'Đậu hạt',
+      },
+      {
+        inventoryId: 107,
+        ingredientId: 78,
+        name: 'Thịt heo',
+        quantity: '3 ký',
+        amount: 3,
+        unit: 'kg',
+        freshnessStatus: 'FRESH',
+        confidence: 0.92,
+        box2d: [350, 210, 620, 440],
+        foodGroup: 'Thịt đỏ',
+        isAnimalProduct: true,
+        isRedMeat: true,
       },
     ],
     warnings: [
@@ -194,6 +220,34 @@ async function mockUploadFridgeImage(
   });
 }
 
+async function getAuthToken(): Promise<string | null> {
+  let token = localStorage.getItem('vl_access_token') || localStorage.getItem('vl_guest_token');
+  if (token) {
+    try {
+      if (token.startsWith('"') && token.endsWith('"')) {
+        token = JSON.parse(token);
+      }
+    } catch {
+      // Bỏ qua lỗi parse JSON nếu token là chuỗi thuần
+    }
+    return token;
+  }
+  // Tự động khởi tạo phiên khách ẩn danh nếu chưa đăng nhập để người dùng trải nghiệm ngay
+  try {
+    const res = await fetch('/api/v1/auth/anonymous', { method: 'POST' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.accessToken) {
+        localStorage.setItem('vl_guest_token', json.data.accessToken);
+        return json.data.accessToken;
+      }
+    }
+  } catch (e) {
+    console.warn('[FridgeAPI] Không thể tự tạo phiên khách:', e);
+  }
+  return null;
+}
+
 /**
  * Gửi ảnh tủ lạnh thật tới máy chủ qua POST multipart/form-data
  * Dùng XMLHttpRequest để theo dõi chính xác tiến trình tải lên (onprogress) và hỗ trợ AbortController
@@ -204,9 +258,11 @@ async function realUploadFridgeImage(
 ): Promise<FridgeScanResponse> {
   const { onProgress, signal } = options;
 
-  // Endpoint mục tiêu theo yêu cầu (/api/fridge/scan) hoặc biến môi trường
+  // Endpoint mục tiêu chuẩn RESTful backend (/api/v1/fridge/detections)
   const endpoint =
-    import.meta.env.VITE_FRIDGE_SCAN_API_URL || '/api/fridge/scan';
+    import.meta.env.VITE_FRIDGE_SCAN_API_URL || '/api/v1/fridge/detections';
+
+  const token = await getAuthToken();
 
   return new Promise<FridgeScanResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -246,7 +302,39 @@ async function realUploadFridgeImage(
 
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const response = JSON.parse(xhr.responseText) as FridgeScanResponse;
+          const raw = JSON.parse(xhr.responseText);
+          const backendData = raw.data || raw;
+          const detectedList = backendData.detectedIngredients || backendData.detected || [];
+
+          const mappedDetected: DetectedIngredient[] = detectedList.map((item: any, idx: number) => ({
+            inventoryId: item.inventoryId ?? (idx + 1),
+            ingredientId: item.ingredientId ?? null,
+            name: item.name,
+            freshnessStatus: (item.freshness || item.freshnessStatus || 'FRESH') as FreshnessStatus,
+            confidence: item.confidence ?? 0.95,
+            box2d: item.boundingBox || item.box2d || null,
+            quantity: item.quantity ?? null,
+            amount: item.amount ?? null,
+            unit: item.unit ?? null,
+          }));
+
+          const response: FridgeScanResponse = {
+            statusCode: raw.statusCode ?? xhr.status,
+            message: raw.message ?? 'Đã nhận diện nguyên liệu thành công.',
+            data: {
+              saved: !!backendData.savedToFridge || !!backendData.saved,
+              isValidFridge: backendData.isValidFridge ?? true,
+              rejectionReason: backendData.rejectionReason ?? null,
+              detected: mappedDetected,
+              quota: backendData.quotaRemaining !== undefined ? {
+                used: 1,
+                limit: 10,
+                remaining: backendData.quotaRemaining,
+              } : (backendData.quota ?? null),
+              scanId: String(backendData.detectionId ?? backendData.scanId ?? 'scan-' + Date.now()),
+            },
+          };
+
           onProgress?.({
             percentage: 100,
             phase: 'done',
@@ -300,6 +388,9 @@ async function realUploadFridgeImage(
     };
 
     xhr.open('POST', endpoint, true);
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
     xhr.timeout = 40000; // 40 giây cho AI vision
 
     const formData = new FormData();

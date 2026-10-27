@@ -473,7 +473,7 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
                             isFresh ? 'bg-[#3d5c47]' : 'bg-[#94532f]'
                           }`}
                         >
-                          {item.name}
+                          {item.name} {item.quantity ? `· ${item.quantity}` : ''}
                         </span>
                       </div>
                     );
@@ -490,7 +490,7 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
               return (
                 <div
                   key={index}
-                  className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 flex items-center justify-between"
+                  className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
@@ -500,9 +500,18 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
                       <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
                         {item.name}
                       </p>
-                      {item.foodGroup && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{item.foodGroup}</p>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {item.quantity && (
+                          <span className="inline-flex items-center text-[11px] font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800">
+                            Định lượng: {item.quantity}
+                          </span>
+                        )}
+                        {item.foodGroup && (
+                          <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                            {item.foodGroup}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -553,34 +562,39 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
       {/* 6. MÀN HÌNH ERROR: BÁO LỖI VÀ THỬ LẠI */}
       {state === 'error' && (
         <div role="alert" className="p-6 flex flex-col items-center text-center max-w-lg mx-auto">
-          <div className="h-14 w-14 mb-3 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center">
-            <AlertCircle className="h-7 w-7" aria-hidden="true" />
+          <div className="h-16 w-16 mb-3 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shadow-xs">
+            <span className="material-symbols-outlined text-[36px]">no_photography</span>
           </div>
 
           <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Không thể phân tích ảnh tủ lạnh
+            {uploadError?.toLowerCase().includes('tủ lạnh') || uploadError?.toLowerCase().includes('nguyên liệu')
+              ? 'Ảnh không phải tủ lạnh chứa nguyên liệu'
+              : 'Không thể phân tích ảnh'}
           </h3>
 
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 bg-red-50/70 dark:bg-red-950/30 p-4 rounded-xl border border-red-200 dark:border-red-900/60 w-full">
-            {uploadError || 'Đã có lỗi xảy ra trong quá trình nhận diện ảnh.'}
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 bg-amber-50/90 dark:bg-amber-950/40 p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 w-full leading-relaxed">
+            {uploadError || 'Hình ảnh tải lên không phải là tủ lạnh có chứa nguyên liệu thực phẩm. Vui lòng chụp hoặc chọn lại ảnh khác.'}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
             <button
               type="button"
-              onClick={handleStartUpload}
+              onClick={handleStartCamera}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#2d5a38] hover:bg-[#23472c] text-white text-sm font-semibold shadow-md active:scale-95 transition-all"
             >
-              <RotateCcw className="h-4 w-4" />
-              <span>Thử lại</span>
+              <Camera className="h-4 w-4" />
+              <span>Chụp lại ảnh khác</span>
             </button>
 
             <button
               type="button"
-              onClick={handleResetToIdle}
+              onClick={() => {
+                handleResetToIdle();
+                hiddenFileInputRef.current?.click();
+              }}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              <span>Chọn ảnh khác</span>
+              <span>Chọn ảnh khác từ máy</span>
             </button>
           </div>
         </div>
