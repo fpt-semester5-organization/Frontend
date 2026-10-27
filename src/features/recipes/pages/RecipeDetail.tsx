@@ -64,6 +64,7 @@ const RecipeDetail: React.FC = () => {
   const recipeId = Number(id);
   const validId = Number.isInteger(recipeId) && recipeId > 0;
   const navigate = useNavigate();
+  const location = useLocation();
   const { isMember, requireMember } = useRequireMember();
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
   const recipe = useRecipe(recipeId);
@@ -105,7 +106,6 @@ const RecipeDetail: React.FC = () => {
   const isPublic = status === 'APPROVED_ACTIVE';
   const canReport = isPublic && !isOwner && (!isMember || data.memberActions.canReport);
 
-  const location = useLocation();
   const handleBack = () => {
     if (window.history.state && window.history.state.idx > 0) {
       navigate(-1);

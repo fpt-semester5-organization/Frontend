@@ -16,6 +16,7 @@ import { EditItemModal } from '../components/EditItemModal';
 import { EditDetectedItemModal } from '../components/EditDetectedItemModal';
 import { FreshnessBadge } from '../components/FreshnessBadge';
 import { BoundingBoxOverlay } from '../components/BoundingBoxOverlay';
+import { FridgeScanner } from '@/components/FridgeScanner';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createFridgeItem,
@@ -95,6 +96,7 @@ export const FridgePage: React.FC = () => {
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
   const [deletedInventoryIds, setDeletedInventoryIds] = useState<number[]>([]);
   const [isSavingToFridge, setIsSavingToFridge] = useState(false);
+  const [isSavedToFridge, setIsSavedToFridge] = useState(false);
   const [editingDetectedIndex, setEditingDetectedIndex] = useState<number | null>(null);
   const [memberQuota, setMemberQuota] = useState<DetectionQuota | null>(null);
   const [serverError, setServerError] = useState<{ message: string; isTooSmall: boolean } | null>(null);
@@ -124,6 +126,7 @@ export const FridgePage: React.FC = () => {
     setDetectionResult(null);
     setDetectedItems([]);
     setDeletedInventoryIds([]);
+    setIsSavedToFridge(false);
     setServerError(null);
     setImageError(null);
     setCompressionResult(null);
@@ -146,6 +149,7 @@ export const FridgePage: React.FC = () => {
     setDetectionResult(null);
     setDetectedItems([]);
     setDeletedInventoryIds([]);
+    setIsSavedToFridge(false);
     setServerError(null);
     setCompressionResult(null);
     setHoveredIndex(null);
@@ -212,6 +216,7 @@ export const FridgePage: React.FC = () => {
     detectMutation.mutate(selectedFile, {
       onSuccess: async (res) => {
         setDetectionResult(res);
+        setIsSavedToFridge(false);
         if (authed && res.quota) {
           setMemberQuota(res.quota);
         }
@@ -228,8 +233,8 @@ export const FridgePage: React.FC = () => {
           setDetectedItems(res.detected);
         }
 
-        if (res.saved) {
-          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu và lưu vào tủ lạnh thông minh!`);
+        if (authed) {
+          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu trong tủ lạnh!`);
         } else {
           toast.info(`Đã nhận diện ${res.detected.length} nguyên liệu (kết quả dùng thử không lưu).`);
         }
@@ -273,6 +278,7 @@ export const FridgePage: React.FC = () => {
       copy[idx] = updatedItem;
       return copy;
     });
+    setIsSavedToFridge(false);
     toast.success(`Đã cập nhật “${updatedItem.name}” (${updatedItem.freshnessStatus})`);
   };
 
@@ -283,6 +289,7 @@ export const FridgePage: React.FC = () => {
       setDeletedInventoryIds((prev) => [...prev, item.inventoryId!]);
     }
     setDetectedItems((prev) => prev.filter((_, i) => i !== idx));
+    setIsSavedToFridge(false);
     toast.info(`Đã loại bỏ “${item?.name || 'nguyên liệu'}” khỏi danh sách.`);
   };
 
@@ -312,10 +319,11 @@ export const FridgePage: React.FC = () => {
       let savedCount = 0;
       const operations: Promise<unknown>[] = [];
       for (const item of detectedItems) {
+        const itemDisplayName = item.quantity ? `${item.name} (${item.quantity})` : item.name;
         if (item.inventoryId) {
           operations.push(
             updateFridgeItem(item.inventoryId, {
-              customItemName: item.name,
+              customItemName: itemDisplayName,
               freshnessStatus: item.freshnessStatus,
             })
           );
@@ -324,7 +332,7 @@ export const FridgePage: React.FC = () => {
           operations.push(
             createFridgeItem({
               ingredientId: item.ingredientId,
-              customItemName: item.name,
+              customItemName: itemDisplayName,
               freshnessStatus: item.freshnessStatus,
             })
           );
@@ -339,20 +347,19 @@ export const FridgePage: React.FC = () => {
       // 3. Làm mới cache dữ liệu kho tủ lạnh
       await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
 
+      setIsSavedToFridge(true);
+
       if (savedCount === detectedItems.length && savedCount > 0) {
-        toast.success(`Đã lưu thành công cả ${savedCount} nguyên liệu vào tủ lạnh! Xem các món gợi ý ngay bên dưới.`);
+        toast.success(`Đã lưu thành công cả ${savedCount} nguyên liệu vào tủ lạnh!`);
       } else if (savedCount > 0) {
         toast.success(
-          `Đã lưu ${savedCount}/${detectedItems.length} nguyên liệu vào tủ lạnh cá nhân. Xem các món gợi ý ngay bên dưới.`
+          `Đã lưu ${savedCount}/${detectedItems.length} nguyên liệu vào tủ lạnh cá nhân.`
         );
       } else {
         toast.warning(
           'Không có nguyên liệu nào khớp với danh mục nguyên liệu thực vật để lưu trữ.'
         );
       }
-
-      // Chuyển mượt sang Tab Kho Tủ Lạnh để xem thành quả
-      setMainTab('inventory');
     } catch {
       toast.error('Có lỗi xảy ra khi lưu vào tủ lạnh cá nhân. Vui lòng thử lại.');
     } finally {
@@ -460,15 +467,11 @@ export const FridgePage: React.FC = () => {
             variant="primary"
             onClick={() => {
               setMainTab('vision');
-              if (detectionResult) {
-                handleResetImage();
-              }
-              fileInputRef.current?.click();
             }}
             className="inline-flex items-center gap-2"
           >
-            <Icon name="photo_camera" className="text-[20px]" />
-            Quét ảnh tủ lạnh
+            <Icon name="center_focus_strong" className="text-[20px]" />
+            Nhận diện tủ lạnh
           </Button>
         </div>
       </header>
@@ -527,157 +530,35 @@ export const FridgePage: React.FC = () => {
       {mainTab === 'vision' && (
         <section aria-label="Phân tích AI Vision" className="w-full">
           {!detectionResult ? (
-            /* TRẠNG THÁI CHƯA NHẬN DIỆN / ĐANG CHỌN ẢNH: AI VISION STUDIO */
-            <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm">
-              <div className="flex items-center justify-between pb-4">
-                <div className="flex items-center gap-2">
-                  <Icon name="center_focus_strong" className="text-[22px] text-primary" />
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">AI Vision Studio</h2>
-                </div>
-                <span className="font-label-sm text-label-sm text-on-surface-variant">
-                  Gemini 2.5 Flash Vision
-                </span>
-              </div>
+            /* TRẠNG THÁI CHƯA NHẬN DIỆN: SỬ DỤNG BỘ QUÉT TỦ LẠNH THÔNG MINH (CAMERA + TẢI ẢNH) */
+            <div className="w-full flex justify-center py-2">
+              <FridgeScanner
+                onSuccess={async (result, imageInfo) => {
+                  const file =
+                    imageInfo.file ??
+                    new File([imageInfo.blob], imageInfo.name, { type: imageInfo.mimeType });
+                  setSelectedFile(file);
 
-              {/* Vùng Drag & Drop / Chọn tệp */}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
+                  try {
+                    const enriched = await cropAllDetectedThumbnails(
+                      imageInfo.blob,
+                      result.data.detected as DetectedItem[],
+                    );
+                    setDetectedItems(enriched);
+                  } catch {
+                    setDetectedItems(result.data.detected as DetectedItem[]);
+                  }
+
+                  setDetectionResult(result.data);
+                  setIsSavedToFridge(false);
+                  if (result.data.quota) {
+                    setMemberQuota(result.data.quota);
+                  }
+                  toast.success(
+                    `Đã nhận diện thành công ${result.data.detected.length} nguyên liệu trong tủ lạnh!`,
+                  );
                 }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
-                  isDragging
-                    ? 'border-primary bg-primary-fixed/20'
-                    : 'border-outline-variant/60 bg-surface-container-low hover:border-outline'
-                }`}
-              >
-                {previewUrl ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="relative flex max-h-[380px] w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-highest shadow-inner">
-                      <img
-                        src={previewUrl}
-                        alt="Ảnh tủ lạnh đã chọn"
-                        className="max-h-[360px] w-auto max-w-full rounded-lg object-contain"
-                      />
-                      {isCompressing && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-xs">
-                          <span className="font-label-sm text-sm">Đang tối ưu ảnh...</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {compressionResult?.wasCompressed && (
-                      <div className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        <Icon name="check_circle" className="text-[16px] text-emerald-600" />
-                        <span>Ảnh đã được tối ưu hóa tải nhanh</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        type="button"
-                      >
-                        Chọn ảnh khác
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleAnalyze}
-                        disabled={!selectedFile || detectMutation.isPending || isCompressing}
-                        loading={detectMutation.isPending}
-                      >
-                        <Icon name="auto_awesome" className="text-[18px]" />
-                        {detectMutation.isPending ? 'AI đang nhận diện…' : 'Nhận diện nguyên liệu'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 py-8">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-fixed text-primary shadow-xs">
-                      <Icon name="add_photo_alternate" className="text-[36px]" />
-                    </div>
-                    <div>
-                      <h3 className="font-headline-sm text-lg font-semibold text-on-surface">
-                        Kéo thả ảnh tủ lạnh vào đây hoặc bấm để chọn tệp
-                      </h3>
-                      <p className="mt-1 font-body-sm text-sm text-on-surface-variant">
-                        Hỗ trợ JPG, PNG, WEBP · Tối thiểu <strong>640×480 px</strong> · Tối đa 10 MB
-                      </p>
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => fileInputRef.current?.click()}
-                      type="button"
-                      className="mt-2 inline-flex items-center gap-2"
-                    >
-                      <Icon name="photo_camera" className="text-[20px]" />
-                      Chọn ảnh tủ lạnh
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Báo lỗi ảnh nếu có */}
-              {imageError && (
-                <div
-                  role="alert"
-                  className="mt-4 flex items-start gap-3 rounded-xl border border-[#fecdca] bg-[#fdeeed] p-4 text-[#b42318]"
-                >
-                  <Icon name="warning" className="shrink-0 text-[22px] text-[#b42318]" />
-                  <div className="flex-1 font-body-sm text-body-sm">
-                    <p className="font-semibold">Ảnh không đạt yêu cầu:</p>
-                    <p className="mt-0.5">{cleanTechnicalCodes(imageError)}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Báo lỗi từ server */}
-              {serverError && (
-                <div
-                  role="alert"
-                  className={`mt-4 flex items-start gap-3 rounded-xl border p-4 font-body-sm text-body-sm ${
-                    serverError.isTooSmall
-                      ? 'border-[#f8dfbe] bg-[#fefbf6] text-[#8a4e0a]'
-                      : 'border-[#fecdca] bg-[#fdeeed] text-[#b42318]'
-                  }`}
-                >
-                  <Icon
-                    name={serverError.isTooSmall ? 'photo_size_select_small' : 'cloud_off'}
-                    className={`shrink-0 text-[22px] ${serverError.isTooSmall ? 'text-[#b76e1a]' : 'text-[#b42318]'}`}
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold">
-                      {serverError.isTooSmall ? 'Ảnh chưa đủ độ phân giải chuẩn' : 'Thông báo từ máy chủ'}
-                    </p>
-                    <p className="mt-0.5">{cleanTechnicalCodes(serverError.message)}</p>
-                    {serverError.isTooSmall && (
-                      <p className="mt-1 text-xs opacity-80">
-                        💡 Mẹo: Hãy chụp thẳng góc từ khoảng cách 0.5 – 1 mét, đảm bảo ánh sáng đủ rõ để AI phân tách được từng loại rau củ.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Hiệu ứng loading */}
-              {detectMutation.isPending && (
-                <div
-                  className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-surface-container-low p-6 text-on-surface"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
-                  <span className="font-label-md text-label-md">
-                    Gemini Vision đang phân tích hình ảnh, nhận diện rau củ và ước lượng độ tươi...
-                  </span>
-                </div>
-              )}
+              />
             </div>
           ) : (
             /* TRẠNG THÁI ĐÃ NHẬN DIỆN XONG: TRANG TRÌNH BÀY ẢNH TỦ LẠNH TO BẢN RÕ NÉT CÙNG BOUNDING BOX */
@@ -696,15 +577,15 @@ export const FridgePage: React.FC = () => {
                       AI đã phát hiện và đóng khung vị trí các loại nguyên liệu trực tiếp trên ảnh
                     </p>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 font-label-sm text-xs font-semibold ${
-                      detectionResult.saved
-                        ? 'bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]'
-                        : 'bg-[#fef6ea] text-[#935216] border border-[#f8dfbe]'
-                    }`}
-                  >
-                    {detectionResult.saved ? '✓ Đã lưu vào kho tủ lạnh' : 'Kết quả dùng thử'}
-                  </span>
+                  {isSavedToFridge ? (
+                    <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-label-sm text-xs font-semibold bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8] transition-all duration-300">
+                      ✓ Đã lưu vào kho tủ lạnh
+                    </span>
+                  ) : !authed ? (
+                    <span className="rounded-full px-3 py-1 font-label-sm text-xs font-semibold bg-[#fef6ea] text-[#935216] border border-[#f8dfbe]">
+                      Kết quả dùng thử
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -805,9 +686,17 @@ export const FridgePage: React.FC = () => {
                             )}
 
                             <div className="flex flex-col gap-1 min-w-0">
-                              <span className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
-                                {item.name}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
+                                  {item.name}
+                                </span>
+                                {item.quantity && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 shadow-2xs">
+                                    <Icon name="scale" className="text-[13px]" />
+                                    <span>{item.quantity}</span>
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <FreshnessBadge status={item.freshnessStatus} size="sm" />
                                 {(item.isAnimalProduct || item.isRedMeat) && (
@@ -885,7 +774,9 @@ export const FridgePage: React.FC = () => {
                         Lưu Trữ Tủ Lạnh Cá Nhân
                       </h4>
                       <p className="font-body-sm text-xs sm:text-sm text-on-surface-variant">
-                        {authed
+                        {isSavedToFridge
+                          ? `Đã lưu thành công ${detectedItems.length} nguyên liệu vào kho tủ lạnh của bạn.`
+                          : authed
                           ? `Đã nhận diện ${detectedItems.length} nguyên liệu. Bấm "Lưu vào tủ lạnh cá nhân" để đồng bộ lưu trữ và nhận gợi ý món ăn.`
                           : 'Đăng ký tài khoản để lưu trữ các nguyên liệu này vào tủ lạnh cá nhân và nhận gợi ý món ăn.'}
                       </p>
@@ -905,33 +796,51 @@ export const FridgePage: React.FC = () => {
                     </Button>
 
                     <Button
-                      variant="primary"
+                      variant={isSavedToFridge ? 'secondary' : 'primary'}
                       size="md"
                       onClick={handleSaveToPersonalFridge}
                       type="button"
                       loading={isSavingToFridge}
-                      className="inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold"
+                      disabled={isSavedToFridge}
+                      className={
+                        isSavedToFridge
+                          ? 'inline-flex items-center gap-2 border-[#c4dec8] bg-[#eaf3ec] text-[#2d5a38] font-semibold cursor-default'
+                          : 'inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold'
+                      }
                     >
-                      <Icon name="bookmark_added" className="text-[20px]" />
-                      <span>Lưu vào tủ lạnh cá nhân</span>
+                      <Icon name={isSavedToFridge ? 'check_circle' : 'bookmark_added'} className="text-[20px]" />
+                      <span>{isSavedToFridge ? 'Đã lưu vào tủ lạnh' : 'Lưu vào tủ lạnh cá nhân'}</span>
                     </Button>
 
-                    {hasItems && (
+                    {isSavedToFridge ? (
                       <Button
-                        variant="secondary"
+                        variant="primary"
                         size="md"
-                        onClick={() => {
-                          setMainTab('inventory');
-                          setTimeout(() => {
-                            document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
-                          }, 100);
-                        }}
+                        onClick={() => setMainTab('inventory')}
                         type="button"
-                        className="inline-flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                        className="inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold"
                       >
-                        <Icon name="soup_kitchen" className="text-[18px]" />
-                        <span>Xem gợi ý món ăn</span>
+                        <Icon name="kitchen" className="text-[18px]" />
+                        <span>Xem kho tủ lạnh</span>
                       </Button>
+                    ) : (
+                      hasItems && (
+                        <Button
+                          variant="secondary"
+                          size="md"
+                          onClick={() => {
+                            setMainTab('inventory');
+                            setTimeout(() => {
+                              document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }, 100);
+                          }}
+                          type="button"
+                          className="inline-flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                        >
+                          <Icon name="soup_kitchen" className="text-[18px]" />
+                          <span>Xem gợi ý món ăn</span>
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>
@@ -1072,11 +981,10 @@ export const FridgePage: React.FC = () => {
                     size="sm"
                     onClick={() => {
                       setMainTab('vision');
-                      fileInputRef.current?.click();
                     }}
                   >
-                    <Icon name="photo_camera" className="text-[18px]" />
-                    Quét ảnh bằng AI
+                    <Icon name="center_focus_strong" className="text-[18px]" />
+                    Nhận diện tủ lạnh
                   </Button>
                   <Button
                     variant="secondary"
@@ -1259,8 +1167,8 @@ export const FridgePage: React.FC = () => {
                     className="mt-3"
                     onClick={() => setMainTab('vision')}
                   >
-                    <Icon name="photo_camera" className="text-[16px]" />
-                    Quét ảnh nguyên liệu ngay
+                    <Icon name="center_focus_strong" className="text-[16px]" />
+                    Nhận diện tủ lạnh
                   </Button>
                 </div>
               ) : suggestionsQuery.isPending ? (

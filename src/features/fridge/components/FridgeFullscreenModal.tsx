@@ -122,6 +122,11 @@ export const FridgeFullscreenModal: React.FC<FridgeFullscreenModalProps> = ({
           <div className="pointer-events-none absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-xl border border-white/20 bg-slate-900/90 px-4 py-2 text-center shadow-xl backdrop-blur-md">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white">{activeItem.name}</span>
+              {activeItem.quantity && (
+                <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-400/30">
+                  {activeItem.quantity}
+                </span>
+              )}
               <FreshnessBadge status={activeItem.freshnessStatus} size="sm" />
               {(activeItem.isAnimalProduct || activeItem.isRedMeat) && (
                 <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-red-300">

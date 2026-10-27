@@ -62,6 +62,7 @@ export type EditItemForm = z.infer<typeof editItemSchema>;
 /** Schema sửa tay nguyên liệu do AI nhận diện. */
 export const editDetectedItemSchema = z.object({
   name: z.string().trim().min(1, 'Tên nguyên liệu không được để trống').max(100, 'Tối đa 100 ký tự'),
+  quantity: z.string().trim().max(50, 'Định lượng tối đa 50 ký tự').optional(),
   freshnessStatus: z.enum(['FRESH', 'NON-FRESH']),
 });
 export type EditDetectedItemForm = z.infer<typeof editDetectedItemSchema>;

@@ -94,6 +94,11 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
               }`}
             >
               <span>{item.name}</span>
+              {item.quantity && (
+                <span className="text-[10px] font-normal opacity-90">
+                  ({item.quantity})
+                </span>
+              )}
               {item.confidence != null && (
                 <span className="text-[10px] opacity-80">
                   {Math.round(item.confidence * 100)}%

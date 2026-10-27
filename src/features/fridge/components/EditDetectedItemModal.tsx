@@ -35,6 +35,7 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
     resolver: zodResolver(editDetectedItemSchema),
     defaultValues: {
       name: '',
+      quantity: '',
       freshnessStatus: 'FRESH',
     },
   });
@@ -43,6 +44,7 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
     if (item) {
       reset({
         name: item.name,
+        quantity: item.quantity ?? '',
         freshnessStatus: item.freshnessStatus,
       });
     }
@@ -55,6 +57,7 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
     onSave(index, {
       ...item,
       name: values.name.trim(),
+      quantity: values.quantity?.trim() || null,
       freshnessStatus: values.freshnessStatus,
     });
     onHide();
@@ -72,11 +75,29 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
             {...register('name')}
             maxLength={100}
             className={INPUT_CLASS}
-            placeholder="Ví dụ: Cà rốt, nấm đông cô..."
+            placeholder="Ví dụ: Cà rốt, nấm đông cô, bí đỏ..."
           />
           {errors.name && (
             <p role="alert" className="font-label-sm text-label-sm text-red-600">
               {errors.name.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="detected-item-quantity" className="font-label-md text-label-md text-on-surface">
+            Số lượng / Định lượng ước tính
+          </label>
+          <input
+            id="detected-item-quantity"
+            {...register('quantity')}
+            maxLength={50}
+            className={INPUT_CLASS}
+            placeholder="Ví dụ: nửa trái, 3 quả, 500g, 1 bó, 3kg..."
+          />
+          {errors.quantity && (
+            <p role="alert" className="font-label-sm text-label-sm text-red-600">
+              {errors.quantity.message}
             </p>
           )}
         </div>

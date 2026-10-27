@@ -14,6 +14,7 @@ export interface DetectedItem {
   inventoryId?: number | null;
   ingredientId?: number | null;
   name: string;
+  quantity?: string | null;
   freshnessStatus: Freshness;
   box2d?: [number, number, number, number] | null;
   thumbnailUrl?: string | null;
