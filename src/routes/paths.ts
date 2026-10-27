@@ -12,6 +12,12 @@ export const PATHS = {
     RESET_PASSWORD: '/auth/reset-password',
     CHANGE_PASSWORD: '/auth/change-password',
   },
+  TERMS: '/terms',
+  PRIVACY: '/privacy',
+  LEGAL: {
+    TERMS: '/terms',
+    PRIVACY: '/privacy',
+  },
   ME: {
     PROFILE: '/me',
     HEALTH: '/me/health',

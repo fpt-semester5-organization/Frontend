@@ -44,6 +44,8 @@ const CheckoutPage = lazy(() => import('@/features/subscription/pages/CheckoutPa
 const PaymentResultPage = lazy(() => import('@/features/subscription/pages/PaymentResultPage'));
 const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySubscriptionPage'));
 const SuggestVenuePage = lazy(() => import('@/features/venues/pages/SuggestVenuePage'));
+const TermsPage = lazy(() => import('@/features/legal/pages/TermsPage'));
+const PrivacyPage = lazy(() => import('@/features/legal/pages/PrivacyPage'));
 
 // Khu Admin (SCR-34…45); Suspense nằm trong AdminLayout.
 const AdminDashboard = lazy(() => import('@/features/admin/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
@@ -147,6 +149,12 @@ const router = createBrowserRouter([
               { path: PATHS.ME.SUBSCRIPTION, element: <MySubscriptionPage /> },
             ],
           },
+
+          // Điều khoản dịch vụ & Chính sách bảo mật
+          { path: PATHS.TERMS, element: <TermsPage /> },
+          { path: PATHS.PRIVACY, element: <PrivacyPage /> },
+          { path: '/terms-of-service', element: <Navigate to={PATHS.TERMS} replace /> },
+          { path: '/privacy-policy', element: <Navigate to={PATHS.PRIVACY} replace /> },
 
           { path: '*', element: <NotFoundPage /> },
         ],

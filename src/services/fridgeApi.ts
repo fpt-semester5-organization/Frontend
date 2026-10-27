@@ -1,4 +1,9 @@
-import type { FridgeScanResponse, UploadProgressInfo } from '@/types';
+import type {
+  FridgeScanResponse,
+  UploadProgressInfo,
+  DetectedIngredient,
+  FreshnessStatus,
+} from '@/types';
 
 export interface UploadOptions {
   onProgress?: (progress: UploadProgressInfo) => void;
