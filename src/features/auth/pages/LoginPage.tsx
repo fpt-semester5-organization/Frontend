@@ -9,6 +9,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { apiErrorCode, apiErrorData, apiErrorMessage } from '@/api/http';
+import { getBannedReason } from '@/api/session';
 import { GoogleButton } from '@/components/common/GoogleButton';
 import { Field, FormAlert, PasswordField, SubmitButton } from '@/components/ui/forms';
 import { Modal } from '@/components/ui/Modal';
@@ -32,6 +33,7 @@ export function LoginPage() {
   const [askRestore, setAskRestore] = useState(false);
   const [notVerifiedEmail, setNotVerifiedEmail] = useState<string | null>(null);
   const [accountLinkState, setAccountLinkState] = useState<{ email: string; idToken: string } | null>(null);
+  const [bannedAlert, setBannedAlert] = useState<string | null>(null);
   const form = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '', restoreAccount: false } });
   const { formError, setFormError, handle, clear } = useApiFormErrors(form.setError);
   const lockLeft = useCountdown(lockedUntil);
@@ -42,6 +44,8 @@ export function LoginPage() {
       email?: string;
       googleIdToken?: string;
       accountLinkRequired?: boolean;
+      banned?: boolean;
+      bannedMessage?: string;
     } | null;
 
     if (state?.accountLinkRequired && state.email) {
@@ -51,10 +55,35 @@ export function LoginPage() {
       }
       setTimeout(() => form.setFocus('password'), 100);
     }
-  }, [location.state, form]);
+
+    // Kiểm tra thông báo tài khoản bị cấm từ sessionStorage, router state hoặc search params (?banned=1)
+    const storedReason = getBannedReason();
+    const searchParams = new URLSearchParams(location.search);
+    const isBannedParam = searchParams.get('banned') === '1' || searchParams.get('banned') === 'true';
+    const banMsg =
+      state?.bannedMessage ||
+      storedReason ||
+      (state?.banned || isBannedParam ? 'Tài khoản của bạn đã bị cấm do vi phạm điều khoản dịch vụ.' : null);
+
+    if (banMsg) {
+      setBannedAlert(banMsg);
+      setFormError(banMsg);
+    }
+
+    const onAccountBannedEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string }>).detail;
+      const msg = detail?.message || 'Tài khoản của bạn đã bị cấm do vi phạm điều khoản dịch vụ.';
+      setBannedAlert(msg);
+      setFormError(msg);
+    };
+
+    window.addEventListener('vl:account_banned', onAccountBannedEvent);
+    return () => window.removeEventListener('vl:account_banned', onAccountBannedEvent);
+  }, [location.state, location.search, form, setFormError]);
 
   const handleAccountLinkRequired = (email: string, idToken: string) => {
     clear();
+    setBannedAlert(null);
     setNotVerifiedEmail(null);
     if (email) {
       form.setValue('email', email);
@@ -80,6 +109,14 @@ export function LoginPage() {
         {
           onError: (err) => {
             const code = apiErrorCode(err);
+            if (code === 'ERR_AUTH_ACCOUNT_BANNED') {
+              const data = apiErrorData(err);
+              const until = typeof data.suspendedUntil === 'string' ? new Date(data.suspendedUntil).toLocaleString('vi-VN') : null;
+              const banMsg = `${apiErrorMessage(err)}${until ? ` Đình chỉ đến ${until}.` : ''}`;
+              toast.error(banMsg);
+              setBannedAlert(banMsg);
+              return setFormError(banMsg);
+            }
             if (code === 'ERR_AUTH_INVALID_CREDENTIALS') {
               setFormError('Mật khẩu không chính xác. Vui lòng nhập đúng mật khẩu để liên kết Google và đăng nhập.');
               form.setFocus('password');
@@ -111,8 +148,10 @@ export function LoginPage() {
           if (code === 'ERR_AUTH_EMAIL_NOT_VERIFIED') setNotVerifiedEmail(values.email.trim());
           if (code === 'ERR_AUTH_ACCOUNT_BANNED') {
             const until = typeof data.suspendedUntil === 'string' ? new Date(data.suspendedUntil).toLocaleString('vi-VN') : null;
-            toast.warning(apiErrorMessage(err));
-            return setFormError(`${apiErrorMessage(err)}${until ? ` Đình chỉ đến ${until}.` : ''}`);
+            const banMsg = `${apiErrorMessage(err)}${until ? ` Đình chỉ đến ${until}.` : ''}`;
+            toast.error(banMsg);
+            setBannedAlert(banMsg);
+            return setFormError(banMsg);
           }
           if (code === 'ERR_AUTH_EMAIL_NOT_VERIFIED') toast.warning(apiErrorMessage(err));
           handle(err);
@@ -149,14 +188,32 @@ export function LoginPage() {
         </p>
       }
     >
-      <GoogleButton label="Tiếp tục với Google" onAccountLinkRequired={handleAccountLinkRequired} />
+      <GoogleButton
+        label="Tiếp tục với Google"
+        onAccountLinkRequired={handleAccountLinkRequired}
+        onAccountBanned={(msg) => {
+          setBannedAlert(msg);
+          setFormError(msg);
+        }}
+      />
       <div className="relative my-space-md flex items-center justify-center">
         <div className="h-px w-full bg-surface-container-highest" />
         <span className="absolute bg-surface-container-lowest px-3 font-label-sm text-label-sm text-on-surface-variant">hoặc</span>
       </div>
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-space-md">
-        {formError && <FormAlert>{formError}</FormAlert>}
+        {bannedAlert ? (
+          <FormAlert tone="error" title="Tài khoản bị cấm">
+            <div className="flex flex-col gap-1">
+              <p>{bannedAlert}</p>
+              <p className="text-label-sm font-normal opacity-90">
+                Nếu bạn cho rằng đây là sự nhầm lẫn, vui lòng liên hệ bộ phận hỗ trợ khách hàng để được giải quyết.
+              </p>
+            </div>
+          </FormAlert>
+        ) : formError ? (
+          <FormAlert>{formError}</FormAlert>
+        ) : null}
         {notVerifiedEmail && (
           <FormAlert kind="info">
             Tài khoản chưa được kích hoạt.{' '}

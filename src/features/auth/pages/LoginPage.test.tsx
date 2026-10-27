@@ -47,4 +47,43 @@ describe('LoginPage (SCR-01)', () => {
     expect(calls.map((c) => (c.body as { restoreAccount: boolean }).restoreAccount)).toEqual([false, true]);
     expect(useAuthStore.getState().guestToken).toBeNull(); // phiên Khách đã hợp nhất vào tài khoản
   });
+
+  it('403 ERR_AUTH_ACCOUNT_BANNED hiển thị thông báo tài khoản bị cấm', async () => {
+    mockApi(() => ({
+      status: 403,
+      errorCode: 'ERR_AUTH_ACCOUNT_BANNED',
+      message: 'Tài khoản của bạn đã bị cấm do vi phạm điều khoản dịch vụ.',
+    }));
+    renderPage(<LoginPage />);
+    await userEvent.type(screen.getByLabelText(/Email/), 'banned@veggielife.vn');
+    await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'Veggie@2026');
+    await userEvent.click(screen.getByRole('button', { name: /^Đăng nhập/ }));
+
+    expect(await screen.findByText('Tài khoản bị cấm')).toBeInTheDocument();
+    expect(screen.getByText(/Tài khoản của bạn đã bị cấm/)).toBeInTheDocument();
+  });
+
+  it('tự động hiển thị cảnh báo tài khoản bị cấm nếu có lý do trong sessionStorage', async () => {
+    window.sessionStorage.setItem('vl_banned_reason', 'Tài khoản đã bị đình chỉ do vi phạm quy tắc cộng đồng.');
+    renderPage(<LoginPage />);
+
+    expect(await screen.findByText('Tài khoản bị cấm')).toBeInTheDocument();
+    expect(screen.getByText('Tài khoản đã bị đình chỉ do vi phạm quy tắc cộng đồng.')).toBeInTheDocument();
+    // Đã đọc và xóa khỏi sessionStorage
+    expect(window.sessionStorage.getItem('vl_banned_reason')).toBeNull();
+  });
+
+  it('lập tức cập nhật hiển thị tài khoản bị cấm khi nhận sự kiện vl:account_banned', async () => {
+    renderPage(<LoginPage />);
+    expect(screen.queryByText('Tài khoản bị cấm')).not.toBeInTheDocument();
+
+    window.dispatchEvent(
+      new CustomEvent('vl:account_banned', {
+        detail: { message: 'Tài khoản bị cấm bởi Quản trị viên.' },
+      })
+    );
+
+    expect(await screen.findByText('Tài khoản bị cấm')).toBeInTheDocument();
+    expect(screen.getByText('Tài khoản bị cấm bởi Quản trị viên.')).toBeInTheDocument();
+  });
 });

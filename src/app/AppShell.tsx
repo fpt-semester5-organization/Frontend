@@ -3,6 +3,7 @@ import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { AppToaster } from '@/components/common/AppToaster';
 import { PageLoader } from '@/components/common/PageLoader';
 import { SignupPromptModal } from '@/components/common/SignupPromptModal';
+import { useSessionBanMonitor } from '@/features/auth/hooks/useSessionBanMonitor';
 import { useSessionRestore } from '@/features/auth/hooks/useSessionRestore';
 import { TranscriptWatcher } from '@/features/videos/components/TranscriptWatcher';
 import { useAuthStore } from '@/stores/auth.store';
@@ -13,6 +14,7 @@ import { useAuthStore } from '@/stores/auth.store';
  */
 export const AppShell: React.FC = () => {
   useSessionRestore();
+  useSessionBanMonitor();
   // Chờ khôi phục phiên xong mới render trang: nếu không, request đầu tiên đi như Khách
   // (thiếu token, memberActions = false) và giao diện hiện sai quyền của Thành viên.
   const restoring = useAuthStore((state) => state.sessionStatus === 'restoring');

@@ -9,7 +9,7 @@ import { PATHS } from '@/routes/paths';
 import { CommandPalette } from '@/components/common/CommandPalette';
 import { toast } from '@/stores/ui.store';
 import { apiErrorCode, apiErrorMessage, apiErrorStatus, http } from '@/api/http';
-import { endSession } from '@/api/session';
+import { endSession, handleAccountBanned } from '@/api/session';
 import { logout as logoutSession } from '@/features/auth/api/auth.api';
 import { useAiMetrics } from '@/features/admin/hooks/useSystem';
 import { useModerationQueue } from '@/features/admin/hooks/useModeration';
@@ -124,9 +124,7 @@ export function AdminLayout() {
       const code = apiErrorCode(error);
       if (status === 403 && code === 'ERR_ADM_FORBIDDEN') toast.warning(apiErrorMessage(error));
       if (status === 403 && code === 'ERR_AUTH_ACCOUNT_BANNED') {
-        endSession();
-        toast.warning(apiErrorMessage(error));
-        navigate(PATHS.AUTH.LOGIN, { replace: true });
+        handleAccountBanned(apiErrorMessage(error));
       }
       return Promise.reject(error);
     });

@@ -5,7 +5,7 @@ import { cleanUserMessage } from '@/lib/userMessage';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
-import { bootstrapGuestSession, endSession, refreshAccessToken } from './session';
+import { bootstrapGuestSession, endSession, handleAccountBanned, refreshAccessToken } from './session';
 import type { ApiEnvelope, ApiErrorBody, Paged } from './types';
 
 export { refreshAccessToken };
@@ -76,7 +76,16 @@ http.interceptors.response.use(
         try {
           token = await refreshAccessToken();
         } catch (refreshError) {
-          const refreshStatus = (refreshError as AxiosError).response?.status;
+          const refreshErr = refreshError as AxiosError<ApiErrorBody>;
+          const refreshStatus = refreshErr.response?.status;
+          const refreshCode = refreshErr.response?.data?.errorCode;
+          const refreshMessage = refreshErr.response?.data?.message;
+
+          if (refreshCode === 'ERR_AUTH_ACCOUNT_BANNED' || (refreshStatus === 403 && /banned|đình chỉ|cấm/i.test(refreshMessage || ''))) {
+            handleAccountBanned(refreshMessage);
+            return Promise.reject(refreshError);
+          }
+
           if (refreshStatus === 401 || refreshStatus === 403) expireSession(); // refresh token hỏng/hết hạn/bị thu hồi
           return Promise.reject(error); // lỗi mạng/5xx khi refresh: giữ phiên, báo lỗi gốc
         }
@@ -94,7 +103,10 @@ http.interceptors.response.use(
     }
 
     // ---- Các mã khác ----
-    if (status === 403 && /^ERR_GUEST_/.test(code) && code !== 'ERR_GUEST_REGION_UNSUPPORTED') {
+    if (status === 403 && (code === 'ERR_AUTH_ACCOUNT_BANNED' || /banned|đình chỉ|cấm/i.test(body?.message || ''))) {
+      handleAccountBanned(body?.message);
+      return Promise.reject(error);
+    } else if (status === 403 && /^ERR_GUEST_/.test(code) && code !== 'ERR_GUEST_REGION_UNSUPPORTED') {
       ui.openSignupPrompt(code === 'ERR_GUEST_PERSONALIZATION_RESTRICTED' ? 'personalization' : 'guest');
     } else if (status === 403 && /^ERR_QUOTA_/.test(code)) {
       if (auth.user) toast.warning(cleanUserMessage(body?.message) || cleanUserMessage(errorMessage(code))); // Thành viên Free: trang tự hiện gợi ý nâng cấp VIP
