@@ -341,7 +341,14 @@ export interface AuditQuery {
 
 export interface AnalyticsOverview {
   users?: { total?: number; newInPeriod?: number; byStatus?: Record<string, number> };
-  content?: { recipes?: number; posts?: number; videos?: number };
+  content?: {
+    recipes?: number;
+    recipesNewInPeriod?: number;
+    posts?: number;
+    postsNewInPeriod?: number;
+    videos?: number;
+    videosNewInPeriod?: number;
+  };
   vip?: { active?: number; revenueVnd?: number };
   moderationQueue?: number;
   aiCostUsd?: number;

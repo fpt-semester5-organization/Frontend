@@ -265,8 +265,11 @@ export const adminHandlers = [
         },
         content: {
           recipes: 1850,
+          recipesNewInPeriod: 45,
           posts: 3420,
+          postsNewInPeriod: 120,
           videos: 620,
+          videosNewInPeriod: 15,
         },
         vip: {
           active: 890,
