@@ -59,6 +59,8 @@ export interface DetectedIngredient {
   ingredientId?: number | null;
   name: string;
   quantity?: string | null;
+  amount?: number | null;
+  unit?: string | null;
   freshnessStatus: FreshnessStatus;
   confidence?: number; // 0.0 - 1.0
   box2d?: [number, number, number, number] | null; // [ymin, xmin, ymax, xmax] tỷ lệ 0-1000
@@ -80,6 +82,8 @@ export interface FridgeScanResponse {
   message: string;
   data: {
     saved: boolean;
+    isValidFridge?: boolean;
+    rejectionReason?: string | null;
     detected: DetectedIngredient[];
     warnings?: string[];
     quota?: DetectionQuota | null;

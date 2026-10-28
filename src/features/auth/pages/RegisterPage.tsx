@@ -80,7 +80,24 @@ export function RegisterPage() {
           <label className="mt-1 flex cursor-pointer select-none items-start gap-2.5 font-body-sm text-body-sm leading-tight text-on-surface-variant">
             <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-primary-container" {...form.register('agreeTerms')} />
             <span>
-              Tôi đồng ý với <span className="font-semibold text-on-surface">Điều khoản</span> và <span className="font-semibold text-on-surface">Chính sách bảo mật</span>
+              Tôi đồng ý với{' '}
+              <Link
+                to={PATHS.TERMS}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
+                title="Điều khoản sử dụng"
+              >
+                Điều khoản
+              </Link>{' '}
+              và{' '}
+              <Link
+                to={PATHS.PRIVACY}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
+                title="Chính sách bảo mật"
+              >
+                Chính sách bảo mật
+              </Link>
             </span>
           </label>
           {form.formState.errors.agreeTerms && <p role="alert" className="font-label-sm text-label-sm text-error">{form.formState.errors.agreeTerms.message}</p>}
