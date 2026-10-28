@@ -167,10 +167,10 @@ export const MealPlanGenerate: React.FC = () => {
   const generating = createPlan.isPending;
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-[1440px] bg-surface-container-lowest pt-[72px]">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-[1440px] bg-background">
       <div className="flex w-full flex-col">
         {/* Top Header */}
-        <section className="w-full px-margin-mobile pb-space-lg pt-space-md sm:px-margin">
+        <section className="w-full px-margin-mobile pb-space-lg pt-6 sm:px-margin sm:pt-8">
           <div className="flex items-center justify-between pb-space-sm">
             <Link
               to={PATHS.MEAL_PLANS.ROOT}

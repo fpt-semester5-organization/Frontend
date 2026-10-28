@@ -44,7 +44,7 @@ export function CheckoutPage() {
   });
 
   return (
-    <main className="min-h-screen w-full bg-background pt-[72px]">
+    <main className="min-h-screen w-full bg-background">
       <div className="mx-auto w-full max-w-[1000px] px-margin-sm py-space-xl lg:px-margin">
         {plans.isLoading ? (
           <PageSkeleton />

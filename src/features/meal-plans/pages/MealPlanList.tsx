@@ -112,8 +112,8 @@ export const MealPlanList: React.FC = () => {
   };
 
   return (
-    <main className="min-h-[calc(100vh-140px)] w-full bg-surface-container-lowest pt-[72px]">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin">
+    <main className="min-h-[calc(100vh-140px)] w-full bg-background">
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-space-md px-margin-mobile pt-6 pb-space-xl sm:px-margin sm:pt-8">
         <header className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
           <div className="flex flex-col gap-space-xs">
             <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg tracking-tight">

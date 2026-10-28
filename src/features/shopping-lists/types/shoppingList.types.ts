@@ -6,7 +6,11 @@ type CreatedList = DeepRequired<Schemas['CreateMealPlanShoppingListResponse']['d
 
 /** 4 quầy hàng (Ingredients.Default_Stall_Type, D74). */
 export type AisleCode = 'PRODUCE' | 'CONDIMENTS' | 'DRY_GOODS' | 'PLANT_PROTEIN';
-export type ShoppingItem = CreatedList['aisles'][number]['items'][number];
+export type ShoppingItem = CreatedList['aisles'][number]['items'][number] & {
+  recipeSources?: string[];
+  days?: string[];
+  dayQuantities?: Partial<Record<string, number>>;
+};
 export type ShoppingAisle = { aisle: AisleCode | string; items: ShoppingItem[] };
 
 export type ShoppingListStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED';
@@ -25,6 +29,7 @@ export type CreatedShoppingList = Omit<CreatedList, 'aisles' | 'status'> & {
  */
 export type ShoppingList = {
   listId: number;
+  planId?: number;
   status: ShoppingListStatus;
   progress: { purchased: number; total: number };
   aisles: ShoppingAisle[];

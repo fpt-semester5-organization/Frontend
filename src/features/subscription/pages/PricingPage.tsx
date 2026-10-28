@@ -18,7 +18,7 @@ export function PricingPage() {
   const rows = benefitRows(q.data?.benefits);
 
   return (
-    <main className="min-h-screen w-full bg-background pt-[72px]">
+    <main className="min-h-screen w-full bg-background">
       <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-space-xl px-margin-sm py-space-xl lg:px-margin">
         <header className="flex flex-col gap-space-xs">
           <h1 className="font-headline-lg text-headline-lg text-primary">Gói VIP</h1>

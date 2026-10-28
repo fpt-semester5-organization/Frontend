@@ -83,7 +83,7 @@ export function PaymentResultPage() {
   const planName = stored && tx && stored.transactionId === tx.transactionId ? stored.planName : sub.data?.plan?.planName;
 
   return (
-    <main className="min-h-screen w-full bg-background pt-[72px]">
+    <main className="min-h-screen w-full bg-background">
       <div className="mx-auto flex w-full max-w-[520px] flex-col items-center gap-space-md px-margin-sm py-space-xl text-center">
         {sub.isLoading ? (
           <PageSkeleton />

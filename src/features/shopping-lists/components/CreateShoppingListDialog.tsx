@@ -28,11 +28,15 @@ export const CreateShoppingListDialog: React.FC<{ planId: number; show: boolean;
     register,
     handleSubmit,
     setError,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ShoppingListValues>({
     resolver: zodResolver(shoppingListSchema),
     defaultValues: { servingsMultiplier: 1, targetShoppingDate: '' },
   });
+
+  const currentMultiplier = watch('servingsMultiplier');
 
   const submit = (values: ShoppingListValues) => {
     setConflict(null);
@@ -87,7 +91,27 @@ export const CreateShoppingListDialog: React.FC<{ planId: number; show: boolean;
             {...register('servingsMultiplier', { valueAsNumber: true })}
             className={cn(INPUT_CLASS, errors.servingsMultiplier && INPUT_ERROR_CLASS)}
           />
-          <p className="font-body-sm text-body-sm text-outline">Ví dụ: nấu cho 2 người thì nhập 2. Từ 1 đến 10.</p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="font-body-sm text-xs text-on-surface-variant">Chọn nhanh:</span>
+            {[1, 2, 4, 6].map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setValue('servingsMultiplier', p, { shouldValidate: true })}
+                className={cn(
+                  'rounded-md px-2.5 py-0.5 text-xs font-semibold transition-all',
+                  currentMultiplier === p
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'border border-surface-container bg-surface-container-low text-on-surface hover:bg-surface-container'
+                )}
+              >
+                {p} người
+              </button>
+            ))}
+          </div>
+          <p className="font-body-sm text-body-sm text-outline">
+            Ví dụ: nấu cho 2 người thì chọn hoặc nhập 2. (Bạn có thể lọc từng ngày và tùy chỉnh khẩu phần chi tiết sau khi tạo).
+          </p>
           <FieldError>{errors.servingsMultiplier?.message}</FieldError>
         </div>
 

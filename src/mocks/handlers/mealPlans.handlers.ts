@@ -123,11 +123,24 @@ interface MockPlan {
   postDeployUsed: number;
 }
 
+interface MockShoppingItem {
+  itemId: number;
+  ingredientId: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  aisle: Aisle;
+  isPurchased: boolean;
+  recipeSources: string[];
+  days: string[];
+  dayQuantities: Record<string, number>;
+}
+
 interface MockShoppingList {
   listId: number;
   planId: number;
   status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
-  items: { itemId: number; ingredientId: number; name: string; quantity: number; unit: string; aisle: Aisle; isPurchased: boolean }[];
+  items: MockShoppingItem[];
 }
 
 const ids = { plan: 40, slot: 5000, list: 10, item: 900 };
@@ -187,7 +200,60 @@ const plans: MockPlan[] = (() => {
   draft.preDeployUsed = 2;
   return [archived, active, draft];
 })();
-const shoppingLists: MockShoppingList[] = [];
+function buildMockShoppingList(plan: MockPlan, multiplier = 1, listId?: number): MockShoppingList {
+  const totals = new Map<
+    number,
+    {
+      quantity: number;
+      recipeSources: Set<string>;
+      days: Set<string>;
+      dayQuantities: Record<string, number>;
+    }
+  >();
+
+  for (const slot of plan.slots) {
+    const rec = recipeById(slot.recipeId);
+    if (!rec) continue;
+    for (const [ingredientId, quantity] of rec.ingredients) {
+      if (!totals.has(ingredientId)) {
+        totals.set(ingredientId, {
+          quantity: 0,
+          recipeSources: new Set(),
+          days: new Set(),
+          dayQuantities: {},
+        });
+      }
+      const entry = totals.get(ingredientId)!;
+      const normQty = quantity * multiplier;
+      entry.quantity += normQty;
+      entry.recipeSources.add(rec.title);
+      entry.days.add(slot.dayOfWeek);
+      entry.dayQuantities[slot.dayOfWeek] = (entry.dayQuantities[slot.dayOfWeek] ?? 0) + normQty;
+    }
+  }
+
+  return {
+    listId: listId ?? ids.list++,
+    planId: plan.planId,
+    status: 'PENDING',
+    items: [...totals.entries()]
+      .map(([ingredientId, entry]) => ({
+        itemId: ids.item++,
+        ingredientId,
+        name: INGREDIENTS[ingredientId].name,
+        quantity: Math.round(entry.quantity),
+        unit: INGREDIENTS[ingredientId].unit,
+        aisle: INGREDIENTS[ingredientId].aisle,
+        isPurchased: false,
+        recipeSources: [...entry.recipeSources].sort(),
+        days: [...entry.days],
+        dayQuantities: entry.dayQuantities,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+  };
+}
+
+const shoppingLists: MockShoppingList[] = [buildMockShoppingList(plans[1], 1, 10)];
 
 // --- DTO theo đúng response mẫu ---
 const recipeDto = (recipeId: number) => {
@@ -230,7 +296,17 @@ const listDto = (list: MockShoppingList) => ({
     aisle,
     items: list.items
       .filter((item) => item.aisle === aisle)
-      .map(({ itemId, ingredientId, name, quantity, unit, isPurchased }) => ({ itemId, ingredientId, name, quantity, unit, isPurchased })),
+      .map(({ itemId, ingredientId, name, quantity, unit, isPurchased, recipeSources, days, dayQuantities }) => ({
+        itemId,
+        ingredientId,
+        name,
+        quantity,
+        unit,
+        isPurchased,
+        recipeSources,
+        days,
+        dayQuantities,
+      })),
   })).filter((aisle) => aisle.items.length > 0),
 });
 
@@ -484,29 +560,7 @@ export const mealPlansHandlers = [
       return fail(409, 'ERR_SHOPPING_LIST_EXISTS', 'Thực đơn này đã có danh sách đi chợ.');
     }
 
-    // Cộng dồn nguyên liệu của 21 bữa theo Ingredient_ID, nhân hệ số khẩu phần.
-    const totals = new Map<number, number>();
-    for (const slot of plan.slots) {
-      for (const [ingredientId, quantity] of recipeById(slot.recipeId).ingredients) {
-        totals.set(ingredientId, (totals.get(ingredientId) ?? 0) + quantity * multiplier);
-      }
-    }
-    const list: MockShoppingList = {
-      listId: ids.list++,
-      planId: plan.planId,
-      status: 'PENDING',
-      items: [...totals.entries()]
-        .map(([ingredientId, quantity]) => ({
-          itemId: ids.item++,
-          ingredientId,
-          name: INGREDIENTS[ingredientId].name,
-          quantity: Math.round(quantity),
-          unit: INGREDIENTS[ingredientId].unit,
-          aisle: INGREDIENTS[ingredientId].aisle,
-          isPurchased: false,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
-    };
+    const list = buildMockShoppingList(plan, multiplier);
     shoppingLists.push(list);
     const { progress: _progress, ...created } = listDto(list);
     return ok(created, 'Đã tạo danh sách đi chợ.', 201);
@@ -519,8 +573,7 @@ export const mealPlansHandlers = [
     if (!me) return unauthorized();
     const list = shoppingLists.find((item) => item.listId === Number(params.id));
     if (!list || !findOwnPlan(list.planId, me.userId)) return planNotFound();
-    const { planId: _planId, ...dto } = listDto(list);
-    return ok(dto);
+    return ok(listDto(list));
   }),
 
   // PATCH /shopping-lists/{id}/items/{itemId} — FN-MEAL-06

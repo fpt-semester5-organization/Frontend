@@ -274,6 +274,14 @@ export const MealPlanDetail: React.FC = () => {
   const navigate = useNavigate();
   const isVip = useAuthStore((state) => state.user?.isVip ?? false);
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(PATHS.MEAL_PLANS.ROOT);
+    }
+  };
+
   const plan = useMealPlan(planId);
   const [nutritionLevel, setNutritionLevel] = useState<NutritionLevel>(isVip ? 'DETAILED' : 'BASIC');
   const nutrition = useMealPlanNutrition(planId, nutritionLevel, !!plan.data);
@@ -408,8 +416,8 @@ export const MealPlanDetail: React.FC = () => {
 
   if (plan.isPending) {
     return (
-      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
-        <div className="flex flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin" role="status" aria-busy="true">
+      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-background">
+        <div className="flex flex-col gap-space-md px-margin-mobile pt-6 pb-space-lg sm:px-margin sm:pt-8" role="status" aria-busy="true">
           <Skeleton className="h-10 w-1/3" />
           <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
@@ -430,8 +438,8 @@ export const MealPlanDetail: React.FC = () => {
   if (plan.isError || !data || !byDay) {
     if (toApiError(plan.error).status === 404) return <NotFound />;
     return (
-      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
-        <div className="px-margin-mobile py-space-lg sm:px-margin">
+      <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-background">
+        <div className="px-margin-mobile pt-6 pb-space-lg sm:px-margin sm:pt-8">
           <ErrorState error={plan.error} onRetry={() => plan.refetch()} retrying={plan.isRefetching} />
         </div>
       </main>
@@ -629,26 +637,25 @@ export const MealPlanDetail: React.FC = () => {
   };
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-surface-container-lowest pt-[72px]">
-      <div className="flex w-full flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin">
+    <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-background">
+      <div className="flex w-full flex-col gap-space-md px-margin-mobile pt-6 pb-space-lg sm:px-margin sm:pt-8">
         {/* Navigation & Header Actions */}
-        <section className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
-          <div className="flex flex-col gap-1.5">
-            <nav aria-label="Điều hướng" className="flex flex-wrap items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
-              <Link to={PATHS.HOME} className="hover:text-primary">
-                Trang chủ
-              </Link>
-              <span>/</span>
-              <Link to={PATHS.MEAL_PLANS.ROOT} className="hover:text-primary">
-                Thực đơn tuần
-              </Link>
-              <span>/</span>
-              <span className="font-semibold text-on-surface">
-                {formatDate(data.startDate)} – {formatDate(data.endDate)}
-              </span>
-            </nav>
+        <section className="flex flex-col gap-space-sm">
+          {/* Nút Quay lại nằm riêng ở trên, tách biệt với tiêu đề */}
+          <div>
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-3 py-1.5 font-label-md text-label-md text-on-surface-variant transition-all hover:bg-surface-container-high hover:text-primary active:scale-95 cursor-pointer"
+            >
+              <Icon name="arrow_back" className="text-[18px]" />
+              <span>Quay lại</span>
+            </button>
+          </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-3">
+          {/* Tiêu đề trang nằm bên dưới chữ Quay lại với khoảng cách vừa phải, cùng hàng với cụm nút hành động */}
+          <div className="flex flex-col justify-between gap-space-md md:flex-row md:items-center">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg tracking-tight">
                 {data.planName}
               </h1>
@@ -662,7 +669,6 @@ export const MealPlanDetail: React.FC = () => {
                 </span>
               )}
             </div>
-          </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             {isDraft && (
@@ -706,7 +712,8 @@ export const MealPlanDetail: React.FC = () => {
               Sinh thực đơn AI
             </Link>
           </div>
-        </section>
+        </div>
+      </section>
 
         {/* Draft Notice Alert */}
         {isDraft && (

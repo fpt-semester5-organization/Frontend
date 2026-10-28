@@ -21,7 +21,7 @@ export function MySubscriptionPage() {
   const txs = [...(d?.transactions ?? [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
   return (
-    <main className="min-h-screen w-full bg-background pt-[72px]">
+    <main className="min-h-screen w-full bg-background">
       <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-space-lg px-margin-sm py-space-xl lg:px-margin">
         <h1 className="font-headline-lg text-headline-lg text-primary">Gói của tôi</h1>
 

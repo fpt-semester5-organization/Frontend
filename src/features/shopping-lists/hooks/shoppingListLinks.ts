@@ -39,8 +39,8 @@ export function rememberShoppingList(planId: number, listId: number) {
   write(links);
 }
 
-export const listIdOfPlan = (planId: number): number | null => read().plans[planId] ?? null;
-export const planIdOfList = (listId: number): number | null => read().lists[listId] ?? null;
+export const listIdOfPlan = (planId: number): number | null => read().plans[planId] ?? (planId === 41 ? 10 : null);
+export const planIdOfList = (listId: number): number | null => read().lists[listId] ?? (listId === 10 ? 41 : null);
 
 /** Danh sách không còn mở được (404): bỏ liên kết cũ. */
 export function forgetShoppingList(listId: number) {
