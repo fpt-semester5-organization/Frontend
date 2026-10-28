@@ -6,7 +6,6 @@ import {
   posts,
   reports,
   transcripts,
-  UPLOADED_VIDEO_TRANSCRIPT,
   users,
   votes,
   type MockComment,
@@ -107,7 +106,14 @@ function attachToRecipe(userId: number, recipeId: number, file: File) {
     return ok({ videoId, status: 'READY' }, 'Đã tải ảnh lên.', 202);
   }
   recipe.type = 'VIDEO';
-  transcripts.push({ videoId, status: 'PENDING', readyAt: Date.now() + 40 * 1000, recipeApproved: false, ...UPLOADED_VIDEO_TRANSCRIPT });
+  transcripts.push({
+    videoId,
+    status: 'PENDING',
+    readyAt: Date.now() + 40 * 1000,
+    recipeApproved: false,
+    rawTranscript: '',
+    extractedRecipe: { title: '', ingredients: [], steps: [] },
+  });
   setTimeout(() => {
     recipe.hasTranscript = true;
   }, 40 * 1000);
@@ -302,13 +308,14 @@ export const communityHandlers = [
       const stored = post.videos.find((item) => item.videoId === videoId);
       if (stored) stored.status = 'READY';
     }, 8000);
-    // Bóc tách công thức chạy ngầm (FN-POST-10): bản thật mất 2–3 phút, mock rút còn 40 giây, nội dung cố định.
+    // Bóc tách công thức chạy ngầm (FN-POST-10)
     transcripts.push({
       videoId,
       status: 'PENDING',
       readyAt: Date.now() + 40 * 1000,
       recipeApproved: false,
-      ...UPLOADED_VIDEO_TRANSCRIPT,
+      rawTranscript: '',
+      extractedRecipe: { title: '', ingredients: [], steps: [] },
     });
     return ok({ videoId, status: 'PROCESSING' }, 'Đã nhận video, đang xử lý.', 202);
   }),

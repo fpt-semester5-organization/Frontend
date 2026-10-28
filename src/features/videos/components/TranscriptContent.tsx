@@ -146,9 +146,14 @@ const TranscriptView: React.FC<{ text: string }> = ({ text }) => {
  * Kết quả bóc tách đã xong: công thức AI trích và bản phiên âm lời thoại.
  * Người xem khác nhận extractedRecipe = null cho tới khi công thức được duyệt (Leader câu 6).
  */
-export const TranscriptContent: React.FC<{ transcript: VideoTranscriptResponse; isAuthor: boolean }> = ({
+export const TranscriptContent: React.FC<{
+  transcript: VideoTranscriptResponse;
+  isAuthor: boolean;
+  onCreateRecipe?: () => void;
+}> = ({
   transcript,
   isAuthor,
+  onCreateRecipe,
 }) => {
   const recipe = transcript.extractedRecipe;
   const [tab, setTab] = useState<Tab>(recipe ? 'recipe' : 'transcript');
@@ -186,7 +191,19 @@ export const TranscriptContent: React.FC<{ transcript: VideoTranscriptResponse; 
       <div id={`${baseId}-${tab}-panel`} role="tabpanel" aria-labelledby={`${baseId}-${tab}-tab`}>
         {tab === 'recipe' ? (
           recipe ? (
-            <RecipeView recipe={recipe} />
+            <div className="flex flex-col gap-space-md">
+              <RecipeView recipe={recipe} />
+              {onCreateRecipe && (
+                <button
+                  type="button"
+                  onClick={onCreateRecipe}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 font-label-md text-label-md font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                >
+                  <Icon name="soup_kitchen" className="text-[18px]" />
+                  Dùng công thức này để đăng bài
+                </button>
+              )}
+            </div>
           ) : (
             <div className="flex flex-col items-center gap-space-sm py-space-lg text-center">
               <Icon name="pending_actions" className="text-[40px] text-outline" />

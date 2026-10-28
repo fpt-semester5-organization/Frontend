@@ -8,7 +8,8 @@
  * (authorId, status, categoryId, dietarySchoolId, difficultyLevel, isOptional) — xem RecipeOwnerFields trong recipe.types.
  */
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQueries } from '@tanstack/react-query';
 import type { UseFormSetError } from 'react-hook-form';
 import { ContentTypeTabs } from '@/components/common/ContentTypeTabs';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -25,6 +26,8 @@ import { toApiError } from '@/lib/apiError';
 import { getErrorMessage, notifyApiError, notifyInfo, notifySuccess } from '@/lib/notify';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
+import { listIngredients } from '../api/recipes.api';
+import { masterKeys } from '../hooks/recipeKeys';
 import {
   RecipeForm,
   type RecipeFormHelpers,
@@ -36,7 +39,14 @@ import { RecipeStatusBadge } from '../components/RecipeStatusBadge';
 import { useCreateRecipe, useUpdateRecipe, useUploadRecipeMedia } from '../hooks/useRecipeMutations';
 import { useIngredientInfos, useRecipe } from '../hooks/useRecipes';
 import { RECIPE_STATUS_META, canEditRecipe, isDraftLike } from '../lib/recipeStatus';
-import { EMPTY_RECIPE_FORM, toFormValues, toRecipeBody, toUpdateBody, type RecipeFormValues } from '../types/recipe.schemas';
+import {
+  EMPTY_RECIPE_FORM,
+  emptyIngredientRow,
+  toFormValues,
+  toRecipeBody,
+  toUpdateBody,
+  type RecipeFormValues,
+} from '../types/recipe.schemas';
 import type { MyRecipeStatus, RecipeStatus, UpdateRecipeBody } from '../types/recipe.types';
 
 /** Khóa nút gửi tạm thời sau 429 (UI Spec 1.1). */
@@ -124,6 +134,106 @@ const RecipeEditor: React.FC = () => {
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<PendingOutcome | null>(null);
   const lockedSeconds = useCountdown(lockedUntil);
+
+  const location = useLocation();
+  const locationState = location.state as {
+    prefillRecipe?: {
+      title?: string;
+      description?: string;
+      servings?: string;
+      cookTimeMinutes?: string;
+      ingredients?: { name: string; quantity?: string; unit?: string; isOptional?: boolean }[];
+      steps?: string[];
+    };
+    fromVideoId?: number;
+    fromPostId?: number;
+  } | null;
+
+  const sttPrefill = !isEdit && locationState?.prefillRecipe ? locationState.prefillRecipe : null;
+
+  const prefillQueries = useQueries({
+    queries: (sttPrefill?.ingredients ?? []).map((ing) => ({
+      queryKey: masterKeys.ingredients(ing.name),
+      queryFn: () => listIngredients({ keyword: ing.name, page: 1, size: 5 }),
+      enabled: !!sttPrefill && !!ing.name,
+      staleTime: 60 * 60 * 1000,
+    })),
+  });
+
+  const [prefillDefaults, setPrefillDefaults] = useState<RecipeFormValues | null>(() => {
+    if (!sttPrefill) return null;
+    const steps = (sttPrefill.steps ?? []).filter((s) => s.trim().length > 0);
+    const instructions =
+      steps.length >= 2
+        ? steps.map((text) => ({ text }))
+        : steps.length === 1
+          ? [{ text: steps[0] }, { text: '' }]
+          : [{ text: '' }, { text: '' }];
+
+    return {
+      title: sttPrefill.title || '',
+      dietarySchoolId: '',
+      categoryId: '',
+      description: sttPrefill.description || '',
+      prepTimeMinutes: '10',
+      cookTimeMinutes: sttPrefill.cookTimeMinutes || '20',
+      servings: sttPrefill.servings || '2',
+      difficultyLevel: 'EASY',
+      ingredients:
+        (sttPrefill.ingredients ?? []).length > 0
+          ? (sttPrefill.ingredients ?? []).map((ing) => ({
+              ingredientId: null,
+              name: ing.name,
+              info: null,
+              quantity: ing.quantity ? String(ing.quantity) : '1',
+              unit: ing.unit || 'g',
+              isOptional: ing.isOptional ?? false,
+            }))
+          : [emptyIngredientRow()],
+      instructions,
+    };
+  });
+
+  useEffect(() => {
+    if (!sttPrefill || isEdit) return;
+    const allDone = prefillQueries.every((q) => q.isSuccess || q.isError);
+    if (!allDone) return;
+
+    const mappedIngredients = (sttPrefill.ingredients ?? []).map((ing, idx) => {
+      const q = prefillQueries[idx];
+      const items = q?.data?.items ?? [];
+      const exact = items.find((item) => item.name.toLowerCase() === ing.name.toLowerCase()) || items[0];
+      return {
+        ingredientId: exact ? exact.ingredientId : null,
+        name: exact ? exact.name : ing.name,
+        info: exact || null,
+        quantity: ing.quantity ? String(ing.quantity) : '1',
+        unit: ing.unit || (exact ? exact.standardUnit : 'g'),
+        isOptional: ing.isOptional ?? false,
+      };
+    });
+
+    const steps = (sttPrefill.steps ?? []).filter((s) => s.trim().length > 0);
+    const instructions =
+      steps.length >= 2
+        ? steps.map((text) => ({ text }))
+        : steps.length === 1
+          ? [{ text: steps[0] }, { text: '' }]
+          : [{ text: '' }, { text: '' }];
+
+    setPrefillDefaults({
+      title: sttPrefill.title || '',
+      dietarySchoolId: '',
+      categoryId: '',
+      description: sttPrefill.description || '',
+      prepTimeMinutes: '10',
+      cookTimeMinutes: sttPrefill.cookTimeMinutes || '20',
+      servings: sttPrefill.servings || '2',
+      difficultyLevel: 'EASY',
+      ingredients: mappedIngredients.length > 0 ? mappedIngredients : [emptyIngredientRow()],
+      instructions,
+    });
+  }, [sttPrefill, isEdit, prefillQueries]);
 
   // Trang sửa: công thức từ API không có status nghĩa là bản công khai (GET chỉ trả APPROVED_ACTIVE cho người khác).
   const editStatus: MyRecipeStatus = (recipe.data?.status as MyRecipeStatus | undefined) ?? 'APPROVED_ACTIVE';
@@ -406,10 +516,25 @@ const RecipeEditor: React.FC = () => {
   return shell(
     <>
       {!isEdit && <ContentTypeTabs activeType="RECIPE" />}
+      {sttPrefill && (
+        <div className="mb-space-md flex items-start gap-3 rounded-xl border border-primary/30 bg-gradient-to-r from-primary-container/30 via-surface-container-low to-secondary-container/20 p-space-md shadow-sm">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary shadow-sm">
+            <Icon name="auto_awesome" className="text-[22px]" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-label-lg text-label-lg font-bold text-primary">
+              Dữ liệu được bóc tách tự động từ video qua AI
+            </h3>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Tên món, mô tả, danh sách nguyên liệu và các bước nấu đã được tự động điền từ video. Bạn hãy kiểm tra lại, chọn trường phái ăn chay và danh mục trước khi đăng bài.
+            </p>
+          </div>
+        </div>
+      )}
       <RecipeForm
         key={`${editId ?? 'new'}-${formKey}`}
         variant={variant}
-        defaultValues={isEdit && editDefaults ? editDefaults : EMPTY_RECIPE_FORM}
+        defaultValues={isEdit && editDefaults ? editDefaults : prefillDefaults ? prefillDefaults : EMPTY_RECIPE_FORM}
         submitting={submitting}
         lockedSeconds={lockedSeconds}
         cancelTo={isEdit ? PATHS.ME.CONTENT('recipes') : fromCommunity ? PATHS.COMMUNITY.ROOT : PATHS.RECIPES.ROOT}
