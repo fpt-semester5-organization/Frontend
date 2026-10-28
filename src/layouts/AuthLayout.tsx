@@ -41,11 +41,11 @@ export function AuthLayout() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-center gap-3 px-gutter font-body-sm text-body-sm text-on-surface-variant">
           <p>© 2026 VeggieLife</p>
           <span>•</span>
-          <Link to={PATHS.TERMS} target="_blank" className="transition-colors hover:text-primary hover:underline">
+          <Link to={PATHS.TERMS} className="transition-colors hover:text-primary hover:underline">
             Điều khoản
           </Link>
           <span>•</span>
-          <Link to={PATHS.PRIVACY} target="_blank" className="transition-colors hover:text-primary hover:underline">
+          <Link to={PATHS.PRIVACY} className="transition-colors hover:text-primary hover:underline">
             Chính sách bảo mật
           </Link>
         </div>

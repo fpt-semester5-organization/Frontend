@@ -83,22 +83,18 @@ export function RegisterPage() {
               Tôi đồng ý với{' '}
               <Link
                 to={PATHS.TERMS}
-                target="_blank"
-                rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
-                title="Mở Điều khoản sử dụng trong tab mới"
+                title="Điều khoản sử dụng"
               >
                 Điều khoản
               </Link>{' '}
               và{' '}
               <Link
                 to={PATHS.PRIVACY}
-                target="_blank"
-                rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
-                title="Mở Chính sách bảo mật trong tab mới"
+                title="Chính sách bảo mật"
               >
                 Chính sách bảo mật
               </Link>

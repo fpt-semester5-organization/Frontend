@@ -35,7 +35,7 @@ describe('Legal Pages and Links', () => {
     expect(screen.getAllByText(/Xử lý ảnh Quét tủ lạnh & Mã vạch/i).length).toBeGreaterThan(0);
   });
 
-  it('renders clickable links for Terms and Privacy on RegisterPage with target="_blank"', () => {
+  it('renders clickable links for Terms and Privacy on RegisterPage without target="_blank"', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
@@ -47,11 +47,11 @@ describe('Legal Pages and Links', () => {
     const termsLink = screen.getByRole('link', { name: /Điều khoản/i });
     expect(termsLink).toBeInTheDocument();
     expect(termsLink).toHaveAttribute('href', '/terms');
-    expect(termsLink).toHaveAttribute('target', '_blank');
+    expect(termsLink).not.toHaveAttribute('target');
 
     const privacyLink = screen.getByRole('link', { name: /Chính sách bảo mật/i });
     expect(privacyLink).toBeInTheDocument();
     expect(privacyLink).toHaveAttribute('href', '/privacy');
-    expect(privacyLink).toHaveAttribute('target', '_blank');
+    expect(privacyLink).not.toHaveAttribute('target');
   });
 });
