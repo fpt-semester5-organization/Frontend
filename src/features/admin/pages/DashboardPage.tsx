@@ -37,7 +37,7 @@ export function DashboardPage() {
   return (
     <AdminPage
       title="Tổng quan nền tảng & vận hành"
-      subtitle="Số liệu trong khoảng thời gian đã chọn (người dùng mới, doanh thu VIP, chi phí AI). Số tổng không phụ thuộc khoảng thời gian."
+      subtitle="Số liệu trong khoảng thời gian đã chọn (người dùng mới, nội dung mới, doanh thu VIP, chi phí AI). Số tổng không phụ thuộc khoảng thời gian."
       actions={
         <div className="inline-flex items-center rounded-xl bg-surface-container-high p-1 font-label-md text-label-md shadow-inner" role="group" aria-label="Khoảng thời gian">
           {PRESETS.map(([k, label]) => (
@@ -56,24 +56,59 @@ export function DashboardPage() {
 
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} refetch={q.refetch} isEmpty={!d} emptyTitle="Chưa có số liệu" emptyHint="Máy chủ chưa trả số liệu cho khoảng thời gian này." rows={4}>
         <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Tổng người dùng" value={num(d?.users?.total)} hint={`+${num(d?.users?.newInPeriod)} trong kỳ`} />
-          <StatCard tone={d?.moderationQueue ? 'alert' : 'default'} label="Hàng đợi kiểm duyệt" value={<>{num(d?.moderationQueue)} <span className="font-body-md text-body-md font-normal text-on-surface-variant">mục</span></>} hint={<Link to={PATHS.ADMIN.MODERATION} className="text-secondary hover:underline">Mở hàng đợi</Link>} />
-          <StatCard label="Doanh thu VIP (trong kỳ)" value={d?.vip?.revenueVnd === undefined ? '—' : formatVnd(d.vip.revenueVnd)} hint={`${num(d?.vip?.active)} thành viên VIP đang hiệu lực`} />
-          <StatCard label="Chi phí AI (trong kỳ)" value={d?.aiCostUsd === undefined ? '—' : `$${d.aiCostUsd.toFixed(2)}`} hint={<Link to={PATHS.ADMIN.AI} className="text-secondary hover:underline">Chi tiết token &amp; chi phí</Link>} />
+          <StatCard
+            label="Tổng người dùng"
+            value={num(d?.users?.total)}
+            hint={
+              d?.users?.newInPeriod !== undefined ? (
+                <span className={`font-semibold ${(d.users.newInPeriod ?? 0) > 0 ? 'text-success' : 'text-on-surface-variant'}`}>
+                  +{num(d.users.newInPeriod)} trong kỳ
+                </span>
+              ) : undefined
+            }
+          />
+          <StatCard tone={d?.moderationQueue ? 'alert' : 'default'} label="Hàng đợi kiểm duyệt (Tồn đọng)" value={<>{num(d?.moderationQueue)} <span className="font-body-md text-body-md font-normal text-on-surface-variant">mục</span></>} hint={<Link to={PATHS.ADMIN.MODERATION} className="text-secondary hover:underline">Chờ xử lý ngay</Link>} />
+          <StatCard label="Doanh thu VIP (trong kỳ)" value={d?.vip?.revenueVnd === undefined ? '—' : formatVnd(d.vip.revenueVnd)} hint={`Hiện có ${num(d?.vip?.active)} tài khoản VIP toàn sàn`} />
+          <StatCard
+            label="Chi phí AI (trong kỳ)"
+            value={
+              d?.aiCostUsd === undefined
+                ? '—'
+                : d.aiCostUsd === 0
+                  ? '$0.00'
+                  : d.aiCostUsd < 0.01
+                    ? '< $0.01'
+                    : `$${d.aiCostUsd.toFixed(2)}`
+            }
+            hint={<Link to={PATHS.ADMIN.AI} className="text-secondary hover:underline">Chi tiết token &amp; chi phí</Link>}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-space-md lg:grid-cols-2">
           <Panel title="Nội dung">
             <dl className="grid grid-cols-3 gap-space-md p-space-lg text-center">
-              {([['Công thức', d?.content?.recipes], ['Bài viết', d?.content?.posts], ['Video', d?.content?.videos]] as const).map(([label, n]) => (
-                <div key={label}>
+              {([
+                ['Công thức', d?.content?.recipes, d?.content?.recipesNewInPeriod],
+                ['Bài viết', d?.content?.posts, d?.content?.postsNewInPeriod],
+                ['Video', d?.content?.videos, d?.content?.videosNewInPeriod],
+              ] as const).map(([label, n, nNew]) => (
+                <div key={label} className="flex flex-col items-center">
                   <dd className="font-headline-md text-headline-md text-on-surface">{num(n)}</dd>
                   <dt className="font-label-md text-label-md text-on-surface-variant">{label}</dt>
+                  {nNew !== undefined && (
+                    <span
+                      className={`mt-1 font-label-sm text-label-sm font-semibold ${
+                        (nNew ?? 0) > 0 ? 'text-success' : 'text-on-surface-variant'
+                      }`}
+                    >
+                      +{num(nNew)} trong kỳ
+                    </span>
+                  )}
                 </div>
               ))}
             </dl>
           </Panel>
-          <Panel title="Người dùng theo trạng thái" actions={<Link to={PATHS.ADMIN.USERS} className="font-label-md text-label-md text-secondary hover:underline">Quản lý</Link>}>
+          <Panel title="Người dùng theo trạng thái (Toàn sàn)" actions={<Link to={PATHS.ADMIN.USERS} className="font-label-md text-label-md text-secondary hover:underline">Quản lý</Link>}>
             {byStatus.length === 0 ? (
               <p className="p-space-lg font-body-sm text-body-sm text-on-surface-variant">Máy chủ chưa trả phân bổ theo trạng thái.</p>
             ) : (

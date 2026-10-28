@@ -47,9 +47,34 @@ export function SearchFilter({ value, onSearch, placeholder, maxLength = 100, la
 
 export function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <label className={BOX}>
+    <label
+      className={`${BOX} cursor-pointer select-none`}
+      onClick={(e) => {
+        const input = e.currentTarget.querySelector('input') as HTMLInputElement | null;
+        if (input && typeof input.showPicker === 'function' && e.target !== input) {
+          try {
+            input.showPicker();
+          } catch {
+            // ignore
+          }
+        }
+      }}
+    >
       <span className="font-label-sm text-label-sm text-on-surface-variant">{label}</span>
-      <input type="date" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={CTRL} />
+      <input
+        type="date"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker?.();
+          } catch {
+            // ignore
+          }
+        }}
+        className={`${CTRL} cursor-pointer`}
+      />
     </label>
   );
 }
