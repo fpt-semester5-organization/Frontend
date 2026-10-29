@@ -143,6 +143,10 @@ export interface ModerationItem {
   reportId: number;
   targetType: ModerationTargetType;
   targetId: number;
+  parentPostId?: number;
+  targetTitle?: string;
+  targetContent?: string;
+  authorName?: string;
   violationType: ViolationType;
   reportSource: ReportSource;
   evidenceSummary?: string;

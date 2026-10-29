@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiErrorMessage } from '@/api/http';
 import { formatDateTime } from '@/lib/format';
 import { getRecipe } from '@/features/recipes/api/recipes.api';
-import { getPost } from '@/features/community/api/community.api';
+import { getPost, listComments } from '@/features/community/api/community.api';
 import { DecisionModal, type DecisionTarget } from '../components/DecisionModal';
 import { FormModal, ReasonConfirmModal } from '../components/FormModal';
 import { AdminPage } from '../components/AdminPage';
@@ -23,7 +23,7 @@ import { QueryState } from '../components/QueryState';
 import { StatusPill } from '../components/StatusPill';
 import { useDecideReport, useDeleteComment, useModerationCount, useModerationQueue } from '../hooks/useModeration';
 import { useListState } from '../hooks/useListState';
-import { SOURCE_LABEL, TARGET_LABEL, VIOLATION_LABEL, targetLink } from '../lib/labels';
+import { SOURCE_LABEL, TARGET_LABEL, VIOLATION_LABEL } from '../lib/labels';
 import { toastApiError } from '../lib/api';
 import type { ModerationItem, ModerationTargetType, ReportSource, ViolationType } from '../types/admin.types';
 
@@ -32,7 +32,6 @@ const TARGETS = Object.entries(TARGET_LABEL) as [ModerationTargetType, string][]
 
 const AI_COUNT_FILTER = { reportSource: 'AI_SCAN' as const };
 const USER_COUNT_FILTER = { reportSource: 'USER_REPORT' as const };
-const COMMENT_COUNT_FILTER = { targetType: 'COMMENT' as const };
 
 export type ModerationTab = 'ALL' | 'AI_SCAN' | 'USER_REPORT' | 'COMMENT';
 
@@ -53,7 +52,7 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
 
   const [activeTab, setActiveTab] = useState<ModerationTab>(defaultTab);
 
-  const { filters, page, size, setFilter, setMultipleFilters, setPage, reset } = useListState<Filters>({
+  const { filters, page, size, setFilter, setPage, reset } = useListState<Filters>({
     reportSource: defaultTab === 'AI_SCAN' ? 'AI_SCAN' : defaultTab === 'USER_REPORT' ? 'USER_REPORT' : undefined,
     targetType: defaultTab === 'COMMENT' ? 'COMMENT' : undefined,
   });
@@ -62,7 +61,6 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
   const allCount = useModerationCount();
   const aiCount = useModerationCount(AI_COUNT_FILTER);
   const userCount = useModerationCount(USER_COUNT_FILTER);
-  const commentCount = useModerationCount(COMMENT_COUNT_FILTER);
 
   const decide = useDecideReport();
   const del = useDeleteComment();
@@ -74,13 +72,14 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
   const selectTab = (tab: ModerationTab) => {
     setActiveTab(tab);
     if (tab === 'ALL') {
-      setMultipleFilters({ reportSource: undefined, targetType: undefined });
-    } else if (tab === 'AI_SCAN') {
-      setMultipleFilters({ reportSource: 'AI_SCAN', targetType: undefined });
-    } else if (tab === 'USER_REPORT') {
-      setMultipleFilters({ reportSource: 'USER_REPORT', targetType: undefined });
+      setFilter('reportSource', undefined);
+      setFilter('targetType', undefined);
     } else if (tab === 'COMMENT') {
-      setMultipleFilters({ targetType: 'COMMENT', reportSource: undefined });
+      setFilter('reportSource', undefined);
+      setFilter('targetType', 'COMMENT');
+    } else {
+      setFilter('targetType', undefined);
+      setFilter('reportSource', tab);
     }
   };
 
@@ -98,15 +97,14 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
   return (
     <AdminPage
       title="Hàng đợi kiểm duyệt nội dung"
-      subtitle="Trung tâm kiểm duyệt hợp nhất: bài viết, công thức, video và bình luận do AI phát hiện hoặc người dùng báo cáo (Human-in-the-loop)."
+      subtitle="Xử lý nội dung vi phạm do AI gắn cờ hoặc người dùng báo cáo."
     >
-      {/* 4 Tab trực quan: Tất cả, AI gắn cờ, Người dùng báo cáo, Bình luận */}
-      <div className="flex flex-wrap border-b border-outline-variant/30" role="tablist" aria-label="Nguồn và loại kiểm duyệt">
+      {/* 3 Tab trực quan phân theo nguồn: Tất cả, AI gắn cờ, Người dùng báo cáo */}
+      <div className="flex flex-wrap border-b border-outline-variant/30" role="tablist" aria-label="Nguồn kiểm duyệt">
         {[
-          { id: 'ALL' as const, label: 'Tất cả nội dung', icon: 'dashboard_customize', count: allCount },
-          { id: 'AI_SCAN' as const, label: 'Bài do AI gắn cờ', icon: 'smart_toy', count: aiCount },
-          { id: 'USER_REPORT' as const, label: 'Bài bị báo cáo', icon: 'group', count: userCount },
-          { id: 'COMMENT' as const, label: 'Bình luận', icon: 'rate_review', count: commentCount },
+          { id: 'ALL' as const, label: 'Tất cả', icon: 'dashboard_customize', count: allCount },
+          { id: 'AI_SCAN' as const, label: 'AI gắn cờ', icon: 'smart_toy', count: aiCount },
+          { id: 'USER_REPORT' as const, label: 'Người dùng báo cáo', icon: 'group', count: userCount },
         ].map((t) => (
           <button
             key={t.id}
@@ -116,7 +114,7 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
             aria-selected={activeTab === t.id}
             aria-controls="panel-moderation-queue"
             onClick={() => selectTab(t.id)}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 font-label-md text-label-md transition-all sm:px-5 sm:font-label-lg sm:text-label-lg ${
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 font-label-md text-label-md transition-all sm:px-5 sm:font-label-lg sm:text-label-lg cursor-pointer ${
               activeTab === t.id
                 ? 'border-primary font-bold text-primary'
                 : 'border-transparent text-on-surface-variant hover:border-outline hover:text-on-surface'
@@ -144,18 +142,16 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
           onChange={(v) => setFilter('violationType', v)}
           options={VIOLATIONS}
         />
-        {activeTab !== 'COMMENT' && (
-          <SelectFilter
-            label="Đối tượng"
-            value={filters.targetType}
-            onChange={(v) => setFilter('targetType', v)}
-            options={TARGETS}
-          />
-        )}
+        <SelectFilter
+          label="Đối tượng"
+          value={filters.targetType}
+          onChange={(v) => setFilter('targetType', v)}
+          options={TARGETS}
+        />
         <ResetButton
           onClick={() => {
             reset();
-            selectTab(activeTab);
+            setActiveTab('ALL');
           }}
         />
       </FilterBar>
@@ -188,7 +184,6 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
               </thead>
               <tbody className="font-body-sm text-body-sm">
                 {items.map((it) => {
-                  const link = targetLink(it.targetType, it.targetId);
                   const isComment = it.targetType === 'COMMENT';
                   return (
                     <tr
@@ -215,20 +210,15 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
                             <span className="rounded bg-surface-container px-1.5 py-0.5 font-label-sm text-label-sm text-on-surface-variant font-medium">
                               {TARGET_LABEL[it.targetType] ?? it.targetType}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setInspecting(it)}
-                              className="font-mono font-bold text-primary hover:underline cursor-pointer"
-                              title="Bấm để xem nội dung nguyên bản"
-                            >
+                            <span className="font-mono font-bold text-on-surface">
                               #{it.targetId}
-                            </button>
+                            </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => setInspecting(it)}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 font-label-sm text-label-sm text-primary hover:bg-primary/20 font-semibold cursor-pointer w-fit transition-colors"
-                            title="Xem chi tiết nội dung nguyên bản ngay tại đây"
+                            title="Xem chi tiết nội dung nguyên bản"
                           >
                             <span className="material-symbols-outlined text-[15px]">
                               {it.targetType === 'RECIPE' ? 'restaurant_menu' : it.targetType === 'POST' ? 'article' : 'chat'}
@@ -237,43 +227,37 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
                           </button>
                         </div>
                       </td>
-                      <td className="max-w-[340px] px-space-md py-space-md align-top">
-                        <div className="flex flex-col gap-2">
+                      <td className="max-w-[360px] px-space-md py-space-md align-top">
+                        <div className="flex flex-col gap-1.5">
                           <span className="w-fit rounded bg-surface-container-high px-2 py-0.5 font-label-sm text-label-sm font-bold text-on-surface">
                             {VIOLATION_LABEL[it.violationType] ?? it.violationType}
                           </span>
                           {it.evidenceSummary && (
-                            <div className="rounded-lg bg-surface-container-low p-2.5 border-l-2 border-primary/50">
-                              <span className="text-[11px] font-semibold text-on-surface-variant block mb-0.5">Trích dẫn nội dung vi phạm:</span>
-                              <p className="text-on-surface text-xs italic font-medium leading-relaxed line-clamp-3">
-                                {it.evidenceSummary}
-                              </p>
-                            </div>
+                            <p className="text-xs text-on-surface-variant italic font-medium leading-relaxed line-clamp-2">
+                              {it.evidenceSummary}
+                            </p>
+                          )}
+                          {isComment && it.targetContent && (
+                            <p className="text-xs text-on-surface line-clamp-2 leading-relaxed bg-surface-container-low/70 rounded-lg px-2.5 py-1.5 border border-outline-variant/40">
+                              "{it.targetContent}"
+                            </p>
                           )}
                         </div>
                       </td>
-                      <td className="px-space-md py-space-md align-top">
+                      <td className="px-space-md py-space-md align-top whitespace-nowrap">
                         <StatusPill tone={it.status === 'INVESTIGATING' ? 'warn' : 'wait'}>
                           {it.status === 'INVESTIGATING' ? 'Đang điều tra' : 'Chờ xử lý'}
                         </StatusPill>
                       </td>
-                      <td className="px-space-lg py-space-md text-right align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setInspecting(it)}
-                            className="rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-container-low flex items-center gap-1"
-                            title="Xem chi tiết nội dung vi phạm"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">visibility</span>
-                            Chi tiết
-                          </button>
+                      <td className="px-space-lg py-space-md text-right align-top whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => open(it, 'DISMISS')}
-                            className="rounded-xl bg-surface-container px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-container-high"
+                            className="rounded-lg bg-surface-container px-2.5 py-1.5 font-label-sm text-label-sm font-medium text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                            title="Bác bỏ báo cáo này"
                           >
-                            Bác bỏ báo cáo
+                            Bác bỏ
                           </button>
                           {isComment && (
                             <button
@@ -282,17 +266,19 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
                                 del.reset();
                                 setToDelete(it);
                               }}
-                              className="rounded-xl bg-error/15 px-3 py-1.5 font-label-md text-label-md font-semibold text-error hover:bg-error/25"
+                              className="rounded-lg bg-error/15 px-2.5 py-1.5 font-label-sm text-label-sm font-semibold text-error hover:bg-error/25 transition-colors cursor-pointer"
+                              title="Xóa bình luận này"
                             >
-                              Xóa bình luận
+                              Xóa
                             </button>
                           )}
                           <button
                             type="button"
                             onClick={() => open(it, 'UPHOLD')}
-                            className="rounded-xl bg-error px-3 py-1.5 font-label-md text-label-md text-on-error shadow-sm hover:opacity-90"
+                            className="rounded-lg bg-error px-2.5 py-1.5 font-label-sm text-label-sm font-semibold text-on-error shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                            title="Xác nhận vi phạm và áp dụng chế tài"
                           >
-                            Xác nhận vi phạm
+                            Xác nhận
                           </button>
                         </div>
                       </td>
@@ -309,7 +295,7 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
       <DecisionModal
         target={target}
         pending={decide.isPending}
-        error={decide.isError ? apiErrorMessage(decide.error) : null}
+        error={decide.error ? apiErrorMessage(decide.error) : null}
         onHide={() => setTarget(null)}
         onSubmit={(v) =>
           target &&
@@ -332,7 +318,7 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
         consequence={`Bình luận #${toDelete?.targetId ?? ''} và toàn bộ trả lời bên dưới sẽ bị ẩn khỏi người dùng (xóa mềm). Lý do xóa được lưu vào nhật ký kiểm toán.`}
         confirmLabel="Xóa bình luận"
         pending={del.isPending}
-        error={del.isError ? apiErrorMessage(del.error) : null}
+        error={del.error ? apiErrorMessage(del.error) : null}
         onHide={() => setToDelete(null)}
         onConfirm={(reason) =>
           toDelete &&
@@ -353,10 +339,6 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
           item={inspecting}
           onClose={() => setInspecting(null)}
           onOpenDecision={(it, dec) => open(it, dec)}
-          onDeleteComment={(it) => {
-            del.reset();
-            setToDelete(it);
-          }}
         />
       )}
     </AdminPage>
@@ -367,21 +349,17 @@ function InspectionModal({
   item,
   onClose,
   onOpenDecision,
-  onDeleteComment,
 }: {
   item: ModerationItem;
   onClose: () => void;
   onOpenDecision: (item: ModerationItem, decision: 'UPHOLD' | 'DISMISS') => void;
-  onDeleteComment: (item: ModerationItem) => void;
 }) {
-  const isComment = item.targetType === 'COMMENT';
-
   return (
     <FormModal
       show={true}
       onHide={onClose}
       title={`Thẩm tra ${TARGET_LABEL[item.targetType] ?? item.targetType} #${item.targetId} (Báo cáo #RPT-${item.reportId})`}
-      size="lg"
+      size="xl"
     >
       <div className="flex flex-col gap-4">
         {/* Thông tin báo cáo & Nguồn */}
@@ -434,7 +412,7 @@ function InspectionModal({
             <span className="material-symbols-outlined text-[16px] text-primary">
               {item.targetType === 'RECIPE' ? 'restaurant_menu' : item.targetType === 'POST' ? 'article' : 'chat'}
             </span>
-            Nội dung nguyên bản của {TARGET_LABEL[item.targetType] ?? item.targetType} #{item.targetId}
+            Nội dung nguyên bản &amp; Ngữ cảnh {TARGET_LABEL[item.targetType] ?? item.targetType} #{item.targetId}
           </label>
           <OriginalContentRenderer item={item} />
         </div>
@@ -444,7 +422,7 @@ function InspectionModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-high"
+            className="rounded-xl bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
           >
             Đóng
           </button>
@@ -454,29 +432,17 @@ function InspectionModal({
               onClose();
               onOpenDecision(item, 'DISMISS');
             }}
-            className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-low"
+            className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-low transition-colors"
           >
             Bác bỏ báo cáo
           </button>
-          {isComment && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onDeleteComment(item);
-              }}
-              className="rounded-xl bg-error/15 px-4 py-2 font-label-md text-label-md font-semibold text-error hover:bg-error/25"
-            >
-              Xóa bình luận
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {
               onClose();
               onOpenDecision(item, 'UPHOLD');
             }}
-            className="rounded-xl bg-error px-4 py-2 font-label-md text-label-md text-on-error hover:opacity-90 shadow-sm"
+            className="rounded-xl bg-error px-4 py-2 font-label-md text-label-md font-semibold text-on-error hover:opacity-90 shadow-sm transition-opacity"
           >
             Xác nhận vi phạm
           </button>
@@ -489,6 +455,7 @@ function InspectionModal({
 function OriginalContentRenderer({ item }: { item: ModerationItem }) {
   const isRecipe = item.targetType === 'RECIPE';
   const isPost = item.targetType === 'POST';
+  const isComment = item.targetType === 'COMMENT';
 
   const recipeQuery = useQuery({
     queryKey: ['admin-preview-recipe', item.targetId],
@@ -501,6 +468,199 @@ function OriginalContentRenderer({ item }: { item: ModerationItem }) {
     queryFn: () => getPost(item.targetId),
     enabled: isPost,
   });
+
+  // Truy vấn bài viết gốc chứa bình luận này và toàn bộ danh sách bình luận ngữ cảnh
+  const parentPostId = item.parentPostId;
+  const parentPostQuery = useQuery({
+    queryKey: ['admin-preview-parent-post', parentPostId],
+    queryFn: () => getPost(parentPostId!),
+    enabled: isComment && !!parentPostId,
+  });
+
+  const commentsQuery = useQuery({
+    queryKey: ['admin-preview-thread', parentPostId],
+    queryFn: () => listComments({ resource: 'posts', id: parentPostId! }, { page: 1, size: 50 }),
+    enabled: isComment && !!parentPostId,
+  });
+
+  if (isComment) {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3.5 max-h-[460px] overflow-y-auto">
+        {/* 1. Bình luận đang bị kiểm duyệt */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between pb-1.5 border-b border-error/30">
+            <span className="font-label-sm text-label-sm font-bold text-error flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">flag</span>
+              Bình luận đang bị kiểm duyệt (#{item.targetId})
+            </span>
+            <span className="font-semibold text-xs text-on-surface">
+              {item.authorName ?? 'Thành viên'}
+            </span>
+          </div>
+          <div className="rounded-lg bg-error-container/20 border border-error/40 p-2.5 text-xs text-on-surface font-medium leading-relaxed whitespace-pre-wrap">
+            "{item.targetContent || item.evidenceSummary || 'Không tìm thấy nội dung bình luận.'}"
+          </div>
+        </div>
+
+        {/* 2. Chi tiết bài viết gốc chứa bình luận */}
+        {parentPostId ? (
+          <div className="flex flex-col gap-2 pt-2 border-t border-surface-container">
+            <div className="flex items-center justify-between">
+              <span className="font-label-sm text-label-sm font-bold text-primary flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">article</span>
+                Bài viết gốc chứa bình luận (#{parentPostId})
+              </span>
+              <a
+                href={`/community/posts/${parentPostId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-secondary hover:underline font-semibold"
+              >
+                <span>Mở bài viết tab mới</span>
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </a>
+            </div>
+
+            {parentPostQuery.isLoading ? (
+              <div className="p-3 text-center text-xs text-on-surface-variant flex items-center justify-center gap-2 rounded-lg bg-surface-container-low">
+                <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                Đang tải chi tiết bài viết gốc...
+              </div>
+            ) : parentPostQuery.data ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col sm:flex-row gap-3 items-start">
+                  {parentPostQuery.data.imageUrl && (
+                    <img
+                      src={parentPostQuery.data.imageUrl}
+                      alt={parentPostQuery.data.title}
+                      className="w-full sm:w-36 h-24 object-cover rounded-lg border border-outline-variant/40 shrink-0"
+                    />
+                  )}
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <h5 className="font-headline-sm text-headline-sm font-bold text-on-surface line-clamp-2">
+                      {parentPostQuery.data.title}
+                    </h5>
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                      <span>Tác giả bài viết: <strong className="text-on-surface">{parentPostQuery.data.author?.fullName}</strong></span>
+                      <span>•</span>
+                      <span>{formatDateTime(parentPostQuery.data.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nội dung bài viết gốc */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">notes</span>
+                    Nội dung bài viết:
+                  </span>
+                  <div className="text-xs text-on-surface whitespace-pre-wrap leading-relaxed bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/20 max-h-24 overflow-y-auto">
+                    {parentPostQuery.data.content}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-on-surface-variant italic rounded-lg bg-surface-container-low p-2">
+                Không thể tải thông tin bài viết gốc.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {/* 3. Toàn bộ luồng thảo luận & các bình luận khác trong bài viết */}
+        {parentPostId ? (
+          <div className="flex flex-col gap-2 pt-2 border-t border-surface-container">
+            <div className="flex items-center justify-between">
+              <span className="font-label-sm text-label-sm font-bold text-primary flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">forum</span>
+                Các bình luận trong bài viết ({commentsQuery.data?.items?.length ?? 0} mục)
+              </span>
+              <span className="text-[11px] text-on-surface-variant">
+                Bình luận bị gắn cờ được viền đỏ nổi bật
+              </span>
+            </div>
+
+            {commentsQuery.isLoading ? (
+              <div className="p-3 text-center text-xs text-on-surface-variant flex items-center justify-center gap-2 rounded-lg bg-surface-container-low">
+                <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                Đang tải các bình luận liên quan...
+              </div>
+            ) : commentsQuery.data?.items && commentsQuery.data.items.length > 0 ? (
+              <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-1">
+                {commentsQuery.data.items.map((cmt) => {
+                  const isFlagged = cmt.commentId === item.targetId;
+                  return (
+                    <div
+                      key={cmt.commentId}
+                      className={`rounded-lg p-2.5 text-xs transition-colors ${
+                        isFlagged
+                          ? 'border-2 border-error bg-error-container/20 shadow-sm'
+                          : 'border border-outline-variant/40 bg-surface-container-low'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-on-surface">
+                            {cmt.author?.fullName ?? 'Thành viên'}
+                          </span>
+                          <span className="text-[10px] text-outline font-mono">#{cmt.commentId}</span>
+                          {isFlagged && (
+                            <span className="rounded bg-error px-1.5 py-0.2 font-label-sm text-[10px] font-bold text-on-error">
+                              Đang kiểm duyệt
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-outline">{formatDateTime(cmt.createdAt)}</span>
+                      </div>
+                      <p className="text-body-sm leading-relaxed text-on-surface whitespace-pre-wrap">
+                        {cmt.content}
+                      </p>
+
+                      {/* Các phản hồi con bên dưới nếu có */}
+                      {cmt.replies && cmt.replies.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-1.5 pl-3 border-l-2 border-primary/20">
+                          {cmt.replies.map((rep) => {
+                            const isReplyFlagged = rep.commentId === item.targetId;
+                            return (
+                              <div
+                                key={rep.commentId}
+                                className={`rounded p-1.5 ${
+                                  isReplyFlagged
+                                    ? 'border-2 border-error bg-error-container/20'
+                                    : 'bg-surface-container-lowest'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-[11px] mb-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-semibold text-on-surface">{rep.author?.fullName}</span>
+                                    {isReplyFlagged && (
+                                      <span className="rounded bg-error px-1 text-[9px] text-on-error font-bold">
+                                        Đang kiểm duyệt
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-outline">{formatDateTime(rep.createdAt)}</span>
+                                </div>
+                                <p className="text-xs text-on-surface leading-relaxed">{rep.content}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-on-surface-variant italic rounded-lg bg-surface-container-low p-2">
+                Chưa có bình luận nào khác trong bài viết.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   if (isRecipe) {
     if (recipeQuery.isLoading) {
@@ -609,25 +769,78 @@ function OriginalContentRenderer({ item }: { item: ModerationItem }) {
     }
     const p = postQuery.data;
     return (
-      <div className="flex flex-col gap-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest p-3.5 max-h-[380px] overflow-y-auto">
-        <h4 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-          {p.title}
-        </h4>
-        <div className="flex items-center gap-2 text-xs text-on-surface-variant pb-1.5 border-b border-surface-container">
-          <span className="font-medium text-on-surface">{p.author?.fullName ?? 'Tác giả'}</span>
-          <span>•</span>
-          <span>{formatDateTime(p.createdAt)}</span>
+      <div className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3.5 max-h-[420px] overflow-y-auto">
+        <div className="flex flex-col sm:flex-row gap-3 items-start">
+          {p.imageUrl && (
+            <img
+              src={p.imageUrl}
+              alt={p.title}
+              className="w-full sm:w-36 h-24 object-cover rounded-lg border border-outline-variant/40 shrink-0"
+            />
+          )}
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <h4 className="font-headline-sm text-headline-sm font-bold text-on-surface line-clamp-2">
+              {p.title}
+            </h4>
+            <div className="flex items-center gap-2 text-xs text-on-surface-variant pb-1">
+              <span>Tác giả bài viết: <strong className="text-on-surface">{p.author?.fullName ?? 'Tác giả'}</strong></span>
+              <span>•</span>
+              <span>{formatDateTime(p.createdAt)}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-on-surface-variant">
+              <a
+                href={`/community/posts/${item.targetId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-secondary hover:underline font-semibold"
+              >
+                <span>Mở bài viết tab mới</span>
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </a>
+              {p.recipes && p.recipes.length > 0 && (
+                <span className="rounded bg-primary-container/30 px-1.5 py-0.5 text-primary font-medium">
+                  🥗 {p.recipes.length} công thức đính kèm
+                </span>
+              )}
+              {p.videos && p.videos.length > 0 && (
+                <span className="rounded bg-secondary-container/30 px-1.5 py-0.5 text-secondary font-medium">
+                  🎬 {p.videos.length} video đính kèm
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        {p.imageUrl && (
-          <img
-            src={p.imageUrl}
-            alt={p.title}
-            className="w-full max-h-52 object-cover rounded-lg border border-outline-variant/40"
-          />
+
+        {/* Nội dung bài viết nguyên bản */}
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-surface-container">
+          <span className="font-label-sm text-label-sm font-bold text-on-surface flex items-center gap-1 text-primary">
+            <span className="material-symbols-outlined text-[15px]">description</span>
+            Nội dung bài viết nguyên bản
+          </span>
+          <div className="rounded-lg bg-surface-container-low p-3 text-body-sm text-on-surface whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+            {p.content}
+          </div>
+        </div>
+
+        {/* Công thức đính kèm nếu có */}
+        {p.recipes && p.recipes.length > 0 && (
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-surface-container">
+            <span className="font-label-sm text-label-sm font-bold text-on-surface flex items-center gap-1 text-primary">
+              <span className="material-symbols-outlined text-[15px]">restaurant_menu</span>
+              Công thức đính kèm ({p.recipes.length} món)
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+              {p.recipes.map((rcp) => (
+                <div key={rcp.recipeId} className="flex items-center gap-2 rounded-lg bg-surface-container-low p-2">
+                  {rcp.imageUrl && (
+                    <img src={rcp.imageUrl} alt={rcp.title} className="w-10 h-10 object-cover rounded" />
+                  )}
+                  <span className="font-medium text-on-surface line-clamp-1">{rcp.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
-        <div className="text-body-sm text-on-surface whitespace-pre-wrap leading-relaxed">
-          {p.content}
-        </div>
       </div>
     );
   }
