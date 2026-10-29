@@ -228,7 +228,7 @@ export const SOURCE_VENUE_LABEL: Record<string, string> = {
 };
 
 export const CRITERIA_HINT =
-  'Cần đủ 4 tiêu chí (BR-ADM-MAS-003): đủ định lượng và thời gian từng bước, đã qua kiểm duyệt không vi phạm, ≥ 10 lượt thả tim, không còn báo cáo chờ xử lý.';
+  'Xét duyệt và cấp huy hiệu cho các công thức đạt chuẩn về định lượng, thời gian, trường phái chay và có tối thiểu 10 lượt yêu thích.';
 
 /** Đường dẫn công khai của đối tượng bị báo cáo; bình luận không có route riêng. */
 export function targetLink(type: string, id: number): string | null {

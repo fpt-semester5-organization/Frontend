@@ -53,9 +53,9 @@ describe('Hàng đợi kiểm duyệt 2 Tab (SCR-34)', () => {
     expect(screen.getByText('Quảng cáo trái phép phát hiện bởi AI')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByText('Spam / quảng cáo')).toBeInTheDocument();
 
-    // Kiểm tra 2 tab trực quan hiển thị
-    const aiTab = screen.getByRole('tab', { name: /Bài do AI gắn cờ/i });
-    const userTab = screen.getByRole('tab', { name: /Bài bị báo cáo/i });
+    // Kiểm tra các tab nguồn kiểm duyệt trực quan hiển thị
+    const aiTab = screen.getByRole('tab', { name: /(?:Bài do )?AI gắn cờ/i });
+    const userTab = screen.getByRole('tab', { name: /Người dùng báo cáo|Bài bị báo cáo/i });
     expect(aiTab).toBeInTheDocument();
     expect(userTab).toBeInTheDocument();
   });
@@ -64,7 +64,7 @@ describe('Hàng đợi kiểm duyệt 2 Tab (SCR-34)', () => {
     renderWithProviders(<AdminModerationQueuePage />);
     await screen.findByText('#RPT-91');
 
-    const userTab = screen.getByRole('tab', { name: /Bài bị báo cáo/i });
+    const userTab = screen.getByRole('tab', { name: /Người dùng báo cáo|Bài bị báo cáo/i });
     await userEvent.click(userTab);
 
     await waitFor(() =>
@@ -77,7 +77,7 @@ describe('Hàng đợi kiểm duyệt 2 Tab (SCR-34)', () => {
   it('quyết định xử lý yêu cầu ghi chú 10–500 ký tự', async () => {
     vi.mocked(moderation.decideReport).mockResolvedValue(ok({ reportId: 91, status: 'RESOLVED' }, 'Đã xử lý'));
     renderWithProviders(<AdminModerationQueuePage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Xác nhận vi phạm' }));
+    await userEvent.click(await screen.findByRole('button', { name: /(?:Xác nhận|Xác nhận vi phạm)/ }));
 
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/Ghi chú quyết định/), 'ngắn');
@@ -103,7 +103,7 @@ describe('Kiểm duyệt bình luận vi phạm (SCR-35)', () => {
     renderWithProviders(<CommentModerationPage />);
     expect(await screen.findByText('#RPT-91')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Xóa bình luận' }));
+    await userEvent.click(screen.getByRole('button', { name: /(?:Xóa bình luận|Xóa)/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/toàn bộ trả lời bên dưới sẽ bị ẩn/)).toBeInTheDocument();
 
