@@ -116,22 +116,18 @@ export function AdminLayout() {
     30,
   );
 
-  // Xử lý phản hồi 403 toàn cục cho Admin:
-  // 403 ERR_ADM_FORBIDDEN: toast cảnh báo theo spec (không đổi trang); 403 ERR_AUTH_ACCOUNT_BANNED: tài khoản bị khóa -> kết thúc phiên.
+  // Xử lý phản hồi 403 riêng cho Admin:
+  // 403 ERR_ADM_FORBIDDEN: toast cảnh báo theo spec (không đổi trang).
+  // 403 ERR_AUTH_ACCOUNT_BANNED đã được interceptor toàn cục tại src/api/http.ts xử lý tự động.
   useEffect(() => {
     const id = http.interceptors.response.use(undefined, (error) => {
       const status = apiErrorStatus(error);
       const code = apiErrorCode(error);
       if (status === 403 && code === 'ERR_ADM_FORBIDDEN') toast.warning(apiErrorMessage(error));
-      if (status === 403 && code === 'ERR_AUTH_ACCOUNT_BANNED') {
-        endSession();
-        toast.warning(apiErrorMessage(error));
-        navigate(PATHS.AUTH.LOGIN, { replace: true });
-      }
       return Promise.reject(error);
     });
     return () => http.interceptors.response.eject(id);
-  }, [navigate]);
+  }, []);
 
   const ai = useAiMetrics({});
   const circuit = circuitView(ai.data?.circuit?.state);

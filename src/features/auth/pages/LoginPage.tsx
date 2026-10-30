@@ -31,6 +31,7 @@ export function LoginPage() {
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [askRestore, setAskRestore] = useState(false);
   const [notVerifiedEmail, setNotVerifiedEmail] = useState<string | null>(null);
+  const [bannedNotice, setBannedNotice] = useState<string | null>(null);
   const [accountLinkState, setAccountLinkState] = useState<{ email: string; idToken: string } | null>(null);
   const form = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '', restoreAccount: false } });
   const { formError, setFormError, handle, clear } = useApiFormErrors(form.setError);
@@ -42,7 +43,25 @@ export function LoginPage() {
       email?: string;
       googleIdToken?: string;
       accountLinkRequired?: boolean;
+      banned?: boolean;
+      bannedMessage?: string;
     } | null;
+
+    let notice = state?.bannedMessage;
+    if (!notice) {
+      try {
+        notice = sessionStorage.getItem('vl_banned_notice') || undefined;
+        if (notice) sessionStorage.removeItem('vl_banned_notice');
+      } catch {
+        /* bỏ qua */
+      }
+    }
+
+    if (state?.banned || notice) {
+      const msg = notice || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên';
+      setBannedNotice(msg);
+      toast.error(msg);
+    }
 
     if (state?.accountLinkRequired && state.email) {
       form.setValue('email', state.email);
@@ -111,8 +130,9 @@ export function LoginPage() {
           if (code === 'ERR_AUTH_EMAIL_NOT_VERIFIED') setNotVerifiedEmail(values.email.trim());
           if (code === 'ERR_AUTH_ACCOUNT_BANNED') {
             const until = typeof data.suspendedUntil === 'string' ? new Date(data.suspendedUntil).toLocaleString('vi-VN') : null;
-            toast.warning(apiErrorMessage(err));
-            return setFormError(`${apiErrorMessage(err)}${until ? ` Đình chỉ đến ${until}.` : ''}`);
+            const banMsg = apiErrorMessage(err) || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên';
+            toast.error(banMsg);
+            return setFormError(`${banMsg}${until ? ` Đình chỉ đến ${until}.` : ''}`);
           }
           if (code === 'ERR_AUTH_EMAIL_NOT_VERIFIED') toast.warning(apiErrorMessage(err));
           handle(err);
@@ -156,6 +176,11 @@ export function LoginPage() {
       </div>
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-space-md">
+        {bannedNotice && (
+          <FormAlert tone="error">
+            <span className="font-semibold">{bannedNotice}</span>
+          </FormAlert>
+        )}
         {formError && <FormAlert>{formError}</FormAlert>}
         {notVerifiedEmail && (
           <FormAlert kind="info">

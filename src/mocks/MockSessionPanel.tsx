@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { handleAccountBanned } from '@/api/session';
 import { Icon } from '@/components/ui/Icon';
 import { login, logout } from '@/features/auth/api/auth.api';
 import { cn } from '@/lib/cn';
@@ -88,6 +89,20 @@ const MockSessionPanel: React.FC = () => {
               </button>
             );
           })}
+          {user && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                handleAccountBanned('Tài khoản của bạn đã bị khóa bởi Quản trị viên (Thử nghiệm ban thực tế)');
+              }}
+              className="mt-1 flex w-full items-center gap-1.5 rounded-lg bg-error/20 px-2 py-1.5 text-left font-semibold text-error hover:bg-error/30 transition-colors"
+            >
+              <Icon name="block" className="text-[16px]" />
+              🚨 Giả lập Admin cấm tài khoản này
+            </button>
+          )}
           <label className="mt-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10">
             <input
               type="checkbox"

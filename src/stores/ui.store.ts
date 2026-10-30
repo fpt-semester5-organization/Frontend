@@ -27,11 +27,14 @@ interface UiState {
   toasts: ToastItem[];
   signupPrompt: { open: boolean; reason: SignupPromptReason; returnUrl: string };
   serviceBanner: string | null;
+  bannedModal: { open: boolean; message: string };
   pushToast: (variantOrKind: ToastVariant | ToastKind, message: string, action?: ToastAction) => void;
   dismissToast: (id: number) => void;
   openSignupPrompt: (arg?: SignupPromptReason | string) => void;
   closeSignupPrompt: () => void;
   setServiceBanner: (message: string | null) => void;
+  openBannedModal: (message?: string) => void;
+  closeBannedModal: () => void;
 }
 
 let seq = 0;
@@ -43,6 +46,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   toasts: [],
   signupPrompt: { open: false, reason: 'guest', returnUrl: '/' },
   serviceBanner: null,
+  bannedModal: { open: false, message: '' },
   pushToast: (variantOrKind, message, action) => {
     const id = ++seq;
     const variant: ToastVariant = variantOrKind === 'error' ? 'danger' : variantOrKind;
@@ -63,6 +67,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   closeSignupPrompt: () => set((s) => ({ signupPrompt: { ...s.signupPrompt, open: false } })),
   setServiceBanner: (serviceBanner) => set({ serviceBanner }),
+  openBannedModal: (message = 'Tài khoản của bạn đã bị khóa bởi Quản trị viên') =>
+    set({ bannedModal: { open: true, message } }),
+  closeBannedModal: () => set((s) => ({ bannedModal: { ...s.bannedModal, open: false } })),
 }));
 
 /** Gọi được ngoài React (interceptor, v.v.). */

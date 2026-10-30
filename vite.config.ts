@@ -38,6 +38,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/hubs': {
+        target: 'http://localhost:5137',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
       '/swagger': {
         target: 'http://localhost:5137',
         changeOrigin: true,

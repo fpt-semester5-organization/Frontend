@@ -5,7 +5,7 @@ import { cleanUserMessage } from '@/lib/userMessage';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
-import { bootstrapGuestSession, endSession, refreshAccessToken } from './session';
+import { bootstrapGuestSession, clearAllTokensFromStorage, endSession, handleAccountBanned, refreshAccessToken } from './session';
 import type { ApiEnvelope, ApiErrorBody, Paged } from './types';
 
 export { refreshAccessToken };
@@ -17,6 +17,7 @@ export { refreshAccessToken };
  *  - 401 ERR_AUTH_INVALID_TOKEN (hoặc không có mã): làm mới token đúng 1 lần (POST /auth/refresh-token, cookie HttpOnly,
  *    nhiều request đồng thời dùng chung 1 lần refresh), thử lại request; vẫn 401 hoặc refresh hỏng thì kết thúc phiên và về /auth/login;
  *  - 401 của Khách (Anonymous JWT hết hạn 24 giờ): xin phiên Khách mới 1 lần rồi thử lại;
+ *  - 403 ERR_AUTH_ACCOUNT_BANNED: tài khoản bị khóa/cấm -> xóa sạch token trong localStorage, báo lỗi và về /auth/login;
  *  - 403 ERR_GUEST_* / ERR_QUOTA_*: mở SignupPromptModal (Khách); 429: toast; 503: banner; 5xx: toast + ghi correlationId.
  *
  * KHÔNG đặt sẵn `Content-Type`: axios tự chọn JSON cho object và multipart (có boundary) cho FormData.
@@ -76,8 +77,22 @@ http.interceptors.response.use(
         try {
           token = await refreshAccessToken();
         } catch (refreshError) {
-          const refreshStatus = (refreshError as AxiosError).response?.status;
-          if (refreshStatus === 401 || refreshStatus === 403) expireSession(); // refresh token hỏng/hết hạn/bị thu hồi
+          const refreshErr = refreshError as AxiosError<ApiErrorBody>;
+          const refreshStatus = refreshErr.response?.status;
+          const refreshCode = refreshErr.response?.data?.errorCode;
+          const refreshMsg = refreshErr.response?.data?.message;
+          const isRefreshBanned =
+            refreshStatus === 403 &&
+            (refreshCode === 'ERR_AUTH_ACCOUNT_BANNED' ||
+              refreshCode === 'ERR_AUTH_ACCOUNT_SUSPENDED' ||
+              refreshMsg?.toLowerCase().includes('khóa') ||
+              refreshMsg?.toLowerCase().includes('cấm'));
+
+          if (isRefreshBanned) {
+            handleAccountBanned(cleanUserMessage(refreshMsg) || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên');
+          } else if (refreshStatus === 401 || refreshStatus === 403) {
+            expireSession(); // refresh token hỏng/hết hạn/bị thu hồi
+          }
           return Promise.reject(error); // lỗi mạng/5xx khi refresh: giữ phiên, báo lỗi gốc
         }
         config.headers.Authorization = `Bearer ${token}`;
@@ -89,6 +104,24 @@ http.interceptors.response.use(
           config.headers.Authorization = `Bearer ${token}`;
           return http(config);
         }
+      }
+      return Promise.reject(error);
+    }
+
+    // ---- 403: Tài khoản bị Admin cấm/khóa (ERR_AUTH_ACCOUNT_BANNED) ----
+    const isBanned =
+      status === 403 &&
+      (code === 'ERR_AUTH_ACCOUNT_BANNED' ||
+        code === 'ERR_AUTH_ACCOUNT_SUSPENDED' ||
+        body?.message?.toLowerCase().includes('khóa') ||
+        body?.message?.toLowerCase().includes('cấm'));
+
+    if (isBanned) {
+      const banMessage = cleanUserMessage(body?.message) || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên';
+      if (!config?.url?.includes('/auth/login')) {
+        handleAccountBanned(banMessage);
+      } else {
+        clearAllTokensFromStorage();
       }
       return Promise.reject(error);
     }
