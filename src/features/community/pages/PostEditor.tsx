@@ -50,7 +50,7 @@ const PostEditor: React.FC = () => {
       navigate(PATHS.ME.CONTENT());
     } else {
       notifySuccess(message || 'Đã lưu bài viết.');
-      navigate(PATHS.COMMUNITY.POST_DETAIL(targetId));
+      navigate(isEdit ? PATHS.COMMUNITY.POST_DETAIL(targetId) : PATHS.COMMUNITY.ROOT);
     }
   };
 

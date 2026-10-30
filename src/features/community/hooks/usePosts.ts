@@ -20,15 +20,16 @@ export function usePostList(params: PostListParams, options?: { enabled?: boolea
 }
 
 /** Cuộn vô hạn bài viết (SCR-25): nạp thêm trang mới khi người dùng cuộn đến cuối feed. */
-export function useInfinitePosts(params: Omit<PostListParams, 'page'>, options?: { enabled?: boolean }) {
+export function useInfinitePosts(params: Omit<PostListParams, 'page'>, options?: { enabled?: boolean; refetchOnMount?: boolean | 'always' }) {
   return useInfiniteQuery<Paged<PostListItem>>({
-    queryKey: [...communityKeys.all, 'infinite', params],
+    queryKey: [...communityKeys.postLists(), 'infinite', params],
     queryFn: ({ pageParam = 1 }) => listPosts({ ...params, page: pageParam as number }),
     initialPageParam: 1,
     getNextPageParam: (last: Paged<PostListItem>) =>
       last.meta.page * last.meta.size < last.meta.total ? last.meta.page + 1 : undefined,
     enabled: options?.enabled ?? true,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: options?.refetchOnMount ?? 'always',
     retry: retryServerErrorsOnce,
   });
 }

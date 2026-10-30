@@ -81,6 +81,40 @@ const HomePage: React.FC = () => {
                 </p>
               )}
             </div>
+
+            {/* Sắp xếp: Mới nhất | Phổ biến */}
+            <div className="flex items-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest p-1 shadow-xs" role="tablist" aria-label="Sắp xếp danh sách">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filters.sort === 'NEWEST'}
+                onClick={() => update({ sort: 'NEWEST' })}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-label-md text-label-md transition-all cursor-pointer',
+                  filters.sort === 'NEWEST'
+                    ? 'bg-primary-container font-semibold text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                )}
+              >
+                <Icon name="schedule" className="text-[16px]" />
+                Mới nhất
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filters.sort === 'POPULAR'}
+                onClick={() => update({ sort: 'POPULAR' })}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 font-label-md text-label-md transition-all cursor-pointer',
+                  filters.sort === 'POPULAR'
+                    ? 'bg-primary-container font-semibold text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                )}
+              >
+                <Icon name="local_fire_department" className="text-[16px]" />
+                Phổ biến
+              </button>
+            </div>
           </div>
 
           {/* Bộ lọc duy nhất và hợp nhất: Tìm kiếm + Loại nội dung + Sắp xếp + Trường phái & Thời gian */}

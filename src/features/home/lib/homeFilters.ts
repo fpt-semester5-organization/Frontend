@@ -9,7 +9,7 @@ export const RECIPE_PAGE_SIZE = 9;
 const CONTENT_TYPES: RecipeContentType[] = ['ALL', 'RECIPE', 'VIDEO'];
 const SORTS: RecipeSort[] = ['POPULAR', 'NEWEST'];
 
-export const DEFAULT_FILTERS: HomeFilters = { keyword: '', dietarySchoolId: null, quick: false, contentType: 'ALL', sort: 'POPULAR' };
+export const DEFAULT_FILTERS: HomeFilters = { keyword: '', dietarySchoolId: null, quick: false, contentType: 'ALL', sort: 'NEWEST' };
 
 /** Đọc bộ lọc từ query string; giá trị sai bị bỏ qua (về mặc định) thay vì gửi 400 lên server. */
 export function parseFilters(search: URLSearchParams): HomeFilters {
