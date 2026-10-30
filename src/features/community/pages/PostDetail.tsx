@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -12,8 +12,14 @@ import { formatNumber } from '@/lib/format';
 import { notifyApiError, notifySuccess } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
+import { SyncedVideoScriptPlayer } from '@/features/videos/components/SyncedVideoScriptPlayer';
+import { useVideoTranscript } from '@/features/videos/hooks/useVideoTranscript';
+import { extractVideoDirectlyWithAi } from '@/features/videos/api/videos.api';
+import { splitRawTranscriptToSegments } from '@/features/videos/lib/sampleTranscripts';
+import type { TranscriptSegment } from '@/features/videos/types/transcript.types';
+import type { PostVideoAttachment } from '../types/community.types';
 import { CommentSection } from '../components/CommentSection';
-import { LinkedRecipes, PostVideos } from '../components/PostAttachments';
+import { LinkedRecipes } from '../components/PostAttachments';
 import { RelatedPosts } from '../components/RelatedPosts';
 import { ReportDialog } from '../components/ReportDialog';
 import { VoteButton } from '../components/VoteButton';
@@ -39,6 +45,108 @@ const NotFound: React.FC = () => (
     }
   />
 );
+
+interface PostDetailMediaProps {
+  title: string;
+  imageUrl?: string | null;
+  video?: PostVideoAttachment | null;
+}
+
+/**
+ * Hiển thị media chính của bài viết chi tiết:
+ * - Nếu bài viết có video: hiển thị SyncedVideoScriptPlayer (đồng bộ kịch bản lời thoại từ CSDL/AI) thay thế ảnh tĩnh.
+ * - Nếu là bài viết ảnh thông thường: hiển thị ảnh minh họa.
+ */
+const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, video }) => {
+  const [duration, setDuration] = useState<number>(video?.durationSeconds ?? 10);
+  const videoId = video?.videoId ?? 0;
+  const videoUrl = video?.videoUrl;
+
+  const { data: transcriptData, isLoading: isTranscriptLoading } = useVideoTranscript(videoId, {
+    enabled: Boolean(videoId),
+    poll: false,
+  });
+
+  const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (videoUrl && !isTranscriptLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
+      extractVideoDirectlyWithAi(videoUrl)
+        .then((res) => {
+          if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
+        })
+        .catch((err) => {
+          console.warn('AI STT direct call error in PostDetail:', err);
+        });
+    }
+  }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript]);
+
+  const { activeSegments, transcriptSource } = useMemo(() => {
+    if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
+      return {
+        activeSegments: transcriptData.transcript.segments.map((s, idx) => ({
+          id: idx + 1,
+          start: s.start,
+          end: s.end,
+          text: s.text,
+        })),
+        transcriptSource: 'CSDL VeggieLife (Đồng bộ)',
+      };
+    }
+    if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.rawTranscript) {
+      const parsed = splitRawTranscriptToSegments(transcriptData.transcript.rawTranscript, duration);
+      if (parsed.length > 0) {
+        return {
+          activeSegments: parsed,
+          transcriptSource: 'CSDL VeggieLife (Bản gốc)',
+        };
+      }
+    }
+    if (aiLiveTranscript) {
+      const parsed = splitRawTranscriptToSegments(aiLiveTranscript, duration);
+      if (parsed.length > 0) {
+        return {
+          activeSegments: parsed,
+          transcriptSource: 'AI Faster-Whisper Live',
+        };
+      }
+    }
+    return {
+      activeSegments: [] as TranscriptSegment[],
+      transcriptSource: isTranscriptLoading ? 'Đang tải CSDL...' : 'Đang xử lý STT...',
+    };
+  }, [transcriptData, aiLiveTranscript, duration, isTranscriptLoading]);
+
+  // Nếu bài viết có video thì hiển thị SyncedVideoScriptPlayer ngay vị trí chính (thay thế ảnh tĩnh đứng yên)
+  if (video && video.videoUrl) {
+    return (
+      <div className="mb-space-lg overflow-hidden rounded-2xl border border-surface-container shadow-md">
+        <SyncedVideoScriptPlayer
+          videoUrl={video.videoUrl}
+          posterUrl={video.thumbnailUrl || imageUrl}
+          title={title}
+          segments={activeSegments}
+          autoPlay={true}
+          onDurationChange={setDuration}
+          subtitleSource={transcriptSource}
+        />
+      </div>
+    );
+  }
+
+  // Nếu bài viết chỉ có ảnh tĩnh thông thường (không có video)
+  if (imageUrl) {
+    return (
+      <figure className="mb-space-lg overflow-hidden rounded-2xl border border-surface-container">
+        <div className="aspect-[16/9] w-full overflow-hidden bg-surface-container">
+          <img src={imageUrl} alt={`Ảnh minh họa: ${title}`} className="h-full w-full object-cover" />
+        </div>
+      </figure>
+    );
+  }
+
+  return null;
+};
 
 /** SCR-26 community/PostDetail — bình luận nhiều tầng, thả tim, báo cáo (FN-POST-06, FN-COMM-01..05). */
 const PostDetail: React.FC = () => {
@@ -72,6 +180,21 @@ const PostDetail: React.FC = () => {
 
   const data = post.data;
   const isOwner = currentUserId !== null && data.author.userId === currentUserId;
+
+  const primaryVideo: PostVideoAttachment | null =
+    data.videos?.find((v) => v.videoId && v.status === 'READY') ??
+    data.videos?.find((v) => v.videoId) ??
+    (data.videos?.[0] ?? null) ??
+    ((data as { videoUrl?: string }).videoUrl
+      ? {
+          videoId: (data as { videoId?: number }).videoId,
+          videoUrl: (data as { videoUrl?: string }).videoUrl!,
+          thumbnailUrl: data.imageUrl ?? undefined,
+          durationSeconds: 10,
+          title: data.title,
+        }
+      : null);
+
 
   const handleDelete = () =>
     deletePost.mutate(postId, {
@@ -161,25 +284,21 @@ const PostDetail: React.FC = () => {
           {data.title}
         </h1>
 
-        {data.imageUrl && (
-          <figure className="mb-space-lg overflow-hidden rounded-lg">
-            <div className="aspect-[16/9] w-full overflow-hidden bg-surface-container">
-              <img src={data.imageUrl} alt={`Ảnh minh họa: ${data.title}`} className="h-full w-full object-cover" />
-            </div>
-          </figure>
+        {data.content && (
+          <div className="mb-space-md font-body-md text-body-md leading-relaxed break-words whitespace-pre-line text-on-surface">
+            {data.content}
+          </div>
         )}
 
         <div className="mb-space-lg empty:hidden">
           <LinkedRecipes recipes={data.recipes} />
         </div>
 
-        <div className="mb-space-xl font-body-md text-body-md leading-relaxed break-words whitespace-pre-line text-on-surface">
-          {data.content}
-        </div>
-
-        <div className="mb-space-xl empty:hidden">
-          <PostVideos videos={data.videos} postId={data.postId} />
-        </div>
+        <PostDetailMedia
+          title={data.title}
+          imageUrl={data.imageUrl}
+          video={primaryVideo}
+        />
 
         <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">
           <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />

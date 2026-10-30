@@ -26,6 +26,7 @@ export type VideoTranscriptResponse = Omit<TranscriptData, 'rawTranscript' | 'ex
   extractedRecipe: ExtractedRecipe | null;
   quota?: AiQuota | null;
   transcriptStatus?: TranscriptStatus;
+  segments?: Array<{ start: number; end: number; text: string }>;
 };
 
 /** Kết quả đã chuẩn hóa cho giao diện: 404 ERR_TRANSCRIPT_NOT_READY cũng là "đang xử lý" (UC-13, 1.0.E1). */
