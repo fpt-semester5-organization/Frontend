@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
 import { formatDuration } from '@/lib/format';
+import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
+import { SyncedVideoScriptPlayer } from '@/features/videos/components/SyncedVideoScriptPlayer';
+import { useVideoTranscript } from '@/features/videos/hooks/useVideoTranscript';
+import { extractVideoDirectlyWithAi } from '@/features/videos/api/videos.api';
+import { splitRawTranscriptToSegments } from '@/features/videos/lib/sampleTranscripts';
+import type { TranscriptSegment } from '@/features/videos/types/transcript.types';
 import type { PostRecipeAttachment, PostVideoAttachment } from '../types/community.types';
 
 /** Công thức đính kèm bài viết (FN-POST-06): khối "Liên kết công thức" dẫn tới SCR-12. */
@@ -41,56 +47,140 @@ export const LinkedRecipes: React.FC<{ recipes: PostRecipeAttachment[] }> = ({ r
   );
 };
 
-/**
- * Video đính kèm (FN-POST-06): mỗi video dẫn tới trang xem video và bản phiên âm (SCR-21).
- * Link kèm postId để trang video lấy URL phát từ chính bài viết này.
- */
-export const PostVideos: React.FC<{ videos: PostVideoAttachment[]; postId: number }> = ({ videos, postId }) => {
-  const list = videos.filter((video) => video.videoId);
-  if (list.length === 0) return null;
+const InlineVideoScriptPlayer: React.FC<{
+  video: PostVideoAttachment;
+  onClose: () => void;
+}> = ({ video, onClose }) => {
+  const [duration, setDuration] = useState<number>(video.durationSeconds ?? 10);
+  const { data: transcriptData, isLoading } = useVideoTranscript(video.videoId ?? 0, {
+    enabled: Boolean(video.videoId),
+    poll: false,
+  });
+  const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (video.videoUrl && !isLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
+      extractVideoDirectlyWithAi(video.videoUrl)
+        .then((res) => {
+          if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
+        })
+        .catch((err) => {
+          console.warn('AI STT direct call error:', err);
+        });
+    }
+  }, [video.videoUrl, isLoading, transcriptData, aiLiveTranscript]);
+
+  const { segments, source } = useMemo(() => {
+    if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
+      return {
+        segments: transcriptData.transcript.segments.map((s, idx) => ({
+          id: idx + 1,
+          start: s.start,
+          end: s.end,
+          text: s.text,
+        })),
+        source: 'CSDL VeggieLife (Đồng bộ)',
+      };
+    }
+    if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.rawTranscript) {
+      return {
+        segments: splitRawTranscriptToSegments(transcriptData.transcript.rawTranscript, duration),
+        source: 'CSDL VeggieLife (Bản gốc)',
+      };
+    }
+    if (aiLiveTranscript) {
+      return {
+        segments: splitRawTranscriptToSegments(aiLiveTranscript, duration),
+        source: 'AI Faster-Whisper Live',
+      };
+    }
+    return {
+      segments: [] as TranscriptSegment[],
+      source: isLoading ? 'Đang tải CSDL...' : 'Đang xử lý STT...',
+    };
+  }, [transcriptData, aiLiveTranscript, duration, isLoading]);
 
   return (
-    <div className="flex flex-col gap-space-sm">
-      {list.map((video) => {
-        const processing = video.status !== undefined && video.status !== 'READY';
-        const body = (
-          <>
-            <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-inverse-surface">
-              {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />}
-              <Icon
-                name={processing ? 'hourglass_top' : 'play_circle'}
-                className="absolute inset-0 m-auto flex h-fit w-fit text-[32px] text-white/90"
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-label-md text-label-md text-on-surface">
-                {video.title || `Video #${video.videoId}`}
-              </p>
-              {processing ? (
-                <p className="font-body-sm text-body-sm text-on-surface-variant">Video đang được xử lý, quay lại sau ít phút.</p>
-              ) : (
-                <p className="flex flex-wrap items-center gap-x-space-sm font-body-sm text-body-sm text-on-surface-variant">
-                  {video.durationSeconds !== undefined && <span>{formatDuration(video.durationSeconds)}</span>}
-                  <span className="text-primary">Xem video & tóm tắt công thức</span>
-                </p>
+    <div className="overflow-hidden rounded-2xl border border-surface-container shadow-md">
+      <SyncedVideoScriptPlayer
+        videoUrl={video.videoUrl}
+        posterUrl={video.thumbnailUrl}
+        title={video.title}
+        segments={segments}
+        autoPlay={true}
+        onClose={onClose}
+        onDurationChange={setDuration}
+        subtitleSource={source}
+      />
+    </div>
+  );
+};
+
+/**
+ * Video đính kèm trong bài viết: phát trực tiếp kèm tóm tắt kịch bản tại chỗ mà không cần chuyển trang.
+ */
+export const PostVideos: React.FC<{ videos: PostVideoAttachment[]; postId: number }> = ({ videos }) => {
+  const list = videos.filter((video) => video.videoId);
+  const [activeVideoId, setActiveVideoId] = useState<number | null>(null);
+
+  if (list.length === 0) return null;
+
+  const currentActiveVideo = list.find((v) => v.videoId === activeVideoId);
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      {currentActiveVideo && currentActiveVideo.videoUrl && (
+        <InlineVideoScriptPlayer
+          video={currentActiveVideo}
+          onClose={() => setActiveVideoId(null)}
+        />
+      )}
+
+      <div className="flex flex-col gap-space-sm">
+        {list.map((video) => {
+          const isPlaying = activeVideoId === video.videoId;
+          const processing = video.status !== undefined && video.status !== 'READY';
+          return (
+            <button
+              key={video.videoId}
+              type="button"
+              disabled={processing}
+              onClick={() => setActiveVideoId(isPlaying ? null : video.videoId!)}
+              className={cn(
+                'flex w-full items-center gap-space-md rounded-xl p-space-sm text-left transition-all cursor-pointer border',
+                isPlaying
+                  ? 'bg-primary-container/20 border-primary/40 shadow-xs'
+                  : 'bg-surface-container-low border-surface-container hover:bg-surface-container'
               )}
-            </div>
-          </>
-        );
-        return processing ? (
-          <div key={video.videoId} className="flex items-center gap-space-md rounded-lg bg-surface-container-low p-space-sm">
-            {body}
-          </div>
-        ) : (
-          <Link
-            key={video.videoId}
-            to={PATHS.VIDEOS.DETAIL(video.videoId!, postId)}
-            className="flex items-center gap-space-md rounded-lg bg-surface-container-low p-space-sm no-underline hover:bg-surface-container"
-          >
-            {body}
-          </Link>
-        );
-      })}
+            >
+              <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-inverse-surface">
+                {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />}
+                <Icon
+                  name={processing ? 'hourglass_top' : isPlaying ? 'pause_circle' : 'play_circle'}
+                  className="absolute inset-0 m-auto flex h-fit w-fit text-[32px] text-white/90"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-label-md text-label-md font-semibold text-on-surface">
+                  {video.title || `Video #${video.videoId}`}
+                </p>
+                {processing ? (
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Video đang được xử lý, quay lại sau ít phút.
+                  </p>
+                ) : (
+                  <p className="flex flex-wrap items-center gap-x-space-sm font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                    {video.durationSeconds !== undefined && <span>{formatDuration(video.durationSeconds)}</span>}
+                    <span className="text-primary font-medium">
+                      {isPlaying ? 'Đang phát video kèm kịch bản' : 'Bấm để phát video & kịch bản'}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

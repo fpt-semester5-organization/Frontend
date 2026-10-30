@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { GuestQuotaBadge } from '@/components/common/GuestQuotaBadge';
 import { Button } from '@/components/ui/Button';
@@ -67,6 +67,7 @@ const Hint: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  */
 export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ videoId, postId, videoTitle, isAuthor }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isGuest = !useAuthStore((state) => state.isAuthenticated);
   const pushToast = useUiStore((state) => state.pushToast);
@@ -125,6 +126,36 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ videoId, postI
   const closeAlreadyDone = () => {
     setAlreadyDone(null);
     void transcript.refetch();
+  };
+
+  const handleCreateRecipe = () => {
+    const data = transcript.data?.transcript;
+    const extracted = data?.extractedRecipe;
+    const raw = data?.rawTranscript;
+
+    navigate(PATHS.RECIPES.NEW, {
+      state: {
+        prefillRecipe: {
+          title: extracted?.title || videoTitle || '',
+          description: raw
+            ? `Công thức được bóc tách từ video nấu ăn bằng AI.\n\nBản phiên âm lời thoại:\n${raw}`
+            : 'Công thức được bóc tách từ video qua AI.',
+          servings: (extracted as { servings?: number | null } | null | undefined)?.servings
+            ? String((extracted as { servings?: number | null }).servings)
+            : '',
+          cookTimeMinutes: '20',
+          ingredients: (extracted?.ingredients ?? []).map((ing) => ({
+            name: ing.name,
+            quantity: ing.quantity != null ? String(ing.quantity) : '1',
+            unit: ing.unit || 'g',
+            isOptional: false,
+          })),
+          steps: extracted?.steps ?? [],
+        },
+        fromVideoId: videoId,
+        fromPostId: postId,
+      },
+    });
   };
 
   const quota = transcript.data?.transcript?.quota;
@@ -265,7 +296,14 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ videoId, postI
     }
 
     if (transcript.data?.transcript) {
-      return <TranscriptContent transcript={transcript.data.transcript} isAuthor={isAuthor} />;
+      return (
+        <div className="flex flex-col gap-space-md">
+          <TranscriptContent
+            transcript={transcript.data.transcript}
+            isAuthor={isAuthor}
+          />
+        </div>
+      );
     }
     return null;
   };
