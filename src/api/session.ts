@@ -69,6 +69,17 @@ export function bootstrapGuestSession(force = false): Promise<string | null> {
 }
 
 export const BANNED_ACCOUNT_DEFAULT_MESSAGE = 'Tài khoản của bạn đã bị khóa bởi Quản trị viên';
+export const BANNED_REASON_KEY = 'vl_banned_reason';
+const BANNED_NOTICE_KEY = 'vl_banned_notice';
+
+let isHandlingBan = false;
+
+type RouterNavigator = (to: string, options?: { replace?: boolean; state?: unknown }) => void;
+let routerNavigator: RouterNavigator | null = null;
+
+export function registerRouterNavigator(navigator: RouterNavigator | null): void {
+  routerNavigator = navigator;
+}
 
 /** Xóa sạch toàn bộ token (Access Token, Refresh Token, User, Guest) trong localStorage. */
 export function clearAllTokensFromStorage(): void {
@@ -89,13 +100,6 @@ export function clearAllTokensFromStorage(): void {
   }
 }
 
-type RouterNavigator = (to: string, options?: { replace?: boolean; state?: unknown }) => void;
-let routerNavigator: RouterNavigator | null = null;
-
-export function registerRouterNavigator(navigator: RouterNavigator | null): void {
-  routerNavigator = navigator;
-}
-
 /** Kết thúc phiên cục bộ: xóa token + người dùng, bỏ cache của người dùng cũ, mở lại phiên Khách. Không gọi API. */
 export function endSession(): void {
   clearAllTokensFromStorage();
@@ -113,45 +117,77 @@ export function endSession(): void {
  * 3. Bật Toast / Modal thông báo rõ ràng "Tài khoản của bạn đã bị khóa bởi Quản trị viên".
  * 4. Tự động chuyển hướng người dùng về trang đăng nhập (/auth/login).
  */
-export function handleAccountBanned(customMessage?: string): void {
-  const message = customMessage || BANNED_ACCOUNT_DEFAULT_MESSAGE;
+export function handleAccountBanned(message?: string): void {
+  if (isHandlingBan) return;
+  isHandlingBan = true;
 
-  // 1. Xóa sạch token trong localStorage
-  clearAllTokensFromStorage();
+  const banMessage = message?.trim() || BANNED_ACCOUNT_DEFAULT_MESSAGE;
 
-  // 2. Dọn dẹp trạng thái auth store & query cache
-  useAuthStore.getState().logout();
-  useAuthStore.getState().clearGuestToken();
-  useGuestStore.getState().reset();
-  queryClient.clear();
-
-  // Lưu thông báo vào sessionStorage để duy trì kể cả khi tải lại trang
+  // 1. Lưu lý do cấm vào sessionStorage để màn hình đăng nhập đọc và hiển thị
   try {
-    sessionStorage.setItem('vl_banned_notice', message);
+    sessionStorage.setItem(BANNED_REASON_KEY, banMessage);
+    sessionStorage.setItem(BANNED_NOTICE_KEY, banMessage);
   } catch {
     /* bỏ qua */
   }
 
-  // 3. Bật Toast thông báo lỗi & mở Modal
-  toast.error(message);
-  useUiStore.getState().openBannedModal(message);
+  // 2. Thu hồi token, dọn sạch phiên người dùng trong localStorage & store
+  clearAllTokensFromStorage();
+  endSession();
 
-  // 4. Tự động điều hướng về /login
+  // 3. Bật Toast thông báo lỗi & mở Modal
+  toast.error(banMessage);
+  try {
+    useUiStore.getState().openBannedModal(banMessage);
+  } catch {
+    /* bỏ qua */
+  }
+
+  // 4. Lập tức quay trở về màn hình đăng nhập (/auth/login)
+  const loginPath = PATHS.AUTH.LOGIN;
   if (typeof window !== 'undefined') {
-    const isLoginPage = window.location.pathname.startsWith(PATHS.AUTH.LOGIN);
+    const isLoginPage = window.location.pathname.startsWith(loginPath);
     if (!isLoginPage) {
       if (routerNavigator) {
         try {
-          routerNavigator(PATHS.AUTH.LOGIN, {
+          routerNavigator(loginPath, {
             replace: true,
-            state: { banned: true, bannedMessage: message },
+            state: { banned: true, bannedMessage: banMessage },
           });
+          setTimeout(() => {
+            isHandlingBan = false;
+          }, 1500);
           return;
         } catch {
-          /* rơi vào window.location.assign */
+          /* fallback to window.location.assign */
         }
       }
-      window.location.assign(PATHS.AUTH.LOGIN);
+      window.location.assign(`${loginPath}?banned=1`);
+    } else {
+      window.dispatchEvent(new CustomEvent('vl:account_banned', { detail: { message: banMessage } }));
     }
   }
+
+  setTimeout(() => {
+    isHandlingBan = false;
+  }, 1500);
+}
+
+export function _resetBanHandlingForTests(): void {
+  isHandlingBan = false;
+}
+
+/** Lấy thông điệp tài khoản bị cấm từ sessionStorage và xóa ngay sau đó. */
+export function getBannedReason(): string | null {
+  try {
+    const reason = sessionStorage.getItem(BANNED_REASON_KEY) || sessionStorage.getItem(BANNED_NOTICE_KEY);
+    if (reason) {
+      sessionStorage.removeItem(BANNED_REASON_KEY);
+      sessionStorage.removeItem(BANNED_NOTICE_KEY);
+      return reason;
+    }
+  } catch {
+    /* bỏ qua */
+  }
+  return null;
 }

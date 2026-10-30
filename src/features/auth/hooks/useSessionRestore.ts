@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { refreshAccessToken } from '@/api/http';
-import { bootstrapGuestSession } from '@/api/session';
+import { apiErrorCode, apiErrorMessage, apiErrorStatus, refreshAccessToken } from '@/api/http';
+import { bootstrapGuestSession, handleAccountBanned } from '@/api/session';
 import { useAuthStore } from '@/stores/auth.store';
 import { getCurrentUser } from '../api/auth.api';
 
@@ -22,12 +22,23 @@ export function useSessionRestore() {
         const token = await refreshAccessToken();
         const user = await getCurrentUser();
         setAuth(user, token);
-      } catch {
-        // Không có phiên (hoặc lấy hồ sơ lỗi): xóa token dở dang, coi là Khách.
+      } catch (err) {
+        const code = apiErrorCode(err);
+        const status = apiErrorStatus(err);
+        const msg = apiErrorMessage(err);
+
+        // Nếu tài khoản đã bị cấm/đình chỉ: lập tức thu hồi token và quay về trang login hiển thị cảnh báo
+        if (code === 'ERR_AUTH_ACCOUNT_BANNED' || (status === 403 && /banned|đình chỉ|cấm/i.test(msg))) {
+          handleAccountBanned(msg);
+          return;
+        }
+
+        // Không có phiên (hoặc lấy hồ sơ lỗi thông thường): xóa token dở dang, coi là Khách.
         logout();
         await bootstrapGuestSession();
       }
     })();
   }, []);
 }
+
 

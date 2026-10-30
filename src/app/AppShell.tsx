@@ -5,17 +5,19 @@ import { AppToaster } from '@/components/common/AppToaster';
 import { BannedAccountModal } from '@/components/common/BannedAccountModal';
 import { PageLoader } from '@/components/common/PageLoader';
 import { SignupPromptModal } from '@/components/common/SignupPromptModal';
+import { useSessionBanMonitor } from '@/features/auth/hooks/useSessionBanMonitor';
 import { useSessionRestore } from '@/features/auth/hooks/useSessionRestore';
 import { TranscriptWatcher } from '@/features/videos/components/TranscriptWatcher';
 import { useRealtimeAccountStatus } from '@/hooks/useRealtimeAccountStatus';
 import { useAuthStore } from '@/stores/auth.store';
 
 /**
- * Phần bao ngoài mọi route: khôi phục phiên, popup mời đăng ký, toast dùng chung,
- * modal thông báo tài khoản bị cấm, lắng nghe SignalR realtime và theo dõi kết quả bóc tách video cho tác giả.
+ * Phần bao ngoài mọi route: khôi phục phiên, giám sát cấm/đình chỉ, popup mời đăng ký,
+ * toast dùng chung, modal thông báo tài khoản bị cấm, lắng nghe SignalR realtime và theo dõi kết quả bóc tách video.
  */
 export const AppShell: React.FC = () => {
   useSessionRestore();
+  useSessionBanMonitor();
   useRealtimeAccountStatus();
 
   const navigate = useNavigate();

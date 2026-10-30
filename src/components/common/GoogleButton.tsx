@@ -26,10 +26,11 @@ export function decodeGoogleCredential(token: string): { email?: string; name?: 
 export interface GoogleButtonProps {
   label?: string;
   onAccountLinkRequired?: (email: string, idToken: string) => void;
+  onAccountBanned?: (message: string) => void;
 }
 
 /** Đăng nhập/đăng ký bằng Google (FN-AUTH-07, POST /auth/google). */
-export function GoogleButton({ label, onAccountLinkRequired }: GoogleButtonProps) {
+export function GoogleButton({ label, onAccountLinkRequired, onAccountBanned }: GoogleButtonProps) {
   const googleLogin = useLoginWithGoogle();
   const navigate = useNavigate();
 
@@ -67,6 +68,12 @@ export function GoogleButton({ label, onAccountLinkRequired }: GoogleButtonProps
             handleAccountLink(idToken, err);
             return;
           }
+          if (code === 'ERR_AUTH_ACCOUNT_BANNED') {
+            const msg = apiErrorMessage(err) || 'Tài khoản của bạn đã bị cấm do vi phạm điều khoản dịch vụ.';
+            if (onAccountBanned) onAccountBanned(msg);
+            else toast.error(msg);
+            return;
+          }
           toast.error(apiErrorMessage(err));
         },
       }
@@ -89,6 +96,12 @@ export function GoogleButton({ label, onAccountLinkRequired }: GoogleButtonProps
                 const code = apiErrorCode(err);
                 if (code === 'ERR_AUTH_ACCOUNT_LINK_REQUIRED') {
                   handleAccountLink(devToken, err);
+                  return;
+                }
+                if (code === 'ERR_AUTH_ACCOUNT_BANNED') {
+                  const msg = apiErrorMessage(err) || 'Tài khoản của bạn đã bị cấm do vi phạm điều khoản dịch vụ.';
+                  if (onAccountBanned) onAccountBanned(msg);
+                  else toast.error(msg);
                   return;
                 }
                 toast.error(apiErrorMessage(err));

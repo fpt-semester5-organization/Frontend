@@ -7,7 +7,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { http } from '@/api/http';
-import { handleAccountBanned } from '@/api/session';
+import { handleAccountBanned, _resetBanHandlingForTests } from '@/api/session';
 import { mockApi } from '@/test/mockApi';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
@@ -16,6 +16,7 @@ describe('BannedAccountFlow - Kiểm thử thực tế trải nghiệm trên Gia
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    _resetBanHandlingForTests();
 
     useAuthStore.setState({
       user: null,

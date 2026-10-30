@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAllTokensFromStorage, handleAccountBanned, registerRouterNavigator } from '@/api/session';
+import { clearAllTokensFromStorage, handleAccountBanned, registerRouterNavigator, _resetBanHandlingForTests } from '@/api/session';
 import { http } from '@/api/http';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore, type AuthUser } from '@/stores/auth.store';
@@ -21,6 +21,7 @@ describe('Xử lý tài khoản bị Admin cấm/khóa (Frontend Ban Revocation)
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    _resetBanHandlingForTests();
     mockNavigator.mockClear();
     registerRouterNavigator(mockNavigator);
 
