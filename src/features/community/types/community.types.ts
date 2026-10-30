@@ -110,6 +110,10 @@ export interface CommunityFeedItem {
   caloriesKcal?: number | null;
   dietarySchool?: string | null;
   isVerified?: boolean;
+  type?: string;
+  hasVideo?: boolean;
+  videoId?: number;
+  videoUrl?: string;
 }
 
 export const fromPost = (p: PostListItem): CommunityFeedItem => ({
@@ -123,6 +127,14 @@ export const fromPost = (p: PostListItem): CommunityFeedItem => ({
   createdAt: p.createdAt,
   voteCount: p.voteCount,
   commentCount: p.commentCount,
+  type: (p as { type?: string }).type,
+  hasVideo: Boolean(
+    (p as { hasVideo?: boolean }).hasVideo ||
+    (p as { type?: string }).type === 'VIDEO' ||
+    (p as { videoUrl?: string }).videoUrl
+  ),
+  videoId: (p as { videoId?: number }).videoId,
+  videoUrl: (p as { videoUrl?: string }).videoUrl,
 });
 
 export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').RecipeListItem): CommunityFeedItem => ({
@@ -138,6 +150,8 @@ export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').Re
   caloriesKcal: r.caloriesKcal,
   dietarySchool: r.dietarySchool,
   isVerified: r.isVerified,
+  type: r.type,
+  hasVideo: Boolean(r.type === 'VIDEO'),
 });
 
 /** Trộn xen kẽ hai mảng (bài viết, công thức) để feed Tất cả luôn đa dạng nội dung. */

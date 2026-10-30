@@ -143,78 +143,26 @@ const TranscriptView: React.FC<{ text: string }> = ({ text }) => {
 };
 
 /**
- * Kết quả bóc tách đã xong: công thức AI trích và bản phiên âm lời thoại.
- * Người xem khác nhận extractedRecipe = null cho tới khi công thức được duyệt (Leader câu 6).
+ * Kết quả bóc tách âm thanh: bản phiên âm lời thoại video (Speech-to-Text).
  */
-export const TranscriptContent: React.FC<{ transcript: VideoTranscriptResponse; isAuthor: boolean }> = ({
+export const TranscriptContent: React.FC<{
+  transcript: VideoTranscriptResponse;
+  isAuthor?: boolean;
+}> = ({
   transcript,
-  isAuthor,
 }) => {
-  const recipe = transcript.extractedRecipe;
-  const [tab, setTab] = useState<Tab>(recipe ? 'recipe' : 'transcript');
-  const baseId = useId();
-  const tabs: { value: Tab; label: string; icon: string }[] = [
-    { value: 'recipe', label: 'Công thức', icon: 'soup_kitchen' },
-    { value: 'transcript', label: 'Bản phiên âm', icon: 'subtitles' },
-  ];
-
   return (
     <div className="flex flex-col gap-space-md">
-      <div role="tablist" aria-label="Nội dung tóm tắt" className="grid grid-cols-2 gap-1 rounded-xl bg-surface-container p-1">
-        {tabs.map((item) => (
-          <button
-            key={item.value}
-            id={`${baseId}-${item.value}-tab`}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.value}
-            aria-controls={`${baseId}-${item.value}-panel`}
-            onClick={() => setTab(item.value)}
-            className={cn(
-              'flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-label-md text-label-md transition-colors',
-              tab === item.value
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            )}
-          >
-            <Icon name={item.icon} className="hidden text-[18px] sm:inline-block" />
-            <span className="whitespace-nowrap">{item.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div id={`${baseId}-${tab}-panel`} role="tabpanel" aria-labelledby={`${baseId}-${tab}-tab`}>
-        {tab === 'recipe' ? (
-          recipe ? (
-            <RecipeView recipe={recipe} />
-          ) : (
-            <div className="flex flex-col items-center gap-space-sm py-space-lg text-center">
-              <Icon name="pending_actions" className="text-[40px] text-outline" />
-              <p className="font-label-lg text-label-lg text-on-surface">Công thức đang chờ tác giả xác nhận</p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Bạn vẫn xem được bản phiên âm lời thoại của video.
-              </p>
-              <button
-                type="button"
-                onClick={() => setTab('transcript')}
-                className="font-label-md text-label-md text-primary hover:underline"
-              >
-                Xem bản phiên âm
-              </button>
-            </div>
-          )
-        ) : (
-          <TranscriptView text={transcript.rawTranscript ?? ''} />
-        )}
-      </div>
-
-      <p className="flex items-start gap-1.5 border-t border-surface-container pt-space-sm font-body-sm text-body-sm text-on-surface-variant">
-        <Icon name="info" className="mt-0.5 text-[16px]" />
-        <span>
-          Nội dung do AI tạo từ lời thoại của video nên có thể chưa chính xác.
-          {isAuthor && ' Người xem khác chỉ thấy phần công thức sau khi công thức được duyệt.'}
+      <div className="flex items-center gap-2 border-b border-surface-container pb-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-container text-on-primary shadow-2xs shrink-0">
+          <Icon name="subtitles" className="text-[16px]" />
         </span>
-      </p>
+        <h4 className="font-label-lg text-label-lg font-bold text-on-surface">
+          Lời thoại bóc tách từ video
+        </h4>
+      </div>
+
+      <TranscriptView text={transcript.rawTranscript ?? ''} />
     </div>
   );
 };

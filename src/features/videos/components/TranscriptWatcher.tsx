@@ -25,11 +25,12 @@ const WatchItem: React.FC<{ watch: TranscriptWatch }> = ({ watch }) => {
             if (window.location.pathname === PATHS.VIDEOS.DETAIL(videoId)) return;
 
             const name = title ? `"${title}"` : 'của bạn';
-            const action = { label: 'Xem kết quả', to: PATHS.VIDEOS.DETAIL(videoId, postId) };
+            const destination = postId ? PATHS.COMMUNITY.POST_DETAIL(postId) : PATHS.COMMUNITY.ROOT;
+            const action = { label: 'Xem video', to: destination };
             if (outcome === 'COMPLETED') {
-              pushToast('success', `Đã có bản tóm tắt công thức từ video ${name}. Hãy kiểm tra lại kết quả AI tạo.`, action);
+              pushToast('success', `Đã bóc tách xong kịch bản video ${name}.`, action);
             } else {
-              pushToast('warning', `Chưa bóc tách được công thức từ video ${name}.`, action);
+              pushToast('warning', `Chưa bóc tách được kịch bản video ${name}.`, action);
             }
           },
           onGiveUp: () => remove(videoId),
