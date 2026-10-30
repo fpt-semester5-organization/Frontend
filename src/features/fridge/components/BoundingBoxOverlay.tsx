@@ -28,10 +28,10 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
         if (!item.box2d || !isValidBox2D(item.box2d)) return null;
 
         const [ymin, xmin, ymax, xmax] = item.box2d;
-        const top = ymin / 10;
-        const left = xmin / 10;
-        const height = (ymax - ymin) / 10;
-        const width = (xmax - xmin) / 10;
+        const top = Math.max(0, Math.min(96, ymin / 10));
+        const left = Math.max(0, Math.min(96, xmin / 10));
+        const height = Math.max(2, Math.min(100 - top, (ymax - ymin) / 10));
+        const width = Math.max(2, Math.min(100 - left, (xmax - xmin) / 10));
 
         const isHovered = hoveredIndex === idx;
         const isDimmed = hoveredIndex !== null && !isHovered;
@@ -85,22 +85,22 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
             onBlur={() => onHoverItem(null)}
             aria-label={`${item.name} (${item.freshnessStatus})`}
           >
-            {/* Nhãn định danh nguyên liệu: nếu ở sát mép trên cùng thì hiển thị lọt vào trong hộp */}
+            {/* Nhãn định danh nguyên liệu: nếu ở sát mép trên cùng hoặc bên phải thì căn gọn vào trong */}
             <div
               className={`absolute ${
-                top < 6 ? 'top-0.5 left-0.5' : '-top-6 left-0'
-              } flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide shadow-sm transition-opacity duration-150 ${badgeBg} ${
+                top < 6 ? 'top-0.5' : '-top-6'
+              } ${left > 70 ? 'right-0' : 'left-0'} flex max-w-[220px] items-center gap-1 overflow-hidden whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide shadow-sm transition-opacity duration-150 ${badgeBg} ${
                 isHovered ? 'opacity-100 scale-105 z-40' : 'opacity-90'
               }`}
             >
-              <span>{item.name}</span>
+              <span className="truncate">{item.name}</span>
               {item.quantity && (
-                <span className="text-[10px] font-normal opacity-90">
+                <span className="shrink-0 text-[10px] font-normal opacity-90">
                   ({item.quantity})
                 </span>
               )}
               {item.confidence != null && (
-                <span className="text-[10px] opacity-80">
+                <span className="shrink-0 text-[10px] opacity-80">
                   {Math.round(item.confidence * 100)}%
                 </span>
               )}

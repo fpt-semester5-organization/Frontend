@@ -7,6 +7,7 @@ import { QUOTA } from '@/constants/quota';
 import { apiErrorMessage } from '@/api/http';
 import { toApiError } from '@/lib/apiError';
 import { formatNumber } from '@/lib/format';
+import { storage } from '@/lib/storage';
 import { PATHS } from '@/routes/paths';
 import { selectIsAuthenticated, selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { useGuestStore } from '@/stores/guest.store';
@@ -117,8 +118,14 @@ export const FridgePage: React.FC = () => {
   const allItemsQuery = useFridgeItems();
   const deleteMutation = useDeleteFridgeItem();
 
-  const hasItems = (allItemsQuery.data?.length ?? 0) > 0;
+  const totalStoredCount = authed ? (allItemsQuery.data?.length ?? 0) : 0;
+  const hasItems = authed && totalStoredCount > 0;
   const suggestionsQuery = useRecipeSuggestions(hasItems);
+
+  // Xóa kho tạm của khách nếu có trước đó
+  useEffect(() => {
+    storage.remove('vl_guest_fridge_items');
+  }, []);
 
   // Reset ảnh để chụp/quét ảnh mới
   const handleResetImage = () => {
@@ -295,7 +302,9 @@ export const FridgePage: React.FC = () => {
 
   // Lưu và đồng bộ danh sách nguyên liệu đã nhận diện vào tủ lạnh cá nhân
   const handleSaveToPersonalFridge = async () => {
+    // Chưa đăng nhập thì KHÔNG ĐƯỢC LƯU
     if (!authed) {
+      toast.warning('Bạn chưa đăng nhập. Vui lòng đăng nhập để lưu nguyên liệu vào tủ lạnh cá nhân!');
       openSignupPrompt('quota');
       return;
     }
@@ -369,6 +378,7 @@ export const FridgePage: React.FC = () => {
 
   // Lọc và sắp xếp kho tủ lạnh ảo (ưu tiên mục NON-FRESH xếp trước)
   const visibleItems = useMemo(() => {
+    if (!authed) return [];
     const list = itemsQuery.data ?? [];
     const query = searchQuery.trim().toLowerCase();
 
@@ -379,14 +389,14 @@ export const FridgePage: React.FC = () => {
       if (a.freshnessStatus === b.freshnessStatus) return a.name.localeCompare(b.name);
       return a.freshnessStatus === 'NON-FRESH' ? -1 : 1;
     });
-  }, [itemsQuery.data, searchQuery]);
+  }, [authed, itemsQuery.data, searchQuery]);
 
   // Hạn mức hiển thị
   const imageLimit = vip ? QUOTA.fridgeImagesPerDay.vip : QUOTA.fridgeImagesPerDay.free;
 
   // Xóa nguyên liệu khỏi tủ lạnh ảo
   const handleConfirmDelete = () => {
-    if (!deletingItem) return;
+    if (!deletingItem || !authed) return;
     const target = deletingItem;
 
     deleteMutation.mutate(target.inventoryId, {
@@ -521,7 +531,7 @@ export const FridgePage: React.FC = () => {
           <Icon name="kitchen" className="text-[20px]" />
           <span>Kho Nguyên Liệu Tủ Lạnh</span>
           <span className="rounded-full bg-surface-container-high px-2.5 py-0.5 text-xs font-bold text-on-surface-variant">
-            {allItemsQuery.data?.length ?? 0}
+            {totalStoredCount}
           </span>
         </button>
       </nav>
@@ -554,9 +564,15 @@ export const FridgePage: React.FC = () => {
                   if (result.data.quota) {
                     setMemberQuota(result.data.quota);
                   }
-                  toast.success(
-                    `Đã nhận diện thành công ${result.data.detected.length} nguyên liệu trong tủ lạnh!`,
-                  );
+                  if (result.data.detected.length === 0) {
+                    toast.error(
+                      'Không nhận diện được nguyên liệu! Không có bất kỳ nguyên liệu thực phẩm nào trong ảnh (đồ điện tử, gia dụng... không phải là nguyên liệu, thực phẩm).',
+                    );
+                  } else {
+                    toast.success(
+                      `Đã nhận diện thành công ${result.data.detected.length} nguyên liệu trong tủ lạnh!`,
+                    );
+                  }
                 }}
               />
             </div>
@@ -566,15 +582,19 @@ export const FridgePage: React.FC = () => {
               {/* Thanh điều khiển kết quả */}
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/40 pb-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                    <Icon name="center_focus_strong" className="text-[24px]" />
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${detectedItems.length > 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}>
+                    <Icon name={detectedItems.length > 0 ? "center_focus_strong" : "search_off"} className="text-[24px]" />
                   </div>
                   <div>
                     <h2 className="font-headline-sm text-lg sm:text-xl font-bold text-on-surface">
-                      Kết Quả Nhận Diện Tủ Lạnh ({detectedItems.length} nguyên liệu)
+                      {detectedItems.length > 0
+                        ? `Kết Quả Nhận Diện Tủ Lạnh (${detectedItems.length} nguyên liệu)`
+                        : 'Không Nhận Diện Được Nguyên Liệu'}
                     </h2>
                     <p className="font-body-sm text-xs text-on-surface-variant">
-                      AI đã phát hiện và đóng khung vị trí các loại nguyên liệu trực tiếp trên ảnh
+                      {detectedItems.length > 0
+                        ? 'AI đã phát hiện và đóng khung vị trí các loại nguyên liệu trực tiếp trên ảnh'
+                        : 'Không có bất kỳ nguyên liệu thực phẩm nào trong ảnh. Các đồ vật không liên quan (như đồ điện tử, đồ gia dụng...) không phải là nguyên liệu thực phẩm.'}
                     </p>
                   </div>
                   {isSavedToFridge ? (
@@ -648,8 +668,14 @@ export const FridgePage: React.FC = () => {
                 </div>
 
                 {detectedItems.length === 0 ? (
-                  <div className="rounded-xl bg-surface-container-low p-6 text-center font-body-sm text-body-sm text-on-surface-variant">
-                    AI không tìm thấy nguyên liệu thực vật nào trong ảnh. Bạn hãy thử chụp rõ nét và đủ ánh sáng hơn.
+                  <div className="rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 p-8 text-center text-amber-900 dark:text-amber-200">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 mb-3">
+                      <Icon name="search_off" className="text-[28px]" />
+                    </div>
+                    <div className="font-bold text-base mb-1">Không nhận diện được nguyên liệu nào</div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 max-w-md mx-auto">
+                      Không có bất kỳ nguyên liệu nào trong ảnh. Hệ thống bắt buộc phải quét đúng là nguyên liệu thực phẩm mới hiển thị. Các đồ vật không liên quan như đồ điện tử, đồ gia dụng không phải là nguyên liệu, thực phẩm.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -778,7 +804,7 @@ export const FridgePage: React.FC = () => {
                           ? `Đã lưu thành công ${detectedItems.length} nguyên liệu vào kho tủ lạnh của bạn.`
                           : authed
                           ? `Đã nhận diện ${detectedItems.length} nguyên liệu. Bấm "Lưu vào tủ lạnh cá nhân" để đồng bộ lưu trữ và nhận gợi ý món ăn.`
-                          : 'Đăng ký tài khoản để lưu trữ các nguyên liệu này vào tủ lạnh cá nhân và nhận gợi ý món ăn.'}
+                          : 'Bạn chưa đăng nhập. Vui lòng đăng nhập hoặc tạo tài khoản để lưu nguyên liệu vào kho tủ lạnh.'}
                       </p>
                     </div>
                   </div>
@@ -808,11 +834,17 @@ export const FridgePage: React.FC = () => {
                           : 'inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold'
                       }
                     >
-                      <Icon name={isSavedToFridge ? 'check_circle' : 'bookmark_added'} className="text-[20px]" />
-                      <span>{isSavedToFridge ? 'Đã lưu vào tủ lạnh' : 'Lưu vào tủ lạnh cá nhân'}</span>
+                      <Icon name={isSavedToFridge ? 'check_circle' : !authed ? 'lock' : 'bookmark_added'} className="text-[20px]" />
+                      <span>
+                        {isSavedToFridge
+                          ? 'Đã lưu vào tủ lạnh'
+                          : !authed
+                          ? 'Đăng nhập để lưu vào kho'
+                          : 'Lưu vào tủ lạnh cá nhân'}
+                      </span>
                     </Button>
 
-                    {isSavedToFridge ? (
+                    {isSavedToFridge && authed ? (
                       <Button
                         variant="primary"
                         size="md"
@@ -873,7 +905,7 @@ export const FridgePage: React.FC = () => {
               <div>
                 <h2 className="font-headline-sm text-headline-sm text-on-surface">Kho Tủ Lạnh Của Bạn</h2>
                 <p className="font-body-sm text-xs text-on-surface-variant">
-                  {allItemsQuery.data?.length ?? 0} nguyên liệu đang được lưu trữ
+                  {authed ? `${totalStoredCount} nguyên liệu đang được lưu trữ` : 'Yêu cầu đăng nhập tài khoản'}
                 </p>
               </div>
 
@@ -909,41 +941,55 @@ export const FridgePage: React.FC = () => {
               )}
             </div>
 
-            {/* Các tab lọc độ tươi */}
-            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Lọc theo độ tươi">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  aria-pressed={filter === f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`rounded-xl px-3.5 py-1.5 font-label-sm text-label-sm transition-all ${
-                    filter === f.key
-                      ? 'bg-primary font-semibold text-on-primary shadow-xs'
-                      : 'border border-outline-variant/60 bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            {/* Các tab lọc độ tươi (chỉ hiển thị khi đã đăng nhập) */}
+            {authed && (
+              <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Lọc theo độ tươi">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    aria-pressed={filter === f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`rounded-xl px-3.5 py-1.5 font-label-sm text-label-sm transition-all ${
+                      filter === f.key
+                        ? 'bg-primary font-semibold text-on-primary shadow-xs'
+                        : 'border border-outline-variant/60 bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {/* Trạng thái chưa đăng nhập */}
+            {/* Trạng thái xem kho tủ lạnh: Chưa đăng nhập */}
             {!authed ? (
-              <div className="flex flex-col items-center gap-2.5 rounded-xl bg-surface-container-low p-8 text-center">
-                <Icon name="lock" className="text-[44px] text-outline" />
-                <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                  Kho tủ lạnh thông minh dành cho thành viên
+              <div className="flex flex-col items-center gap-3.5 rounded-2xl border border-outline-variant/60 bg-surface-container-low p-8 sm:p-12 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Icon name="lock" className="text-[36px]" />
+                </div>
+                <h3 className="font-headline-sm text-lg sm:text-xl font-bold text-on-surface">
+                  Kho Tủ Lạnh Dành Cho Thành Viên
                 </h3>
-                <p className="max-w-md font-body-sm text-body-sm text-on-surface-variant">
-                  Đăng nhập hoặc đăng ký tài khoản để lưu nguyên liệu, theo dõi hạn sử dụng độ tươi và quản lý nguyên liệu dễ dàng.
+                <p className="max-w-md font-body-sm text-sm text-on-surface-variant">
+                  Chưa đăng nhập thì không thể lưu trữ và quản lý kho tủ lạnh. Vui lòng đăng nhập hoặc đăng ký tài khoản để bắt đầu lưu trữ nguyên liệu và nhận gợi ý món ăn thông minh!
                 </p>
-                <Link
-                  to={PATHS.AUTH.LOGIN}
-                  className="mt-2 rounded-xl bg-primary px-5 py-2 font-label-md text-label-md text-on-primary no-underline hover:bg-primary/90"
-                >
-                  Đăng nhập / Đăng ký
-                </Link>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+                  <Link
+                    to={PATHS.AUTH.LOGIN}
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-label-md text-sm font-semibold text-on-primary no-underline shadow-md shadow-primary/25 transition hover:bg-primary/90"
+                  >
+                    <Icon name="login" className="text-[18px]" />
+                    <span>Đăng nhập ngay</span>
+                  </Link>
+                  <Link
+                    to={PATHS.AUTH.REGISTER}
+                    className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/60 bg-surface px-5 py-2.5 font-label-md text-sm font-semibold text-on-surface no-underline hover:bg-surface-container"
+                  >
+                    <Icon name="person_add" className="text-[18px]" />
+                    <span>Đăng ký tài khoản</span>
+                  </Link>
+                </div>
               </div>
             ) : itemsQuery.isPending ? (
               <div className="flex flex-col gap-3" role="status" aria-busy="true">
@@ -1040,11 +1086,6 @@ export const FridgePage: React.FC = () => {
                             </h4>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <FreshnessBadge status={item.freshnessStatus} size="sm" />
-                              {item.freshnessStatus === 'NON-FRESH' && (
-                                <span className="font-label-sm inline-flex items-center rounded-full bg-[#fef6ea] px-2 py-0.5 text-[11px] font-semibold text-[#935216] border border-[#f8dfbe]">
-                                  Cần dùng sớm
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>

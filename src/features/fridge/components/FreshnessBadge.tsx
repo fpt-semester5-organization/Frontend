@@ -23,7 +23,7 @@ export const FreshnessBadge: React.FC<FreshnessBadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 font-semibold rounded-full tracking-wide transition-colors',
+        'inline-flex items-center gap-1 font-semibold rounded-full tracking-wide transition-colors max-w-full overflow-hidden',
         size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-label-sm',
         isFresh
           ? 'bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]'
@@ -35,10 +35,10 @@ export const FreshnessBadge: React.FC<FreshnessBadgeProps> = ({
       {showIcon && (
         <Icon
           name={isFresh ? 'eco' : 'hourglass_bottom'}
-          className={cn(size === 'sm' ? 'text-[14px]' : 'text-[16px]')}
+          className={cn(size === 'sm' ? 'text-[14px]' : 'text-[16px]', 'shrink-0')}
         />
       )}
-      <span>{short ? status : isFresh ? 'FRESH · Còn tươi' : 'NON-FRESH · Cần dùng sớm'}</span>
+      <span className="truncate">{short ? status : isFresh ? 'FRESH · Còn tươi' : 'NON-FRESH · Cần dùng sớm'}</span>
     </span>
   );
 };

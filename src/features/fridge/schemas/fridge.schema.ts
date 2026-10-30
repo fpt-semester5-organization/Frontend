@@ -40,14 +40,10 @@ export function checkImageDimensions(width: number, height: number): string | nu
 
 /** Schema thêm nguyên liệu thủ công vào tủ lạnh ảo. */
 export const addItemSchema = z.object({
-  ingredientId: z
-    .number({
-      required_error: 'Vui lòng chọn một nguyên liệu',
-      invalid_type_error: 'Vui lòng chọn một nguyên liệu',
-    })
-    .int()
-    .min(1, 'Vui lòng chọn một nguyên liệu hợp lệ'),
+  ingredientId: z.number().int().optional(),
   customItemName: z.string().trim().max(100, 'Tên tùy chỉnh tối đa 100 ký tự').optional(),
+  quantity: z.string().trim().max(50, 'Số lượng tối đa 50 ký tự').optional(),
+  unit: z.string().trim().max(30, 'Đơn vị tối đa 30 ký tự').optional(),
   freshnessStatus: z.enum(['FRESH', 'NON-FRESH']).default('FRESH'),
 });
 export type AddItemForm = z.infer<typeof addItemSchema>;
@@ -55,6 +51,8 @@ export type AddItemForm = z.infer<typeof addItemSchema>;
 /** Schema chỉnh sửa nguyên liệu trong tủ lạnh ảo. */
 export const editItemSchema = z.object({
   customItemName: z.string().trim().max(100, 'Tên tùy chỉnh tối đa 100 ký tự').optional(),
+  quantity: z.string().trim().max(50, 'Số lượng tối đa 50 ký tự').optional(),
+  unit: z.string().trim().max(30, 'Đơn vị tối đa 30 ký tự').optional(),
   freshnessStatus: z.enum(['FRESH', 'NON-FRESH']).default('FRESH'),
 });
 export type EditItemForm = z.infer<typeof editItemSchema>;

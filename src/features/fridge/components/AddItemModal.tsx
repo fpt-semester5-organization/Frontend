@@ -37,24 +37,46 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
     resolver: zodResolver(addItemSchema),
     defaultValues: {
       customItemName: '',
+      quantity: '',
+      unit: '',
       freshnessStatus: 'FRESH',
     },
   });
 
   const freshness = watch('freshnessStatus');
+  const watchedCustomName = watch('customItemName');
+  const watchedQuantity = watch('quantity');
+  const watchedUnit = watch('unit');
 
   const handleClose = () => {
     setKeyword('');
     setSelectedIngredient(null);
-    reset({ customItemName: '', freshnessStatus: 'FRESH' });
+    reset({ customItemName: '', quantity: '', unit: '', freshnessStatus: 'FRESH' });
     addMutation.reset();
     onHide();
   };
 
   const onSubmit = (values: AddItemForm) => {
-    addMutation.mutate(values, {
+    // Ghép số lượng và đơn vị vào tên nguyên liệu
+    const baseName = values.customItemName?.trim() || selectedIngredient?.name || keyword.trim();
+    if (!baseName) {
+      toast.warning('Vui lòng chọn hoặc nhập tên nguyên liệu.');
+      return;
+    }
+    const qty = values.quantity?.trim();
+    const unit = values.unit?.trim();
+    const fullQty = qty ? (unit ? `${qty} ${unit}` : qty) : (unit ? `1 ${unit}` : '');
+    const finalCustomName = fullQty ? `${baseName} (${fullQty})` : baseName;
+
+    const payload: AddItemForm = {
+      ...values,
+      ingredientId: selectedIngredient?.ingredientId && selectedIngredient.ingredientId > 0 ? selectedIngredient.ingredientId : undefined,
+      customItemName: finalCustomName,
+    };
+
+    addMutation.mutate(payload, {
       onSuccess: () => {
-        toast.success(`Đã thêm “${values.customItemName || selectedIngredient?.name}” vào tủ lạnh thông minh`);
+        toast.success(`Đã thêm “${finalCustomName}” vào tủ lạnh thông minh`);
         handleClose();
       },
       onError: (err) => {
@@ -77,8 +99,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
     });
   };
 
+  // Preview tên hiển thị
+  const previewBase = watchedCustomName?.trim() || selectedIngredient?.name || keyword.trim();
+  const previewQty = watchedQuantity?.trim();
+  const previewUnit = watchedUnit?.trim();
+  const previewFullQty = previewQty ? (previewUnit ? `${previewQty} ${previewUnit}` : previewQty) : (previewUnit ? `1 ${previewUnit}` : '');
+  const previewFullName = previewFullQty ? `${previewBase} (${previewFullQty})` : previewBase;
+
+  const canSubmit = Boolean(selectedIngredient || keyword.trim() || watchedCustomName?.trim());
+
   return (
-    <Modal show={show} onHide={handleClose} title="Thêm nguyên liệu vào tủ" size="sm">
+    <Modal show={show} onHide={handleClose} title="Thêm nguyên liệu vào tủ" className="max-w-[460px]">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-5" noValidate>
         {/* Tìm kiếm nguyên liệu */}
         <div className="flex flex-col gap-1.5">
@@ -89,7 +120,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             <input
               id="fridge-ing-search"
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={(e) => {
+                setKeyword(e.target.value);
+                if (selectedIngredient && e.target.value !== selectedIngredient.name) {
+                  setSelectedIngredient(null);
+                }
+              }}
               placeholder="Nhập tên: cà rốt, cải thảo, nấm rơm..."
               autoComplete="off"
               className={INPUT_CLASS}
@@ -97,7 +133,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             {keyword && (
               <button
                 type="button"
-                onClick={() => setKeyword('')}
+                onClick={() => {
+                  setKeyword('');
+                  setSelectedIngredient(null);
+                }}
                 className="absolute right-3 top-2.5 text-on-surface-variant hover:text-on-surface"
                 aria-label="Xóa từ khóa"
               >
@@ -121,8 +160,20 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
                 {apiErrorMessage(search.error, 'Lỗi tìm kiếm')}
               </div>
             ) : keyword && (search.data ?? []).length === 0 ? (
-              <div className="p-3 font-body-sm text-body-sm text-on-surface-variant">
-                Không tìm thấy nguyên liệu phù hợp.
+              <div className="p-3 font-body-sm text-body-sm text-on-surface-variant flex flex-col gap-1.5">
+                <span>Chưa có trong danh mục mẫu. Bạn có thể thêm trực tiếp:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const opt = { ingredientId: 0, name: keyword.trim() };
+                    setSelectedIngredient(opt);
+                    setValue('ingredientId', undefined);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors w-fit"
+                >
+                  <Icon name="add" className="text-[16px]" />
+                  <span>Dùng tên: “{keyword.trim()}”</span>
+                </button>
               </div>
             ) : !keyword && !selectedIngredient ? (
               <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
@@ -175,7 +226,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
           <input
             id="fridge-custom-name"
             {...register('customItemName')}
-            placeholder={selectedIngredient?.name ?? 'Mặc định lấy tên nguyên liệu'}
+            placeholder={selectedIngredient?.name || keyword || 'Mặc định lấy tên nguyên liệu'}
             maxLength={100}
             className={INPUT_CLASS}
           />
@@ -186,33 +237,100 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
           )}
         </div>
 
+        {/* Số lượng và đơn vị tính */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="fridge-item-quantity" className="font-label-md text-label-md text-on-surface">
+              Số lượng
+            </label>
+            <input
+              id="fridge-item-quantity"
+              {...register('quantity')}
+              maxLength={30}
+              placeholder="Ví dụ: 3, 500, 1.5, 1/2..."
+              className={INPUT_CLASS}
+            />
+            {errors.quantity && (
+              <p role="alert" className="font-label-sm text-label-sm text-red-600">
+                {errors.quantity.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="fridge-item-unit" className="font-label-md text-label-md text-on-surface">
+              Đơn vị tính
+            </label>
+            <div className="relative">
+              <input
+                id="fridge-item-unit"
+                {...register('unit')}
+                maxLength={30}
+                placeholder="Ví dụ: quả, kg, g, bó..."
+                list="fridge-common-units"
+                className={INPUT_CLASS}
+              />
+              <datalist id="fridge-common-units">
+                <option value="quả" />
+                <option value="trái" />
+                <option value="củ" />
+                <option value="bắp" />
+                <option value="g (gam)" />
+                <option value="kg" />
+                <option value="bó" />
+                <option value="túi" />
+                <option value="hộp" />
+                <option value="miếng" />
+                <option value="cây" />
+                <option value="tép" />
+                <option value="lon" />
+                <option value="ml" />
+                <option value="lít" />
+              </datalist>
+            </div>
+            {errors.unit && (
+              <p role="alert" className="font-label-sm text-label-sm text-red-600">
+                {errors.unit.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Xem trước tên hiển thị khi có số lượng */}
+        {previewFullName && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-xs text-on-surface flex items-center justify-between">
+            <span className="text-on-surface-variant">Tên sẽ lưu vào kho tủ lạnh:</span>
+            <strong className="text-primary font-semibold text-sm">{previewFullName}</strong>
+          </div>
+        )}
+
         {/* Chọn độ tươi */}
         <fieldset className="flex flex-col gap-2">
           <legend className="font-label-md text-label-md text-on-surface">Độ tươi ban đầu</legend>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'FRESH')}
-              className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 font-label-md text-label-md transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
                 freshness === 'FRESH'
-                  ? 'border-emerald-500 bg-[#eaf3ec] font-bold text-[#2d5a38]'
+                  ? 'border-emerald-500 bg-[#eaf3ec] text-[#2d5a38] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >
-              <Icon name="eco" className="text-[18px] text-emerald-600" />
-              <span>FRESH · Còn tươi</span>
+              <Icon name="eco" className="text-[17px] text-emerald-600 shrink-0" />
+              <span className="truncate">FRESH · Còn tươi</span>
             </button>
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'NON-FRESH')}
-              className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 font-label-md text-label-md transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
                 freshness === 'NON-FRESH'
-                  ? 'border-amber-500 bg-[#fef6ea] font-bold text-[#935216]'
+                  ? 'border-amber-500 bg-[#fef6ea] text-[#935216] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >
-              <Icon name="hourglass_bottom" className="text-[18px] text-amber-600" />
-              <span>NON-FRESH · Sắp hỏng</span>
+              <Icon name="hourglass_bottom" className="text-[17px] text-amber-600 shrink-0" />
+              <span className="truncate">NON-FRESH · Sắp hỏng</span>
             </button>
           </div>
         </fieldset>
@@ -226,7 +344,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             variant="primary"
             type="submit"
             loading={addMutation.isPending}
-            disabled={!selectedIngredient}
+            disabled={!canSubmit}
           >
             Thêm vào tủ
           </Button>

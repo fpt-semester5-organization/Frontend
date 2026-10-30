@@ -409,155 +409,199 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
       )}
 
       {/* 5. MÀN HÌNH SUCCESS: KẾT QUẢ NHẬN DIỆN NGUYÊN LIỆU */}
-      {state === 'success' && scanResult && (
-        <div className="p-4 sm:p-6 flex flex-col items-center">
-          <div className="flex items-center gap-3 mb-6 text-center">
-            <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="h-7 w-7" aria-hidden="true" />
-            </div>
-            <div className="text-left">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-                Nhận diện tủ lạnh thành công!
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                AI đã phát hiện {scanResult.data.detected.length} nguyên liệu thực phẩm.
-              </p>
-            </div>
-          </div>
-
-          {/* Cảnh báo độ tươi nếu có */}
-          {scanResult.data.warnings && scanResult.data.warnings.length > 0 && (
-            <div className="w-full mb-4 p-4 rounded-2xl border border-[#f8dfbe] bg-[#fefbf6] text-[#8a4e0a] shadow-xs flex items-start gap-3">
-              <ShieldAlert className="h-5 w-5 text-[#b76e1a] shrink-0 mt-0.5" />
-              <div className="text-sm text-[#734008]">
-                <span className="font-semibold">Lưu ý quan trọng: </span>
-                {scanResult.data.warnings.join(' ')}
+      {state === 'success' && scanResult && (() => {
+        const hasDetected = scanResult.data.detected && scanResult.data.detected.length > 0;
+        return (
+          <div className="p-4 sm:p-6 flex flex-col items-center">
+            <div className="flex items-center gap-3 mb-6 text-center">
+              <div
+                className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${
+                  hasDetected
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600'
+                    : 'bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {hasDetected ? (
+                  <CheckCircle2 className="h-7 w-7" aria-hidden="true" />
+                ) : (
+                  <AlertCircle className="h-7 w-7" aria-hidden="true" />
+                )}
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {hasDetected ? 'Nhận diện tủ lạnh thành công!' : 'Không nhận diện được nguyên liệu'}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {hasDetected
+                    ? `AI đã phát hiện ${scanResult.data.detected.length} nguyên liệu thực phẩm.`
+                    : 'Không có bất kỳ nguyên liệu thực phẩm nào trong ảnh.'}
+                </p>
               </div>
             </div>
-          )}
 
-          {/* HÌNH ẢNH TỦ LẠNH HIỂN THỊ LUÔN SAU KHI AI QUÉT RA */}
-          {currentImage?.previewUrl && (
-            <div className="relative my-4 flex min-h-[340px] max-h-[580px] w-full items-center justify-center overflow-hidden rounded-2xl border border-outline-variant/60 bg-[#f4efe8] dark:bg-surface-container p-3 sm:p-5 shadow-inner">
-              <div className="relative inline-flex max-h-full max-w-full items-center justify-center">
-                <img
-                  src={currentImage.previewUrl}
-                  alt="Ảnh tủ lạnh đã nhận diện AI"
-                  className="max-h-[520px] w-auto max-w-full rounded-xl object-contain shadow-md"
-                />
-                {/* Lớp phủ Bounding Boxes khoanh vùng từng nguyên liệu trên ảnh tủ lạnh */}
-                <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
-                  {scanResult.data.detected.map((item, idx) => {
-                    if (!item.box2d) return null;
-                    const [ymin, xmin, ymax, xmax] = item.box2d;
-                    const top = ymin / 10;
-                    const left = xmin / 10;
-                    const height = (ymax - ymin) / 10;
-                    const width = (xmax - xmin) / 10;
-                    const isFresh = item.freshnessStatus === 'FRESH';
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          top: `${top}%`,
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          height: `${height}%`,
-                        }}
-                        className={`absolute border-2 rounded-md ${
-                          isFresh ? 'border-[#3d5c47] bg-[#3d5c47]/15' : 'border-[#94532f] bg-[#94532f]/20'
+            {/* Thông báo nổi bật khi không phát hiện nguyên liệu nào (ảnh đồ điện tử, đồ gia dụng,...) */}
+            {!hasDetected && (
+              <div className="w-full mb-4 p-4 rounded-2xl border border-amber-300 dark:border-amber-800/70 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 shadow-xs flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-sm leading-relaxed text-left">
+                  <span className="font-semibold block mb-0.5">Không nhận diện được nguyên liệu thực phẩm</span>
+                  Hệ thống bắt buộc phải quét chính xác là nguyên liệu thực phẩm mới hiển thị kết quả. Các đồ vật không liên quan (ví dụ: đồ điện tử, thiết bị công nghệ, đồ gia dụng, vật dụng cá nhân...) không phải là nguyên liệu, thực phẩm. Vui lòng chụp hoặc tải lại ảnh tủ lạnh chứa nguyên liệu thực phẩm tươi sống!
+                </div>
+              </div>
+            )}
+
+            {/* Cảnh báo độ tươi nếu có */}
+            {scanResult.data.warnings && scanResult.data.warnings.length > 0 && (
+              <div className="w-full mb-4 p-4 rounded-2xl border border-[#f8dfbe] bg-[#fefbf6] text-[#8a4e0a] shadow-xs flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-[#b76e1a] shrink-0 mt-0.5" />
+                <div className="text-sm text-[#734008]">
+                  <span className="font-semibold">Lưu ý quan trọng: </span>
+                  {scanResult.data.warnings.join(' ')}
+                </div>
+              </div>
+            )}
+
+            {/* HÌNH ẢNH TỦ LẠNH HIỂN THỊ LUÔN SAU KHI AI QUÉT RA */}
+            {currentImage?.previewUrl && (
+              <div className="relative my-4 flex min-h-[340px] max-h-[580px] w-full items-center justify-center overflow-hidden rounded-2xl border border-outline-variant/60 bg-[#f4efe8] dark:bg-surface-container p-3 sm:p-5 shadow-inner">
+                <div className="relative inline-flex max-h-full max-w-full items-center justify-center">
+                  <img
+                    src={currentImage.previewUrl}
+                    alt="Ảnh tủ lạnh đã nhận diện AI"
+                    className="max-h-[520px] w-auto max-w-full rounded-xl object-contain shadow-md"
+                  />
+                  {/* Lớp phủ Bounding Boxes khoanh vùng từng nguyên liệu trên ảnh tủ lạnh */}
+                  {hasDetected && (
+                    <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
+                      {scanResult.data.detected.map((item, idx) => {
+                        if (!item.box2d) return null;
+                        const [ymin, xmin, ymax, xmax] = item.box2d;
+                        const top = ymin / 10;
+                        const left = xmin / 10;
+                        const height = (ymax - ymin) / 10;
+                        const width = (xmax - xmin) / 10;
+                        const isFresh = item.freshnessStatus === 'FRESH';
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              top: `${top}%`,
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              height: `${height}%`,
+                            }}
+                            className={`absolute border-2 rounded-md ${
+                              isFresh ? 'border-[#3d5c47] bg-[#3d5c47]/15' : 'border-[#94532f] bg-[#94532f]/20'
+                            }`}
+                          >
+                            <span
+                              className={`absolute -top-6 left-0 text-[11px] font-bold px-1.5 py-0.5 rounded shadow-xs text-white whitespace-nowrap ${
+                                isFresh ? 'bg-[#3d5c47]' : 'bg-[#94532f]'
+                              }`}
+                            >
+                              {item.name} {item.quantity ? `· ${item.quantity}` : ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Danh sách nguyên liệu nhận diện hoặc thông báo rỗng */}
+            {hasDetected ? (
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 max-h-[320px] overflow-y-auto pr-1">
+                {scanResult.data.detected.map((item, index) => {
+                  const isFresh = item.freshnessStatus === 'FRESH';
+                  return (
+                    <div
+                      key={index}
+                      className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
+                          {index + 1}
+                        </span>
+                        <div className="truncate">
+                          <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
+                            {item.name}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            {item.quantity && (
+                              <span className="inline-flex items-center text-[11px] font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800">
+                                Định lượng: {item.quantity}
+                              </span>
+                            )}
+                            {item.foodGroup && (
+                              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                {item.foodGroup}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          isFresh
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
                         }`}
                       >
                         <span
-                          className={`absolute -top-6 left-0 text-[11px] font-bold px-1.5 py-0.5 rounded shadow-xs text-white whitespace-nowrap ${
-                            isFresh ? 'bg-[#3d5c47]' : 'bg-[#94532f]'
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            isFresh ? 'bg-emerald-600' : 'bg-amber-600'
                           }`}
-                        >
-                          {item.name} {item.quantity ? `· ${item.quantity}` : ''}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Danh sách nguyên liệu nhận diện */}
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 max-h-[320px] overflow-y-auto pr-1">
-            {scanResult.data.detected.map((item, index) => {
-              const isFresh = item.freshnessStatus === 'FRESH';
-              return (
-                <div
-                  key={index}
-                  className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 flex items-center justify-between gap-2"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
-                      {index + 1}
-                    </span>
-                    <div className="truncate">
-                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
-                        {item.name}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                        {item.quantity && (
-                          <span className="inline-flex items-center text-[11px] font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800">
-                            Định lượng: {item.quantity}
-                          </span>
-                        )}
-                        {item.foodGroup && (
-                          <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {item.foodGroup}
-                          </span>
-                        )}
-                      </div>
+                        />
+                        {isFresh ? 'Tươi ngon' : 'Cần dùng sớm'}
+                      </span>
                     </div>
-                  </div>
-
-                  <span
-                    className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      isFresh
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        isFresh ? 'bg-emerald-600' : 'bg-amber-600'
-                      }`}
-                    />
-                    {isFresh ? 'Tươi ngon' : 'Cần dùng sớm'}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="w-full p-6 sm:p-8 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 text-center mb-6">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 mb-3 shadow-xs">
+                  <span className="material-symbols-outlined text-[28px]" aria-hidden="true">
+                    search_off
                   </span>
                 </div>
-              );
-            })}
-          </div>
+                <h4 className="font-bold text-base text-gray-900 dark:text-gray-100 mb-1">
+                  Không có bất kỳ nguyên liệu nào
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                  Hệ thống không tìm thấy nguyên liệu thực phẩm nào trong bức ảnh. Đồ điện tử, thiết bị công nghệ hoặc đồ gia dụng không phải là nguyên liệu, thực phẩm.
+                </p>
+              </div>
+            )}
 
-          {/* Nút hành động */}
-          <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={handleResetToIdle}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span>Quét thêm ảnh khác</span>
-            </button>
-
-            {onClose && (
+            {/* Nút hành động */}
+            <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#2d5a38] hover:bg-[#23472c] text-white font-semibold text-sm shadow-md transition-colors"
+                onClick={handleResetToIdle}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
-                <span>Xem tủ lạnh & nấu ăn</span>
-                <ChevronRight className="h-4 w-4" />
+                <RotateCcw className="h-4 w-4" />
+                <span>{hasDetected ? 'Quét thêm ảnh khác' : 'Chụp hoặc chọn ảnh khác'}</span>
               </button>
-            )}
+
+              {hasDetected && onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#2d5a38] hover:bg-[#23472c] text-white font-semibold text-sm shadow-md transition-colors"
+                >
+                  <span>Xem tủ lạnh & nấu ăn</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 6. MÀN HÌNH ERROR: BÁO LỖI VÀ THỬ LẠI */}
       {state === 'error' && (

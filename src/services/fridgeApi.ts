@@ -4,10 +4,14 @@ import type {
   DetectedIngredient,
   FreshnessStatus,
 } from '@/types';
+import { useAuthStore } from '@/stores/auth.store';
+import { bootstrapGuestSession, refreshAccessToken } from '@/api/session';
+import { storage } from '@/lib/storage';
 
 export interface UploadOptions {
   onProgress?: (progress: UploadProgressInfo) => void;
   signal?: AbortSignal;
+  _isRetry?: boolean;
 }
 
 /**
@@ -225,31 +229,92 @@ async function mockUploadFridgeImage(
   });
 }
 
-async function getAuthToken(): Promise<string | null> {
-  let token = localStorage.getItem('vl_access_token') || localStorage.getItem('vl_guest_token');
-  if (token) {
-    try {
-      if (token.startsWith('"') && token.endsWith('"')) {
-        token = JSON.parse(token);
-      }
-    } catch {
-      // Bỏ qua lỗi parse JSON nếu token là chuỗi thuần
-    }
-    return token;
-  }
-  // Tự động khởi tạo phiên khách ẩn danh nếu chưa đăng nhập để người dùng trải nghiệm ngay
+/**
+ * Kiểm tra xem JWT Token có hết hạn hay chưa (kèm 30s buffer)
+ */
+function isJwtExpired(token: string): boolean {
+  if (!token || typeof token !== 'string') return true;
   try {
-    const res = await fetch('/api/v1/auth/anonymous', { method: 'POST' });
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000 - 30000;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Lấy Access Token hợp lệ (Thành viên hoặc Khách vãng lai), tự động gia hạn nếu hết hạn
+ */
+export async function getAuthToken(forceRefresh = false): Promise<string | null> {
+  const authState = useAuthStore.getState();
+
+  // 1. Nếu là Thành viên đã đăng nhập
+  if (authState.user) {
+    let token = authState.accessToken || authState.token || storage.get('vl_access_token');
+    if (token && typeof token === 'string' && token.startsWith('"') && token.endsWith('"')) {
+      try { token = JSON.parse(token); } catch {}
+    }
+    if (!token || isJwtExpired(token) || forceRefresh) {
+      try {
+        token = await refreshAccessToken();
+      } catch (e) {
+        console.warn('[FridgeAPI] Không thể làm mới token thành viên:', e);
+        token = null;
+      }
+    }
+    if (token && !isJwtExpired(token)) {
+      return token;
+    }
+  }
+
+  // 2. Nếu là Khách vãng lai (hoặc chưa đăng nhập)
+  let guestToken = authState.guestToken || storage.get('vl_guest_token');
+  if (guestToken && typeof guestToken === 'string' && guestToken.startsWith('"') && guestToken.endsWith('"')) {
+    try { guestToken = JSON.parse(guestToken); } catch {}
+  }
+  if (!guestToken || isJwtExpired(guestToken) || forceRefresh) {
+    try {
+      guestToken = await bootstrapGuestSession(true);
+    } catch (e) {
+      console.warn('[FridgeAPI] Không thể khởi tạo phiên khách qua session:', e);
+      guestToken = null;
+    }
+  }
+
+  if (guestToken && !isJwtExpired(guestToken)) {
+    return guestToken;
+  }
+
+  // 3. Fallback trực tiếp gọi POST /api/v1/auth/anonymous nếu session chưa có
+  try {
+    const res = await fetch('/api/v1/auth/anonymous', {
+      method: 'POST',
+      credentials: 'include',
+    });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data?.accessToken) {
-        localStorage.setItem('vl_guest_token', json.data.accessToken);
-        return json.data.accessToken;
+      const token = json?.data?.accessToken;
+      if (token && typeof token === 'string') {
+        storage.set('vl_guest_token', token);
+        useAuthStore.getState().setGuestToken(token);
+        return token;
       }
     }
   } catch (e) {
-    console.warn('[FridgeAPI] Không thể tự tạo phiên khách:', e);
+    console.warn('[FridgeAPI] Tự tạo phiên khách ẩn danh thất bại:', e);
   }
+
   return null;
 }
 
@@ -261,7 +326,7 @@ async function realUploadFridgeImage(
   blob: Blob | File,
   options: UploadOptions = {},
 ): Promise<FridgeScanResponse> {
-  const { onProgress, signal } = options;
+  const { onProgress, signal, _isRetry } = options;
 
   // Endpoint mục tiêu chuẩn RESTful backend (/api/v1/fridge/detections)
   const endpoint =
@@ -298,6 +363,24 @@ async function realUploadFridgeImage(
     };
 
     xhr.onload = () => {
+      // Nếu gặp mã 401 (token hết hạn) và chưa từng thử lại:
+      // Tự động xóa token cũ, làm mới phiên (hoặc cấp Anonymous JWT mới) và thử lại 1 lần duy nhất
+      if (xhr.status === 401 && !_isRetry) {
+        console.warn('[FridgeAPI] Nhận mã 401 Unauthorized từ server, đang tự động làm mới token và gửi lại...');
+        storage.remove('vl_access_token');
+        storage.remove('vl_guest_token');
+        void getAuthToken(true)
+          .then((freshToken) => {
+            if (freshToken) {
+              return realUploadFridgeImage(blob, { ...options, _isRetry: true });
+            }
+            throw new Error('Phiên làm việc đã hết hạn. Vui lòng tải lại trang hoặc đăng nhập lại.');
+          })
+          .then(resolve)
+          .catch(reject);
+        return;
+      }
+
       // Đã gửi xong byte lên server, đang đợi AI xử lý
       onProgress?.({
         percentage: 95,
@@ -364,7 +447,7 @@ async function realUploadFridgeImage(
               errorMsg = 'Ảnh không hợp lệ hoặc thiếu trường dữ liệu.';
               break;
             case 401:
-              errorMsg = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
+              errorMsg = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập hoặc tải lại trang.';
               break;
             case 403:
               errorMsg = 'Bạn đã sử dụng hết hạn mức quét ảnh tủ lạnh trong ngày.';
@@ -393,6 +476,7 @@ async function realUploadFridgeImage(
     };
 
     xhr.open('POST', endpoint, true);
+    xhr.withCredentials = true; // Bắt buộc để gửi cookie HttpOnly (guest_uuid, refresh_token)
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
@@ -407,7 +491,7 @@ async function realUploadFridgeImage(
 }
 
 /**
- * Hàm gọi API chính: Tự động dùng Mock nếu bật VITE_USE_MOCK hoặc nếu gọi Real API thất bại (fallback thông minh)
+ * Hàm gọi API chính: Dùng Real API để kết nối trực tiếp Backend & AI-Service (hoặc chỉ dùng Mock nếu bật VITE_USE_MOCK=true)
  */
 export async function uploadFridgeImage(
   blob: Blob | File,
@@ -418,24 +502,5 @@ export async function uploadFridgeImage(
     return mockUploadFridgeImage(blob, options);
   }
 
-  try {
-    return await realUploadFridgeImage(blob, options);
-  } catch (error) {
-    // Nếu bị hủy bởi người dùng thì throw ngay
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw error;
-    }
-
-    // Nếu không kết nối được backend (ví dụ chưa có backend thật chạy ở port) và đang ở môi trường DEV:
-    // Cung cấp cảnh báo và tự động fallback sang mock data để việc kiểm thử không bị tắc nghẽn
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[FridgeAPI] Không kết nối được backend thật. Tự động chuyển sang Mock API để phục vụ test tính năng:',
-        error,
-      );
-      return mockUploadFridgeImage(blob, options);
-    }
-
-    throw error;
-  }
+  return await realUploadFridgeImage(blob, options);
 }

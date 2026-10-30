@@ -64,7 +64,7 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
   };
 
   return (
-    <Modal show={!!item} onHide={onHide} title="Sửa tay nguyên liệu AI nhận diện" size="sm">
+    <Modal show={!!item} onHide={onHide} title="Sửa tay nguyên liệu AI nhận diện" className="max-w-[460px]">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-5" noValidate>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="detected-item-name" className="font-label-md text-label-md text-on-surface">
@@ -104,30 +104,30 @@ export const EditDetectedItemModal: React.FC<EditDetectedItemModalProps> = ({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="font-label-md text-label-md text-on-surface">Độ tươi</legend>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'FRESH')}
-              className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 font-label-md text-label-md transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
                 freshness === 'FRESH'
-                  ? 'border-emerald-500 bg-[#eaf3ec] font-bold text-[#2d5a38]'
+                  ? 'border-emerald-500 bg-[#eaf3ec] font-bold text-[#2d5a38] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >
-              <Icon name="eco" className="text-[18px] text-emerald-600" />
-              <span>FRESH · Còn tươi</span>
+              <Icon name="eco" className="text-[18px] text-emerald-600 shrink-0" />
+              <span className="truncate">FRESH · Còn tươi</span>
             </button>
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'NON-FRESH')}
-              className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 font-label-md text-label-md transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
                 freshness === 'NON-FRESH'
-                  ? 'border-amber-500 bg-[#fef6ea] font-bold text-[#935216]'
+                  ? 'border-amber-500 bg-[#fef6ea] font-bold text-[#935216] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
               }`}
             >
-              <Icon name="hourglass_bottom" className="text-[18px] text-amber-600" />
-              <span>NON-FRESH · Dùng sớm</span>
+              <Icon name="hourglass_bottom" className="text-[18px] text-amber-600 shrink-0" />
+              <span className="truncate">NON-FRESH · Dùng sớm</span>
             </button>
           </div>
         </fieldset>
