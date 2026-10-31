@@ -90,7 +90,10 @@ export type ViolationType = CreateReportBody['violationType'];
 export type CreateReportResult = DeepRequired<Schemas['CreateReportResponse']['data']>;
 
 /** POST /videos (FN-POST-08): tải ảnh/video lên Cloudinary và gắn vào bài viết. */
-export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']>;
+export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']> & {
+  imageUrl?: string;
+  videoUrl?: string;
+};
 
 export type FeedItemKind = 'POST' | 'RECIPE';
 

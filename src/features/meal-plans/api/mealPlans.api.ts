@@ -34,6 +34,12 @@ export async function createMealPlan(body: CreateMealPlanBody) {
   return res.data;
 }
 
+/** PUT /meal-plans/{id}/instructions — Cập nhật lưu ý ngữ cảnh cho thực đơn (FN-MEAL-01/03). */
+export async function updateMealPlanInstructions(planId: number, customInstructions: string) {
+  const res = await http.put<ApiEnvelope<MealPlanDetail>>(`/meal-plans/${planId}/instructions`, { customInstructions });
+  return res.data;
+}
+
 /** POST /meal-plans/{id}/activate — FN-MEAL-02 Kích hoạt thực đơn DRAFT. */
 export async function activateMealPlan(planId: number) {
   const res = await http.post<ApiEnvelope<ActivateResult>>(`/meal-plans/${planId}/activate`);

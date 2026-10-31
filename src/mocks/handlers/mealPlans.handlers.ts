@@ -134,9 +134,16 @@ const ids = { plan: 40, slot: 5000, list: 10, item: 900 };
 const recipeById = (recipeId: number) => RECIPES.find((recipe) => recipe.recipeId === recipeId)!;
 const mondayOf = (isoDate: string) => addDays(isoDate, 1 - isoWeekday(isoDate));
 
-/** Xếp 21 bữa: mỗi bữa lấy món cùng loại, xoay vòng theo seed để mỗi thực đơn khác nhau. */
-function buildSlots(seed: number): MockSlot[] {
-  return DAYS.flatMap((dayOfWeek, index) =>
+/** Xếp các bữa ăn: mỗi ngày 3 bữa (Sáng, Trưa, Tối), số ngày linh hoạt từ 1 đến 30 ngày. */
+function buildSlots(seed: number, daysCount = 7, startDate = todayInVietnam()): MockSlot[] {
+  const days: (typeof DAYS)[number][] = Array.from({ length: daysCount }, (_, i) => {
+    const curDate = addDays(startDate, i);
+    const w = isoWeekday(curDate); // 1 = T2..7 = CN
+    const map: (typeof DAYS)[number][] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    return map[w - 1] ?? 'MON';
+  });
+
+  return days.flatMap((dayOfWeek, index) =>
     MEALS.map((mealType) => {
       const pool = RECIPES.filter((recipe) => recipe.mealType === mealType);
       const offset = mealType === 'BREAKFAST' ? index : mealType === 'LUNCH' ? index * 3 : index * 5 + 1;
@@ -151,20 +158,23 @@ function newPlan(
   budgetTier: MockPlan['budgetTier'],
   customInstructions: string | null,
   planStatus: PlanStatus,
-  generatedByAi = true
+  generatedByAi = true,
+  numberOfDays = 7
 ): MockPlan {
   const planId = ids.plan++;
+  const days = Math.max(1, numberOfDays);
+  const end = addDays(startDate, days - 1);
   return {
     planId,
     userId,
-    planName: `Thực đơn tuần ${formatDayMonth(startDate)}`,
+    planName: `Thực đơn ${formatDayMonth(startDate)} – ${formatDayMonth(end)} (${days} ngày)`,
     startDate,
     budgetTier,
     customInstructions,
     targetDailyKcal: TARGET_KCAL[userId] ?? 1700,
     planStatus,
     generatedByAi,
-    slots: buildSlots(planId),
+    slots: buildSlots(planId, days, startDate),
     preDeployUsed: 0,
     postDeployUsed: 0,
   };
@@ -283,12 +293,12 @@ export const mealPlansHandlers = [
     const startDate = typeof body.startDate === 'string' ? body.startDate : '';
     const budgetTier = body.budgetTier as MockPlan['budgetTier'];
     const instructions = typeof body.customInstructions === 'string' ? body.customInstructions : '';
+    const numberOfDays = typeof body.numberOfDays === 'number' && body.numberOfDays >= 1 && body.numberOfDays <= 30 ? body.numberOfDays : 7;
 
     const details: { field: string; message: string }[] = [];
-    if (!isMonday(startDate)) details.push({ field: 'startDate', message: 'Ngày bắt đầu phải là Thứ Hai (YYYY-MM-DD).' });
-    else if (startDate < todayInVietnam()) details.push({ field: 'startDate', message: 'Không tạo thực đơn cho tuần đã qua.' });
+    if (!startDate || startDate < todayInVietnam()) details.push({ field: 'startDate', message: 'Ngày bắt đầu không được ở quá khứ.' });
     if (!['ECONOMICAL', 'STANDARD', 'PREMIUM'].includes(budgetTier)) details.push({ field: 'budgetTier', message: 'Mức ngân sách không hợp lệ.' });
-    if (instructions.length > 200) details.push({ field: 'customInstructions', message: 'Ghi chú tối đa 200 ký tự.' });
+    if (instructions.length > 500) details.push({ field: 'customInstructions', message: 'Ghi chú tối đa 500 ký tự.' });
     if (details.length) return validationError(details);
 
     if (instructions.includes('#no-profile')) {
@@ -308,7 +318,7 @@ export const mealPlansHandlers = [
     }
     if (instructions.includes('#no-candidate')) {
       await delay(FALLBACK_DELAY_MS);
-      return fail(422, 'ERR_MEAL_NO_CANDIDATE', 'Kho công thức chưa đủ món hợp trường phái và dị ứng của bạn để xếp 21 bữa.');
+      return fail(422, 'ERR_MEAL_NO_CANDIDATE', 'Kho công thức chưa đủ món hợp trường phái và dị ứng của bạn để xếp các bữa.');
     }
     if (instructions.includes('#ai-down')) {
       await delay(FALLBACK_DELAY_MS);
@@ -318,9 +328,21 @@ export const mealPlansHandlers = [
     const fallback = instructions.includes('#fallback');
     await delay(fallback ? FALLBACK_DELAY_MS : AI_DELAY_MS);
     const note = instructions.replace(/#[\w-]+/g, '').trim();
-    const plan = newPlan(me.userId, startDate, budgetTier, note || null, 'DRAFT', !fallback);
+    const plan = newPlan(me.userId, startDate, budgetTier, note || null, 'DRAFT', !fallback, numberOfDays);
     plans.push(plan);
     return ok(planDto(plan), 'Đã tạo thực đơn nháp.', 201);
+  }),
+
+  // PUT /meal-plans/{id}/instructions — Cập nhật lưu ý ngữ cảnh (FN-MEAL-01/03)
+  http.put(api('/meal-plans/:id/instructions'), async ({ request, params }) => {
+    await latency();
+    const me = currentUser(request);
+    if (!me) return unauthorized();
+    const plan = findOwnPlan(params.id, me.userId);
+    if (!plan) return planNotFound();
+    const body = await readJson(request);
+    plan.customInstructions = typeof body.customInstructions === 'string' ? body.customInstructions : plan.customInstructions;
+    return ok(planDto(plan), 'Đã áp dụng lưu ý ngữ cảnh cho thực đơn.');
   }),
 
   // GET /meal-plans/{id} — FN-MEAL-02
@@ -333,7 +355,7 @@ export const mealPlansHandlers = [
   }),
 
   // POST /meal-plans/{id}/activate — FN-MEAL-02
-  http.post(api('/meal-plans/:id/activate'), async ({ request, params }) => {
+  http.post(api('/meal-plans/{id}/activate'), async ({ request, params }) => {
     await latency();
     const me = currentUser(request);
     if (!me) return unauthorized();
@@ -371,6 +393,37 @@ export const mealPlansHandlers = [
     if (used >= EDIT_LIMIT) {
       return fail(403, 'ERR_QUOTA_MEAL_SWAP_EXCEEDED', `Bạn đã dùng hết ${EDIT_LIMIT} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`);
     }
+
+    // 1. Nếu người dùng chọn trực tiếp một món từ database
+    if (body.newRecipeId && RECIPES.some((r) => r.recipeId === Number(body.newRecipeId))) {
+      const chosen = recipeById(Number(body.newRecipeId));
+      slot.recipeId = chosen.recipeId;
+      if (isDraft) plan.preDeployUsed += 1;
+      else plan.postDeployUsed += 1;
+      return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, `Đã đổi sang món: ${chosen.title}.`);
+    }
+
+    // 2. Nếu người dùng nhập customNote cho AI
+    if (body.customNote && typeof body.customNote === 'string') {
+      const noteLower = body.customNote.toLowerCase();
+      const current = recipeById(slot.recipeId);
+      const aiCandidate = RECIPES.find((recipe) =>
+        recipe.recipeId !== current.recipeId &&
+        (noteLower.includes('canh') ? /canh|súp/i.test(recipe.title) :
+         noteLower.includes('nước') ? /bún|phở|miến|cháo/i.test(recipe.title) :
+         noteLower.includes('ít calo') ? recipe.kcal < current.kcal :
+         recipe.mealType === current.mealType)
+      ) || RECIPES.find((r) => r.mealType === current.mealType && r.recipeId !== current.recipeId);
+
+      if (aiCandidate) {
+        slot.recipeId = aiCandidate.recipeId;
+        if (isDraft) plan.preDeployUsed += 1;
+        else plan.postDeployUsed += 1;
+        return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, `AI đã đổi món theo ghi chú: ${aiCandidate.title}.`);
+      }
+    }
+
+    // 3. Mặc định: Gợi ý theo lý do hoặc chênh lệch calo <= 15%
     const current = recipeById(slot.recipeId);
     const substitute = RECIPES.filter(
       (recipe) =>

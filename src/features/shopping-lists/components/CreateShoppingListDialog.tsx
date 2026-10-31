@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
@@ -16,22 +16,34 @@ import { PATHS } from '@/routes/paths';
 import { useCreateShoppingList } from '../hooks/useShoppingList';
 
 /** Tạo danh sách đi chợ từ thực đơn ACTIVE (FN-MEAL-05), rồi chuyển sang SCR-24. */
-export const CreateShoppingListDialog: React.FC<{ planId: number; show: boolean; onHide: () => void }> = ({
+export const CreateShoppingListDialog: React.FC<{
+  planId: number;
+  show: boolean;
+  onHide: () => void;
+  daysCount?: number;
+  mealsCount?: number;
+}> = ({
   planId,
   show,
   onHide,
+  daysCount,
+  mealsCount,
 }) => {
   const navigate = useNavigate();
   const createList = useCreateShoppingList(planId);
   const [conflict, setConflict] = useState<string | null>(null);
+  const defaultDays = daysCount && daysCount > 0 ? daysCount : 7;
+  const [selectedDays, setSelectedDays] = useState<number>(defaultDays);
+
   const {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<ShoppingListValues>({
     resolver: zodResolver(shoppingListSchema),
-    defaultValues: { servingsMultiplier: 1, targetShoppingDate: '' },
+    defaultValues: { servingsMultiplier: 1, targetShoppingDate: '', daysCount: defaultDays },
   });
 
   const submit = (values: ShoppingListValues) => {
@@ -39,6 +51,7 @@ export const CreateShoppingListDialog: React.FC<{ planId: number; show: boolean;
     createList.mutate(
       {
         servingsMultiplier: values.servingsMultiplier,
+        daysCount: selectedDays,
         ...(values.targetShoppingDate ? { targetShoppingDate: values.targetShoppingDate } : {}),
       },
       {
@@ -65,12 +78,71 @@ export const CreateShoppingListDialog: React.FC<{ planId: number; show: boolean;
     );
   };
 
+  const quickDays = useMemo(() => {
+    const list: number[] = [];
+    if (defaultDays >= 1) list.push(1);
+    if (defaultDays >= 3 && !list.includes(3)) list.push(3);
+    if (defaultDays >= 5 && !list.includes(5)) list.push(5);
+    if (!list.includes(defaultDays)) list.push(defaultDays);
+    return list;
+  }, [defaultDays]);
+
   return (
     <Modal show={show} onHide={onHide} title="Tạo danh sách đi chợ" locked={createList.isPending}>
       <form onSubmit={handleSubmit(submit)} noValidate className="flex flex-col gap-space-md p-space-lg">
         <p className="font-body-md text-body-md text-on-surface-variant">
-          Hệ thống cộng dồn nguyên liệu của cả 21 bữa và chia theo quầy hàng để bạn đi chợ một lần.
+          Hệ thống cộng dồn nguyên liệu theo {selectedDays} ngày ({selectedDays * 3} bữa ăn) của thực đơn và chia theo quầy hàng để bạn đi chợ dễ dàng.
         </p>
+
+        {/* Lựa chọn số ngày đi chợ */}
+        <div className="flex flex-col gap-space-xs rounded-xl border border-surface-container bg-surface-container-low p-3">
+          <div className="flex items-center justify-between">
+            <label htmlFor="shopping-days" className="font-label-md text-label-md font-semibold text-on-surface">
+              Đi chợ theo số ngày:
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="shopping-days"
+                type="number"
+                min={1}
+                max={defaultDays}
+                value={selectedDays}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(defaultDays, Number(e.target.value) || 1));
+                  setSelectedDays(val);
+                  setValue('daysCount', val);
+                }}
+                className="w-16 rounded-lg bg-surface-container-lowest px-2 py-1 text-center font-bold text-sm text-on-surface border border-surface-container focus:ring-1 focus:ring-primary/30 outline-hidden"
+              />
+              <span className="text-xs font-medium text-on-surface-variant">/ {defaultDays} ngày</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-xs text-on-surface-variant">Chọn nhanh:</span>
+            {quickDays.map((d) => {
+              const active = selectedDays === d;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDays(d);
+                    setValue('daysCount', d);
+                  }}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-all',
+                    active
+                      ? 'bg-primary-container text-on-primary shadow-2xs font-bold'
+                      : 'bg-surface-container-lowest text-on-surface border border-surface-container hover:bg-surface-container'
+                  )}
+                >
+                  {d === defaultDays ? `Toàn bộ (${d} ngày)` : `${d} ngày đầu`}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-space-xs">
           <label htmlFor="servings-multiplier" className={LABEL_CLASS}>

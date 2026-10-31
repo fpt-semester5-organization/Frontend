@@ -64,7 +64,7 @@ export const MealPlanList: React.FC = () => {
           >
             <span className="flex flex-col">
               <span className="font-label-sm text-label-sm opacity-80 uppercase tracking-wide">Đang áp dụng</span>
-              <span className="font-headline-sm text-headline-sm font-bold">{active.planName}</span>
+              <span className="font-serif font-headline-sm text-headline-sm font-bold">{active.planName}</span>
               <span className="font-body-sm text-body-sm opacity-90">Bắt đầu: {formatDate(active.startDate)}</span>
             </span>
             <span className="inline-flex items-center gap-1 font-label-md text-label-md">
@@ -87,7 +87,7 @@ export const MealPlanList: React.FC = () => {
                   <Icon name="calendar_month" className="text-[24px]" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="truncate font-headline-sm text-headline-sm font-bold text-on-surface">{plan.planName}</span>
+                  <span className="truncate font-serif font-headline-sm text-headline-sm font-bold text-on-surface">{plan.planName}</span>
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
                     Tuần {formatWeekRange(plan.startDate)} ({formatDate(plan.startDate)})
                   </span>
@@ -112,11 +112,11 @@ export const MealPlanList: React.FC = () => {
   };
 
   return (
-    <main className="min-h-[calc(100vh-140px)] w-full bg-surface-container-lowest pt-[72px]">
+    <main className="min-h-[calc(100vh-140px)] w-full bg-background pt-[72px]">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-space-lg px-margin-mobile py-space-lg sm:px-margin">
         <header className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
           <div className="flex flex-col gap-space-xs">
-            <h1 className="font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg tracking-tight">
+            <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg tracking-tight">
               Thực đơn của tôi
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant">

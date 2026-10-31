@@ -4,7 +4,7 @@ import { watchVideoTranscript } from '@/features/videos/hooks/useTranscriptWatch
 import { recipeKeys } from '@/features/recipes/hooks/recipeKeys';
 import { createPost, deletePost, updatePost, uploadPostMedia } from '../api/community.api';
 import { getAttachmentKind } from '../types/community.schemas';
-import type { CreatePostBody, UpdatePostBody } from '../types/community.types';
+import type { CreatePostBody, PostListItem, UpdatePostBody } from '../types/community.types';
 import { addRecentCreatedItem, updateRecentCreatedItem } from '../lib/recentFeedStore';
 import { communityKeys } from './communityKeys';
 
@@ -64,7 +64,7 @@ export function useUploadPostMedia() {
       // 1. Đồng bộ thumbnail vào bài viết và kích hoạt Backend xóa cache Redis post_list:*
       if (res.data.imageUrl) {
         try {
-          await updatePost(postId, { imageUrl: res.data.imageUrl });
+          await updatePost(postId, { imageUrl: res.data.imageUrl } as unknown as UpdatePostBody);
         } catch {
           // Bỏ qua nếu có lỗi
         }
