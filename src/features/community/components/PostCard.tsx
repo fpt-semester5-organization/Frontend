@@ -70,13 +70,13 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
       (post as { videoUrl?: string } | undefined)?.videoUrl ??
       (imageUrl?.includes('/video/upload/') ? imageUrl.replace(/\.jpg$/i, '.mp4') : undefined);
 
-    const hasVideoProp =
-      item?.hasVideo ??
-      (item?.type === 'VIDEO') ??
-      (post as { hasVideo?: boolean; type?: string } | undefined)?.hasVideo ??
-      ((post as { type?: string } | undefined)?.type === 'VIDEO') ??
-      Boolean(resolvedVideoId) ??
-      false;
+    const hasVideoProp = Boolean(
+      item?.hasVideo ||
+      item?.type === 'VIDEO' ||
+      (post as { hasVideo?: boolean; type?: string } | undefined)?.hasVideo ||
+      (post as { type?: string } | undefined)?.type === 'VIDEO' ||
+      resolvedVideoId
+    );
 
     // Chỉ bài viết/công thức nào THỰC SỰ có video URL mới hiển thị nút xem video & kịch bản
     const isVideo = Boolean(hasVideoProp && (resolvedVideoUrl || resolvedVideoId));

@@ -265,7 +265,7 @@ export const MealPlanGenerate: React.FC = () => {
     );
   };
 
-  const health = profile.data?.healthProfile;
+  const health = profile.data?.health;
   const allergens = profile.data?.allergens ?? [];
   const limit = isVip ? QUOTA.mealPlanPerWeek.vip : QUOTA.mealPlanPerWeek.free;
   const generating = createPlan.isPending;
@@ -299,6 +299,7 @@ export const MealPlanGenerate: React.FC = () => {
             <span>/</span>
             <span className="font-semibold text-on-surface">Tạo mới</span>
           </nav>
+        </div>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">

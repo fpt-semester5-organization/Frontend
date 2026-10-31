@@ -15,8 +15,6 @@ export function useSessionBanMonitor() {
   const lastCheckRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-
     const checkSession = async () => {
       const { isAuthenticated, user } = useAuthStore.getState();
       if (!isAuthenticated || !user) return;
@@ -30,7 +28,7 @@ export function useSessionBanMonitor() {
     };
 
     // Định kỳ kiểm tra mỗi 60 giây
-    timer = setInterval(() => {
+    const timer = setInterval(() => {
       checkSession();
     }, 60_000);
 

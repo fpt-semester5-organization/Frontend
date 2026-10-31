@@ -142,7 +142,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
   }
 
   // 2. Phân tích Ngân sách
-  const budgetMatches = text.match(/(?:ngân sách|chi phí|tầm|khoảng)\s*[:=]?\s*(\d+[kK]?|\d+[\.,]?\d*\s*(?:triệu|tr|nghìn|ngàn|đ|vnd|vnđ))\s*(?:\/|\s*mỗi\s*|\s*cho\s*1\s*)?(?:ngày|bữa|tuần)?/gi) ||
+  const budgetMatches = text.match(/(?:ngân sách|chi phí|tầm|khoảng)\s*[:=]?\s*(\d+[kK]?|\d+[.,]?\d*\s*(?:triệu|tr|nghìn|ngàn|đ|vnd|vnđ))\s*(?:\/|\s*mỗi\s*|\s*cho\s*1\s*)?(?:ngày|bữa|tuần)?/gi) ||
                         text.match(/(\d+\s*k(?:\/|\s*)ngày|tiết kiệm|bình dân|cao cấp)/gi);
   if (budgetMatches) {
     for (const match of budgetMatches) {
@@ -229,7 +229,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
 
   // 7. Nếu chưa trích xuất được gì nhưng có text tách dấu phẩy hoặc chấm
   if (chips.length === 0) {
-    const parts = text.split(/[,;\.\n]+/).map((p) => p.trim()).filter(Boolean);
+    const parts = text.split(/[,;.\n]+/).map((p) => p.trim()).filter(Boolean);
     for (const part of parts.slice(0, 5)) {
       if (part.length >= 3 && part.length <= 40) {
         addChip(part, 'other');

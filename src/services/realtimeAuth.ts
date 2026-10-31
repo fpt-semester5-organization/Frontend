@@ -59,7 +59,7 @@ export function initRealtimeAuth(): () => void {
       handleAccountBanned(message);
     });
 
-    hubConnection.onclose((err) => {
+    hubConnection.onclose((err: Error | undefined) => {
       if (err) {
         // Trường hợp bị máy chủ chủ động ngắt kết nối do blacklist
         const msg = String(err.message || '');
@@ -78,10 +78,10 @@ export function initRealtimeAuth(): () => void {
         .then(() => {
           isStarting = false;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           isStarting = false;
           // Nếu bị từ chối kết nối ngay từ lúc bắt tay do nằm trong blacklist
-          const errMsg = String(err?.message || '');
+          const errMsg = err instanceof Error ? err.message : String(err || '');
           if (
             errMsg.includes('403') ||
             errMsg.includes('Stopped during negotiation') ||

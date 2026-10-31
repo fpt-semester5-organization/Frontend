@@ -263,7 +263,11 @@ export async function getAuthToken(forceRefresh = false): Promise<string | null>
   if (authState.user) {
     let token = authState.accessToken || authState.token || storage.get('vl_access_token');
     if (token && typeof token === 'string' && token.startsWith('"') && token.endsWith('"')) {
-      try { token = JSON.parse(token); } catch {}
+      try {
+        token = JSON.parse(token);
+      } catch {
+        /* ignore parse error */
+      }
     }
     if (!token || isJwtExpired(token) || forceRefresh) {
       try {
@@ -281,7 +285,11 @@ export async function getAuthToken(forceRefresh = false): Promise<string | null>
   // 2. Nếu là Khách vãng lai (hoặc chưa đăng nhập)
   let guestToken = authState.guestToken || storage.get('vl_guest_token');
   if (guestToken && typeof guestToken === 'string' && guestToken.startsWith('"') && guestToken.endsWith('"')) {
-    try { guestToken = JSON.parse(guestToken); } catch {}
+    try {
+      guestToken = JSON.parse(guestToken);
+    } catch {
+      /* ignore parse error */
+    }
   }
   if (!guestToken || isJwtExpired(guestToken) || forceRefresh) {
     try {
