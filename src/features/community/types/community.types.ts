@@ -90,7 +90,10 @@ export type ViolationType = CreateReportBody['violationType'];
 export type CreateReportResult = DeepRequired<Schemas['CreateReportResponse']['data']>;
 
 /** POST /videos (FN-POST-08): tải ảnh/video lên Cloudinary và gắn vào bài viết. */
-export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']>;
+export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']> & {
+  imageUrl?: string;
+  videoUrl?: string;
+};
 
 export type FeedItemKind = 'POST' | 'RECIPE';
 
@@ -151,7 +154,9 @@ export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').Re
   dietarySchool: r.dietarySchool,
   isVerified: r.isVerified,
   type: r.type,
-  hasVideo: Boolean(r.type === 'VIDEO'),
+  hasVideo: Boolean(r.type === 'VIDEO' || (r as { videoUrl?: string }).videoUrl || (r as { videoId?: number }).videoId),
+  videoId: (r as { videoId?: number }).videoId,
+  videoUrl: (r as { videoUrl?: string }).videoUrl,
 });
 
 /** Trộn xen kẽ hai mảng (bài viết, công thức) để feed Tất cả luôn đa dạng nội dung. */

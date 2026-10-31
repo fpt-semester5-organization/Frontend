@@ -15,6 +15,7 @@ import { FeedFilters } from '../components/FeedFilters';
 import { PostCard, PostFeedSkeleton } from '../components/PostCard';
 import { PostListToolbar } from '../components/PostListToolbar';
 import { useInfinitePosts } from '../hooks/usePosts';
+import { getRecentCreatedItems } from '../lib/recentFeedStore';
 import {
   fromPost,
   fromRecipe,
@@ -40,6 +41,14 @@ const PostFeed: React.FC = () => {
   // State thu gọn cột trái (Bộ lọc) trên Desktop và Offcanvas trên Mobile
   const [leftOpen, setLeftOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Lắng nghe sự kiện thêm bài viết/công thức mới để cập nhật tức thì
+  const [recentTrigger, setRecentTrigger] = useState(0);
+  useEffect(() => {
+    const handleRecent = () => setRecentTrigger((v) => v + 1);
+    window.addEventListener('vl_recent_item_added', handleRecent);
+    return () => window.removeEventListener('vl_recent_item_added', handleRecent);
+  }, []);
 
   // 1. Đọc toàn bộ tham số tìm kiếm & lọc từ URL
   const type = searchParams.get('type') ?? 'ALL'; // 'ALL' | 'POST' | 'RECIPE'
@@ -96,18 +105,50 @@ const PostFeed: React.FC = () => {
   }, [wantRecipes, recipesQuery.data]);
 
   const feedItems: CommunityFeedItem[] = useMemo(() => {
-    if (wantPosts && wantRecipes) {
-      return interleaveItems(postItems, recipeItems);
-    }
-    if (wantPosts) return postItems;
-    return recipeItems;
-  }, [wantPosts, wantRecipes, postItems, recipeItems]);
+    const recent = getRecentCreatedItems().filter((item) => {
+      if (type === 'POST' && item.kind !== 'POST') return false;
+      if (type === 'RECIPE' && item.kind !== 'RECIPE') return false;
+      if (keyword && !item.title.toLowerCase().includes(keyword.toLowerCase())) return false;
+      return true;
+    });
+
+    const latestRecent = recent[0];
+    const raw =
+      wantPosts && wantRecipes
+        ? latestRecent?.kind === 'RECIPE'
+          ? interleaveItems(recipeItems, postItems)
+          : interleaveItems(postItems, recipeItems)
+        : wantPosts
+          ? postItems
+          : recipeItems;
+
+    // Khi sort === 'NEWEST', luôn đặt các bài viết / công thức vừa tạo (recent) lên vị trí đầu tiên
+    const combined = sort === 'NEWEST' ? [...recent, ...raw] : raw;
+
+    // Lọc bỏ trùng lặp: nếu cùng videoId hoặc cùng tiêu đề hoặc cùng ID
+    const seenKeys = new Set<string>();
+    const seenTitles = new Set<string>();
+    const seenVideoIds = new Set<number>();
+    return combined.filter((item) => {
+      if (seenKeys.has(item.key)) return false;
+      if (item.videoId && seenVideoIds.has(item.videoId)) return false;
+      const normalizedTitle = item.title.trim().toLowerCase();
+      if (seenTitles.has(normalizedTitle)) return false;
+
+      seenKeys.add(item.key);
+      if (item.videoId) seenVideoIds.add(item.videoId);
+      seenTitles.add(normalizedTitle);
+      return true;
+    });
+  }, [wantPosts, wantRecipes, postItems, recipeItems, sort, type, keyword, recentTrigger]);
 
   const totalCount =
     (wantPosts ? postsQuery.data?.pages[0]?.meta.total ?? 0 : 0) +
     (wantRecipes ? recipesQuery.data?.pages[0]?.meta.total ?? 0 : 0);
 
-  const isPending = (wantPosts && postsQuery.isPending) || (wantRecipes && recipesQuery.isPending);
+  const isPending =
+    feedItems.length === 0 &&
+    ((wantPosts && postsQuery.isPending) || (wantRecipes && recipesQuery.isPending));
   const isError = (wantPosts && postsQuery.isError) || (wantRecipes && recipesQuery.isError);
   const error = (wantPosts && postsQuery.error) || (wantRecipes && recipesQuery.error);
 

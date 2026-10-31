@@ -122,7 +122,7 @@ export const SanctionDialog: React.FC<SanctionDialogProps> = ({ show, onClose, t
       },
       {
         onSuccess: (res) => {
-          const until = res.data.lockedUntil ? ` Hạn: ${formatServerDateTime(res.data.lockedUntil)}.` : '';
+          const until = res.data?.lockedUntil ? ` Hạn: ${formatServerDateTime(res.data.lockedUntil)}.` : '';
           notifySuccess(`${res.message || 'Đã cập nhật trạng thái.'}${until}`);
           onClose();
         },

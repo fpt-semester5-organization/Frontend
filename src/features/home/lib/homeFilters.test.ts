@@ -38,7 +38,7 @@ describe('toRecipeParams', () => {
     expect(toRecipeParams({ ...DEFAULT_FILTERS, quick: true })).toEqual({
       maxCookTime: 20,
       contentType: 'ALL',
-      sort: 'POPULAR',
+      sort: 'NEWEST',
       size: 9,
     });
   });
@@ -46,7 +46,7 @@ describe('toRecipeParams', () => {
 
 describe('hasActiveFilters', () => {
   it('chỉ sắp xếp thì không tính là đang lọc', () => {
-    expect(hasActiveFilters({ ...DEFAULT_FILTERS, sort: 'NEWEST' })).toBe(false);
+    expect(hasActiveFilters({ ...DEFAULT_FILTERS, sort: 'POPULAR' })).toBe(false);
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, contentType: 'VIDEO' })).toBe(true);
   });
 });

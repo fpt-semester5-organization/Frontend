@@ -28,15 +28,16 @@ export function useRecipeList(params: RecipeListParams, options?: { enabled?: bo
 }
 
 /** Cuộn vô hạn công thức (SCR-25): trang kế theo meta của server. */
-export function useInfiniteRecipes(params: Omit<RecipeListParams, 'page'>, options?: { enabled?: boolean }) {
+export function useInfiniteRecipes(params: Omit<RecipeListParams, 'page'>, options?: { enabled?: boolean; refetchOnMount?: boolean | 'always' }) {
   return useInfiniteQuery({
-    queryKey: [...recipeKeys.all, 'infinite', params],
+    queryKey: [...recipeKeys.lists(), 'infinite', params],
     queryFn: ({ pageParam = 1 }) => listRecipes({ ...params, page: pageParam as number }),
     initialPageParam: 1,
     getNextPageParam: (last: { meta: { page: number; size: number; total: number } }) =>
       last.meta.page * last.meta.size < last.meta.total ? last.meta.page + 1 : undefined,
     enabled: options?.enabled ?? true,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: options?.refetchOnMount ?? 'always',
     retry: retryServerErrorsOnce,
   });
 }

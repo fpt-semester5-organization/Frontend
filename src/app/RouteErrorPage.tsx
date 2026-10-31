@@ -34,11 +34,13 @@ export const AppErrorFallback: React.FC<{ error?: unknown }> = ({ error }) => {
           Về trang chủ
         </a>
       </div>
-      {import.meta.env.DEV && detail && (
-        <details className="mt-space-md w-full max-w-xl text-left">
-          <summary className="cursor-pointer font-label-sm text-label-sm text-on-surface-variant">Chi tiết cho lập trình viên (chỉ hiện khi chạy dev)</summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-3 font-label-sm text-label-sm text-on-surface-variant">
-            {detail}
+      {import.meta.env.DEV && (
+        <details open className="mt-space-md w-full max-w-xl text-left border border-error/30 rounded-xl p-3 bg-red-50/50 dark:bg-red-950/20">
+          <summary className="cursor-pointer font-label-sm text-label-sm font-bold text-error">
+            Chi tiết lỗi kỹ thuật:
+          </summary>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-3 font-mono text-xs text-on-surface-variant select-all">
+            {error instanceof Error ? `${error.name}: ${error.message}\n\n${error.stack}` : detail || 'Không có chi tiết lỗi'}
           </pre>
         </details>
       )}

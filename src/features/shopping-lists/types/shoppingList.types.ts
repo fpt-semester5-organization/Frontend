@@ -16,7 +16,9 @@ export type ShoppingAisle = { aisle: AisleCode | string; items: ShoppingItem[] }
 export type ShoppingListStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED';
 
 /** POST /meal-plans/{id}/shopping-list (FN-MEAL-05). */
-export type CreateShoppingListBody = Schemas['CreateMealPlanShoppingListRequest'];
+export type CreateShoppingListBody = Schemas['CreateMealPlanShoppingListRequest'] & {
+  daysCount?: number;
+};
 export type CreatedShoppingList = Omit<CreatedList, 'aisles' | 'status'> & {
   status: ShoppingListStatus;
   aisles: ShoppingAisle[];

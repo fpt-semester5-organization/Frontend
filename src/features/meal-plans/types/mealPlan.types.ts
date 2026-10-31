@@ -15,10 +15,15 @@ export type MealType = MealSlot['mealType'];
 export type MealPlanListItem = DeepRequired<Schemas['ListMealPlansResponse']['data'][number]>;
 
 /** POST /meal-plans (FN-MEAL-01). */
-export type CreateMealPlanBody = Schemas['CreateMealPlanRequest'];
+export type CreateMealPlanBody = Schemas['CreateMealPlanRequest'] & {
+  numberOfDays?: number;
+};
 
 /** PUT /meal-plans/{id}/slots/{slotId} (FN-MEAL-03). */
-export type SwapSlotBody = Schemas['UpdateMealPlanSlotRequest'];
+export type SwapSlotBody = Schemas['UpdateMealPlanSlotRequest'] & {
+  newRecipeId?: number;
+  customNote?: string;
+};
 export type SwapReason = NonNullable<SwapSlotBody['swapReason']>;
 export type SwapSlotResult = DeepRequired<Schemas['UpdateMealPlanSlotResponse']['data']>;
 

@@ -1,10 +1,16 @@
 /**
  * SCR-23 · meal-plans/Generate · `/meal-plans/new`
  * FN: FN-MEAL-01 · Nguyễn Văn Minh Tâm · Sprint 6
- * Bố cục 2 cột chuẩn Stich AI (Form 8/12 + Sidebar 4/12 Hồ sơ & Quota).
- * Chốt chặn kiểm tra tủ lạnh ảo rỗng (bảo toàn 100%).
+ * Cập nhật luồng tạo thực đơn AI:
+ * - Chọn ngày bắt đầu (không cho chọn quá khứ, mặc định hôm nay)
+ * - Chọn số ngày muốn lập thực đơn (1, 3, 5, 7, 14 hoặc nhập tùy ý 1 - 30)
+ * - Ô lưu ý với placeholder ví dụ ngữ cảnh phong phú
+ * - Hiển thị "Context AI đã hiểu" dưới dạng các chip/tag để kiểm tra, sửa, xóa
+ * - Nút "Tạo thực đơn" với loading & disable khi không hợp lệ
+ * - Hiển thị tiêu đề dạng: "Thực đơn từ Thứ [X] DD/MM/YYYY đến Thứ [Y] DD/MM/YYYY (N ngày)"
+ * - Bảo toàn kiểm tra tủ lạnh ảo rỗng, đồng bộ hồ sơ sức khỏe và hạn mức.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
@@ -24,15 +30,30 @@ import { cn } from '@/lib/cn';
 import { applyServerFieldErrors } from '@/lib/formErrors';
 import { getErrorMessage, notifyApiError, notifySuccess } from '@/lib/notify';
 import { useCreateMealPlan } from '../hooks/useMealPlans';
-import { addDays, getQuickStartDates, todayInVietnam } from '../lib/dates';
+import {
+  addDays,
+  formatMealPlanTitle,
+  getQuickStartDates,
+  todayInVietnam,
+} from '../lib/dates';
 import { BUDGET_LABEL } from '../lib/labels';
 import { generatePlanSchema, type GeneratePlanValues } from '../types/mealPlan.schemas';
 import type { BudgetTier } from '../types/mealPlan.types';
+import {
+  AiParsedChip,
+  compileChipsToInstructions,
+  parseRawNoteToChips,
+  CONTEXT_CATEGORIES,
+  QUICK_CONTEXT_SUGGESTIONS,
+  type ContextCategory,
+} from '../lib/aiContextParser';
+import { AiContextChips } from '../components/AiContextChips';
+import { GeneratingPanel } from '../components/GeneratingPanel';
 
 const TIERS: BudgetTier[] = ['ECONOMICAL', 'STANDARD', 'PREMIUM'];
-const HINTS = ['Ít dầu mỡ', 'Món canh ấm nóng', 'Không cay', 'Giàu đạm thực vật', 'Ưu tiên rau củ luộc'];
-const MAX_NOTE = 200;
-const SECTION_TITLE = 'font-headline-sm text-headline-sm text-primary';
+const QUICK_DAYS_OPTIONS = [1, 3, 5, 7, 14];
+const MAX_NOTE = 500;
+const SECTION_TITLE = 'font-serif font-headline-sm text-headline-sm text-primary';
 
 export const MealPlanGenerate: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +71,10 @@ export const MealPlanGenerate: React.FC = () => {
   const [fridgeItemsCount, setFridgeItemsCount] = useState<number | null>(null);
   const [nonFreshCount, setNonFreshCount] = useState<number>(0);
 
+  // State quản lý Chips ngữ cảnh AI đã hiểu
+  const [aiChips, setAiChips] = useState<AiParsedChip[]>([]);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState<boolean>(false);
+
   const quickDates = useMemo(() => getQuickStartDates(), []);
 
   const {
@@ -60,11 +85,13 @@ export const MealPlanGenerate: React.FC = () => {
     setValue,
     watch,
     getValues,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<GeneratePlanValues>({
     resolver: zodResolver(generatePlanSchema),
+    mode: 'onChange',
     defaultValues: {
       startDate: todayInVietnam(),
+      numberOfDays: 7,
       budgetTier: 'STANDARD',
       useFridge: false,
       customInstructions: '',
@@ -73,7 +100,75 @@ export const MealPlanGenerate: React.FC = () => {
 
   const note = watch('customInstructions') ?? '';
   const startDate = watch('startDate');
+  const numberOfDays = watch('numberOfDays') ?? 7;
   const useFridge = watch('useFridge');
+
+  // Debounce phân tích text ghi chú sang Chips (đồng bộ chuẩn xác, tránh duplicate)
+  useEffect(() => {
+    if (!note.trim()) {
+      setAiChips([]);
+      return;
+    }
+
+    setIsAiAnalyzing(true);
+    const timer = setTimeout(() => {
+      const extracted = parseRawNoteToChips(note);
+      setAiChips(extracted);
+      setIsAiAnalyzing(false);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [note]);
+
+  // Xóa chip: đồng thời gỡ cụm từ khỏi ô text ghi chú
+  const handleRemoveChip = (chipToRemove: AiParsedChip) => {
+    const current = getValues('customInstructions') || '';
+    const parts = current.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
+    const remaining = parts.filter(
+      (p) =>
+        p.toLowerCase() !== chipToRemove.label.toLowerCase() &&
+        !p.toLowerCase().includes(chipToRemove.label.toLowerCase()) &&
+        !chipToRemove.label.toLowerCase().includes(p.toLowerCase())
+    );
+    setValue('customInstructions', remaining.join(', '), { shouldValidate: true });
+    setAiChips((prev) => prev.filter((c) => c.id !== chipToRemove.id));
+  };
+
+  // Bật/tắt gợi ý nhanh: bấm lần đầu thì thêm, bấm lại thì gỡ bỏ (toggle chuẩn, không bị trùng)
+  const handleToggleSuggestion = (item: { label: string; category: ContextCategory }) => {
+    const current = getValues('customInstructions') || '';
+    const isAlreadySelected =
+      current.toLowerCase().includes(item.label.toLowerCase()) ||
+      aiChips.some((c) => c.label.toLowerCase() === item.label.toLowerCase());
+
+    if (isAlreadySelected) {
+      // Gỡ bỏ
+      const parts = current.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
+      const remaining = parts.filter(
+        (p) =>
+          p.toLowerCase() !== item.label.toLowerCase() &&
+          !p.toLowerCase().includes(item.label.toLowerCase()) &&
+          !item.label.toLowerCase().includes(p.toLowerCase())
+      );
+      setValue('customInstructions', remaining.join(', '), { shouldValidate: true });
+      setAiChips((prev) => prev.filter((c) => c.label.toLowerCase() !== item.label.toLowerCase()));
+    } else {
+      // Thêm mới
+      const trimmed = current.trim();
+      const newText = trimmed ? `${trimmed}, ${item.label}` : item.label;
+      setValue('customInstructions', newText, { shouldValidate: true });
+      const newChip: AiParsedChip = {
+        id: `chip_sug_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        category: item.category,
+        label: item.label,
+        icon: CONTEXT_CATEGORIES[item.category].icon,
+      };
+      setAiChips((prev) => {
+        if (prev.some((c) => c.label.toLowerCase() === item.label.toLowerCase())) return prev;
+        return [...prev, newChip];
+      });
+    }
+  };
 
   const handleToggleFridge = async (checked: boolean, onChange: (val: boolean) => void) => {
     if (!checked) {
@@ -110,33 +205,42 @@ export const MealPlanGenerate: React.FC = () => {
     }
   };
 
-  const addHint = (hint: string) => {
-    const cur = (getValues('customInstructions') ?? '').trim();
-    const next = cur ? `${cur}, ${hint.toLowerCase()}` : hint;
-    setValue('customInstructions', next.slice(0, MAX_NOTE), { shouldValidate: true });
-  };
-
   const submit = (values: GeneratePlanValues) => {
     if (values.useFridge && fridgeEmptyError) {
       return;
     }
 
     setFailure(null);
+
+    // Gom Context Chips và note lại thành hướng dẫn hoàn chỉnh gửi lên Backend/AI
+    const compiledInstructions = compileChipsToInstructions(aiChips, values.customInstructions);
+
     createPlan.mutate(
       {
         startDate: values.startDate,
+        numberOfDays: values.numberOfDays,
         budgetTier: values.budgetTier,
         useFridge: values.useFridge,
-        ...(values.customInstructions ? { customInstructions: values.customInstructions } : {}),
+        ...(compiledInstructions ? { customInstructions: compiledInstructions } : {}),
       },
       {
         onSuccess: (res) => {
-          notifySuccess(res.message || 'Đã tạo thực đơn bản nháp (21 bữa)');
+          notifySuccess(
+            res.message || `Đã tạo thực đơn bản nháp (${values.numberOfDays} ngày · ${values.numberOfDays * 3} bữa)`
+          );
           navigate(PATHS.MEAL_PLANS.DETAIL(res.data.planId), { replace: true });
         },
         onError: (error) => {
           const apiError = toApiError(error);
-          if (applyServerFieldErrors(apiError, setError, ['startDate', 'budgetTier', 'useFridge', 'customInstructions'])) {
+          if (
+            applyServerFieldErrors(apiError, setError, [
+              'startDate',
+              'numberOfDays',
+              'budgetTier',
+              'useFridge',
+              'customInstructions',
+            ])
+          ) {
             return;
           }
           if (apiError.errorCode === 'ERR_QUOTA_MEAL_PLAN_EXCEEDED' && !isVip) {
@@ -161,10 +265,15 @@ export const MealPlanGenerate: React.FC = () => {
     );
   };
 
-  const health = profile.data?.health;
+  const health = profile.data?.healthProfile;
   const allergens = profile.data?.allergens ?? [];
   const limit = isVip ? QUOTA.mealPlanPerWeek.vip : QUOTA.mealPlanPerWeek.free;
   const generating = createPlan.isPending;
+
+  // Tính toán tiêu đề kế hoạch dạng chuẩn: "Thực đơn từ Thứ Hai 03/11/2026 đến Chủ Nhật 09/11/2026 (7 ngày)"
+  const dynamicTitle = useMemo(() => {
+    return formatMealPlanTitle(startDate, numberOfDays);
+  }, [startDate, numberOfDays]);
 
   return (
     <main className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-[1440px] bg-background">
@@ -179,23 +288,46 @@ export const MealPlanGenerate: React.FC = () => {
               <Icon name="arrow_back" className="text-[18px]" />
               Quay lại thực đơn tuần
             </Link>
+            <nav aria-label="Điều hướng" className="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
+              <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+                Trang chủ
+              </Link>
+            <span>/</span>
+            <Link to={PATHS.MEAL_PLANS.ROOT} className="hover:text-primary transition-colors">
+              Thực đơn tuần
+            </Link>
+            <span>/</span>
+            <span className="font-semibold text-on-surface">Tạo mới</span>
+          </nav>
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">
+                Thiết lập thực đơn dinh dưỡng
+              </h1>
+              <p className="mt-1 font-body-md text-body-md text-on-surface-variant">
+                Lên lịch thực đơn chuẩn khoa học từ AI dựa trên hồ sơ thể trạng, thói quen ăn uống và tủ lạnh thông minh.
+              </p>
+            </div>
+            {/* Banner hiển thị tiêu đề thực đơn đã tính toán */}
+            <div className="inline-flex items-center gap-2 rounded-xl bg-primary-fixed text-on-primary-fixed border border-primary/20 px-4 py-2 font-label-sm text-xs font-semibold shadow-xs">
+              <Icon name="event" className="text-[18px] text-primary" />
+              <span>{dynamicTitle}</span>
+            </div>
           </div>
-          <h1 className="pt-space-xs font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg tracking-tight">
-            Thiết lập thực đơn tuần bằng AI
-          </h1>
-          <p className="mt-1 font-body-md text-body-md text-on-surface-variant">
-            AI lên 21 bữa (7 ngày × 3 bữa) theo hồ sơ sức khỏe, trường phái ăn chay và dị ứng của bạn.
-          </p>
         </section>
 
-        {/* 2-Column Content Layout */}
-        <section className="w-full px-margin-mobile pb-space-2xl sm:px-margin">
-          <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-12">
-            {/* Left Column: Form Setup (8 cols) */}
-            <form className="flex flex-col gap-space-xl lg:col-span-8" onSubmit={handleSubmit(submit)} noValidate>
+        {generating ? (
+          <GeneratingPanel
+            summary={dynamicTitle}
+            daysCount={numberOfDays}
+          />
+        ) : (
+          <section className="grid grid-cols-1 items-start gap-space-lg lg:grid-cols-12">
+            {/* Left Column: Form Fields (8 cols) */}
+            <form onSubmit={handleSubmit(submit)} noValidate className="flex flex-col gap-space-md lg:col-span-8">
               {failure && (
                 <FormAlert
-                  tone="warning"
+                  tone="error"
                   title={
                     failure.status === 503 || failure.status === 502
                       ? 'Dịch vụ tạm gián đoạn'
@@ -217,35 +349,39 @@ export const MealPlanGenerate: React.FC = () => {
                 </FormAlert>
               )}
 
-              {/* 01: Date Selection */}
+              {/* 01: Date Picker & Number of Days */}
               <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card">
                 <div className="mb-space-md flex items-center gap-space-sm pb-space-md border-b border-surface-container">
                   <span className={SECTION_TITLE}>01</span>
-                  <h2 className={SECTION_TITLE}>Chọn thời gian khởi tạo</h2>
+                  <h2 className={SECTION_TITLE}>Thời gian &amp; Số ngày lập thực đơn</h2>
                 </div>
+
                 <div className="grid grid-cols-1 items-start gap-space-md md:grid-cols-2">
+                  {/* Ngày bắt đầu (date picker, mặc định hôm nay, không chọn quá khứ) */}
                   <div>
-                    <label className="mb-space-xs block font-label-md text-label-md text-on-surface" htmlFor="startDateInput">
-                      Ngày bắt đầu (thực đơn 7 ngày)
+                    <label className="mb-space-xs block font-label-md text-label-md text-on-surface font-semibold" htmlFor="startDateInput">
+                      Ngày bắt đầu <span className="text-secondary">*</span>
                     </label>
                     <input
                       id="startDateInput"
                       type="date"
-                      min={addDays(todayInVietnam(), -6)}
+                      min={todayInVietnam()}
                       aria-invalid={!!errors.startDate}
                       {...register('startDate')}
                       className={cn(
-                        'w-full rounded-lg bg-surface-container-low px-space-md py-space-sm font-body-md text-body-md text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary-container',
-                        errors.startDate && 'ring-1 ring-error'
+                        'w-full rounded-lg bg-surface-container-low px-space-md py-space-sm font-body-md text-body-md text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/20 border border-surface-container-high',
+                        errors.startDate && 'ring-1 ring-error border-error'
                       )}
                     />
                     <FieldError>{errors.startDate?.message}</FieldError>
                     <p className="mt-1 font-body-xs text-xs text-on-surface-variant">
-                      Thực đơn gồm 21 bữa dinh dưỡng liên tiếp trong 7 ngày tính từ ngày bắt đầu bạn chọn.
+                      Mặc định là hôm nay ({todayInVietnam()}). Không được chọn ngày trong quá khứ.
                     </p>
                   </div>
+
+                  {/* Tùy chọn ngày xuất phát nhanh */}
                   <div className="flex flex-col gap-space-xs">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">Tùy chọn nhanh</span>
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">Chọn nhanh ngày bắt đầu:</span>
                     <div className="flex flex-wrap gap-space-xs">
                       {quickDates.map((item) => {
                         const on = startDate === item.iso;
@@ -267,9 +403,7 @@ export const MealPlanGenerate: React.FC = () => {
                               <span
                                 className={cn(
                                   'rounded px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider',
-                                  on
-                                    ? 'bg-primary text-on-primary'
-                                    : 'bg-surface-container-high text-on-surface-variant'
+                                  on ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant'
                                 )}
                               >
                                 {item.badge}
@@ -280,6 +414,61 @@ export const MealPlanGenerate: React.FC = () => {
                       })}
                     </div>
                   </div>
+                </div>
+
+                {/* Số ngày muốn lập thực đơn (1, 3, 5, 7, 14 ngày hoặc nhập tùy ý 1 - 30) */}
+                <div className="mt-5 pt-4 border-t border-surface-container">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+                    <div>
+                      <label className="block font-label-md text-label-md text-on-surface font-semibold" htmlFor="daysInput">
+                        Số ngày muốn lập thực đơn <span className="text-secondary">*</span>
+                      </label>
+                      <p className="text-xs text-on-surface-variant">
+                        Tối thiểu 1 ngày, tối đa 30 ngày (tương ứng {numberOfDays * 3} bữa ăn).
+                      </p>
+                    </div>
+
+                    {/* Input nhập số ngày tùy ý */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="daysInput"
+                        type="number"
+                        min={1}
+                        max={30}
+                        aria-invalid={!!errors.numberOfDays}
+                        {...register('numberOfDays', { valueAsNumber: true })}
+                        className={cn(
+                          'w-24 rounded-lg bg-surface-container-low px-3 py-1.5 text-center font-bold text-sm text-on-surface border border-surface-container-high focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 focus:outline-hidden',
+                          errors.numberOfDays && 'border-error ring-1 ring-error'
+                        )}
+                      />
+                      <span className="font-label-sm text-xs font-medium text-on-surface-variant">ngày</span>
+                    </div>
+                  </div>
+
+                  {/* Chips chọn nhanh số ngày (1, 3, 5, 7, 14 ngày) */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-label-sm text-xs text-on-surface-variant font-medium mr-1">Chọn nhanh:</span>
+                    {QUICK_DAYS_OPTIONS.map((days) => {
+                      const isSelected = numberOfDays === days;
+                      return (
+                        <button
+                          key={days}
+                          type="button"
+                          onClick={() => setValue('numberOfDays', days, { shouldValidate: true })}
+                          className={cn(
+                            'px-3 py-1 rounded-lg font-label-sm text-xs font-semibold transition-all',
+                            isSelected
+                              ? 'bg-primary-container text-on-primary shadow-xs'
+                              : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                          )}
+                        >
+                          {days} ngày {days === 7 ? '(1 tuần)' : days === 14 ? '(2 tuần)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <FieldError>{errors.numberOfDays?.message}</FieldError>
                 </div>
               </article>
 
@@ -304,20 +493,20 @@ export const MealPlanGenerate: React.FC = () => {
                             aria-checked={on}
                             onClick={() => field.onChange(t)}
                             className={cn(
-                              'flex flex-col justify-between rounded-xl p-space-md text-left transition-all',
+                              'flex flex-col justify-between rounded-xl p-space-md text-left transition-all border',
                               on
-                                ? 'bg-primary-fixed/50 ring-2 ring-primary-container'
-                                : 'bg-surface-container-lowest ring-1 ring-surface-container-high hover:bg-surface-container-low'
+                                ? 'bg-primary-fixed/40 border-primary ring-2 ring-primary/20 text-on-surface'
+                                : 'bg-surface-container-lowest border-surface-container-high hover:bg-surface-container-low'
                             )}
                           >
                             <div className="flex items-center justify-between">
-                              <span className={cn('font-label-md text-label-md', on ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+                              <span className={cn('font-label-md text-label-md', on ? 'font-bold text-primary' : 'text-on-surface-variant')}>
                                 {BUDGET_LABEL[t]}
                                 {t === 'STANDARD' ? ' (mặc định)' : ''}
                               </span>
                               <Icon
                                 name="check_circle"
-                                className={cn('text-[18px]', on ? 'text-primary-container' : 'text-transparent')}
+                                className={cn('text-[18px]', on ? 'text-primary' : 'text-transparent')}
                               />
                             </div>
                           </button>
@@ -329,7 +518,7 @@ export const MealPlanGenerate: React.FC = () => {
                 <FieldError>{errors.budgetTier?.message}</FieldError>
               </article>
 
-              {/* 03: Virtual Fridge Integration (With Strict Empty Guard) */}
+              {/* 03: Virtual Fridge Integration */}
               <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card">
                 <div className="mb-space-md flex items-center gap-space-sm pb-space-md border-b border-surface-container">
                   <span className={SECTION_TITLE}>03</span>
@@ -337,14 +526,16 @@ export const MealPlanGenerate: React.FC = () => {
                 </div>
                 <div className="flex flex-col items-start justify-between gap-space-md rounded-xl bg-surface-container-low p-space-md md:flex-row md:items-center">
                   <div className="flex items-start gap-space-md">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-on-primary">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-on-primary shadow-xs">
                       <Icon name="kitchen" className="text-[20px]" />
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-space-sm">
-                        <h3 className="font-label-lg text-label-lg text-primary font-medium">Ưu tiên nguyên liệu trong Tủ Lạnh Thông Minh</h3>
+                        <h3 className="font-label-lg text-label-lg text-primary font-medium">
+                          Ưu tiên nguyên liệu trong Tủ Lạnh Thông Minh
+                        </h3>
                         {fridgeItemsCount !== null && (
-                          <span className="rounded bg-surface-container-lowest px-space-xs py-0.5 font-label-sm text-label-sm text-secondary">
+                          <span className="rounded-full bg-primary-fixed text-on-primary-fixed px-2 py-0.5 font-label-sm text-xs font-semibold">
                             {fridgeItemsCount} nguyên liệu
                           </span>
                         )}
@@ -371,15 +562,14 @@ export const MealPlanGenerate: React.FC = () => {
                         disabled={isCheckingFridge}
                         onClick={() => handleToggleFridge(!field.value, field.onChange)}
                         className={cn(
-                          // p-0.5 ghi đè padding mặc định của <button> (Bootstrap Reboot không xóa), nếu không núm bị lệch và tràn khỏi rãnh.
-                          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-0 p-0.5 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-container focus:ring-offset-2',
-                          field.value ? 'bg-primary-container' : 'bg-outline-variant',
+                          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-0 p-0.5 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                          field.value ? 'bg-primary-container' : 'bg-surface-container-highest',
                           isCheckingFridge && 'opacity-60 cursor-not-allowed'
                         )}
                       >
                         <span
                           className={cn(
-                            'inline-block h-5 w-5 transform rounded-full bg-surface-container-lowest shadow transition duration-200',
+                            'inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200',
                             field.value ? 'translate-x-5' : 'translate-x-0'
                           )}
                         />
@@ -388,7 +578,6 @@ export const MealPlanGenerate: React.FC = () => {
                   />
                 </div>
 
-                {/* Chốt chặn tủ lạnh thông minh rỗng */}
                 {fridgeEmptyError && (
                   <FormAlert tone="error" title="Tủ lạnh thông minh chưa có nguyên liệu" className="mt-space-sm">
                     <p className="mt-0.5">{fridgeEmptyError}</p>
@@ -405,12 +594,13 @@ export const MealPlanGenerate: React.FC = () => {
                 )}
               </article>
 
-              {/* 04: AI Instructions & Quick Hints */}
+              {/* 04: AI Instructions & AI Context Understanding Chips */}
+              {/* 04: AI Instructions & AI Context Understanding (Gộp 2 ô thành 1 khung thống nhất theo yêu cầu) */}
               <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card">
                 <div className="mb-space-md flex items-center justify-between pb-space-md border-b border-surface-container">
                   <div className="flex items-center gap-space-sm">
                     <span className={SECTION_TITLE}>04</span>
-                    <h2 className={SECTION_TITLE}>Yêu cầu riêng cho AI</h2>
+                    <h2 className={SECTION_TITLE}>Ghi chú &amp; Ngữ cảnh cho AI</h2>
                   </div>
                   <span
                     className={cn(
@@ -421,43 +611,106 @@ export const MealPlanGenerate: React.FC = () => {
                     {note.length} / {MAX_NOTE}
                   </span>
                 </div>
-                <textarea
-                  id="aiInstruction"
-                  rows={3}
-                  maxLength={MAX_NOTE}
-                  aria-label="Yêu cầu riêng cho AI"
-                  aria-invalid={!!errors.customInstructions}
-                  placeholder="Ví dụ: ít dầu mỡ, không cay, bữa sáng nấu nhanh dưới 15 phút…"
-                  {...register('customInstructions')}
-                  className="w-full resize-y rounded-lg bg-surface-container-low p-space-md font-body-md text-body-md text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary-container"
-                />
-                <FieldError>{errors.customInstructions?.message}</FieldError>
 
-                <div className="mt-space-md flex flex-wrap items-center gap-space-xs">
-                  <span className="mr-1 font-label-sm text-label-sm text-on-surface-variant">Gợi ý nhanh:</span>
-                  {HINTS.map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => addHint(h)}
-                      className="rounded-lg bg-surface-container-low px-space-sm py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:bg-surface-container"
-                    >
-                      + {h}
-                    </button>
-                  ))}
+                {/* Khung duy nhất tích hợp cả ô nhập, tiêu chí AI đã hiểu và gợi ý nhanh */}
+                <div className="rounded-xl border border-surface-container bg-surface-container-low p-3.5 sm:p-4 flex flex-col gap-3 transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-surface-container-lowest">
+                  {/* Textarea nhập ghi chú tự do */}
+                  <textarea
+                    id="aiInstruction"
+                    rows={3}
+                    maxLength={MAX_NOTE}
+                    aria-label="Yêu cầu riêng cho AI"
+                    aria-invalid={!!errors.customInstructions}
+                    placeholder="Ví dụ: nhà có 2 người lớn, 1 bé 3 tuổi, không ăn cay, hạn chế đồ chiên, ngân sách 100k/ngày..."
+                    {...register('customInstructions')}
+                    className="w-full resize-y bg-transparent p-0 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none border-none"
+                  />
+                  <FieldError>{errors.customInstructions?.message}</FieldError>
+
+                  {/* Tiêu chí AI đã hiểu (hiển thị trực tiếp ngay dưới văn bản khi có chip) */}
+                  {aiChips.length > 0 && (
+                    <div className="pt-2.5 border-t border-surface-container flex flex-wrap items-center gap-1.5 animate-fadeIn">
+                      <span className="font-serif text-xs font-semibold text-primary flex items-center gap-1 mr-1">
+                        <Icon name="auto_awesome" className="text-[14px]" />
+                        Context AI đã hiểu ({aiChips.length}):
+                      </span>
+                      {aiChips.map((chip) => {
+                        const meta = CONTEXT_CATEGORIES[chip.category] || CONTEXT_CATEGORIES.other;
+                        return (
+                          <span
+                            key={chip.id}
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-label-sm text-xs font-medium shadow-2xs',
+                              meta.badgeClass
+                            )}
+                          >
+                            <Icon name={meta.icon} className="text-[12px] opacity-80" />
+                            <span>{chip.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveChip(chip)}
+                              className="ml-0.5 rounded-full p-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                              title="Xóa tiêu chí này"
+                            >
+                              <Icon name="close" className="text-[11px]" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Thanh gợi ý thêm nhanh nằm ngay ở đáy khung */}
+                  <div className="pt-2.5 border-t border-surface-container">
+                    <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mb-2">
+                      <Icon name="tips_and_updates" className="text-[15px] text-secondary" />
+                      <span className="font-medium">Gợi ý thêm nhanh vào ghi chú (bấm để bật/tắt):</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {QUICK_CONTEXT_SUGGESTIONS.map((item) => {
+                        const isAdded =
+                          note.toLowerCase().includes(item.label.toLowerCase()) ||
+                          aiChips.some((c) => c.label.toLowerCase() === item.label.toLowerCase());
+                        return (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={() => handleToggleSuggestion(item)}
+                            title={isAdded ? `Bấm để bỏ chọn: ${item.label}` : `Bấm để thêm: ${item.label}`}
+                            className={cn(
+                              'rounded-lg px-2.5 py-1 text-xs font-medium transition-all border inline-flex items-center gap-1',
+                              isAdded
+                                ? 'bg-primary-container text-on-primary border-primary-container font-semibold shadow-2xs'
+                                : 'bg-surface-container-lowest text-on-surface border-surface-container hover:border-outline-variant hover:bg-surface-container'
+                            )}
+                          >
+                            <Icon name={isAdded ? 'check' : 'add'} className="text-[13px]" />
+                            <span>{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </article>
 
-              {/* Action Buttons */}
+              {/* Action Buttons: Nút Tạo thực đơn hiển thị loading & disabled khi invalid */}
               <div className="flex flex-col items-center justify-between gap-space-md pt-space-xs sm:flex-row">
                 <button
                   type="submit"
-                  disabled={generating}
-                  className="flex w-full items-center justify-center gap-space-sm rounded-xl bg-primary-container px-space-xl py-space-md font-label-lg text-label-lg text-on-primary transition-all hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto shadow-md"
+                  disabled={generating || !isValid}
+                  className="flex w-full items-center justify-center gap-space-sm rounded-lg bg-primary-container px-space-xl py-3.5 font-label-lg text-label-lg text-on-primary font-bold transition-all hover:bg-primary active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto shadow-md"
                   id="submitBtn"
                 >
-                  <Icon name="auto_awesome" className="text-[20px]" />
-                  <span>{generating ? 'Đang tạo…' : 'Tạo thực đơn tuần bằng AI (7 ngày)'}</span>
+                  <Icon
+                    name={generating ? 'progress_activity' : 'auto_awesome'}
+                    className={cn('text-[20px]', generating && 'animate-spin')}
+                  />
+                  <span>
+                    {generating
+                      ? 'AI đang tạo thực đơn...'
+                      : `Tạo thực đơn AI (${numberOfDays} ngày · ${numberOfDays * 3} bữa)`}
+                  </span>
                 </button>
                 <Link
                   to={PATHS.MEAL_PLANS.ROOT}
@@ -468,10 +721,10 @@ export const MealPlanGenerate: React.FC = () => {
               </div>
             </form>
 
-            {/* Right Column: Sidebar Profile & Quota (4 cols) */}
+            {/* Right Column: Sidebar Profile & Quota */}
             <aside className="flex flex-col gap-space-md lg:col-span-4">
               {/* Profile Sync Card */}
-              <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card">
+              <article className="rounded-2xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card">
                 <div className="mb-space-sm flex items-center justify-between pb-space-sm border-b border-surface-container">
                   <div className="flex items-center gap-space-xs">
                     <Icon name="tune" className="text-[20px] text-secondary" />
@@ -487,17 +740,13 @@ export const MealPlanGenerate: React.FC = () => {
                 </div>
 
                 {profile.isPending ? (
-                  <div className="animate-pulse space-y-2 py-2" role="status" aria-busy="true" aria-label="Đang tải hồ sơ">
+                  <div className="animate-pulse space-y-2 py-2" role="status" aria-busy="true">
                     {[0, 1, 2, 3].map((i) => (
                       <div key={i} className="h-5 rounded bg-surface-container" />
                     ))}
                   </div>
                 ) : profile.isError ? (
-                  <FormAlert
-                    tone="error"
-                    title="Lỗi tải hồ sơ"
-                    className="mt-2"
-                  >
+                  <FormAlert tone="error" title="Lỗi tải hồ sơ" className="mt-2">
                     <button
                       type="button"
                       onClick={() => void profile.refetch()}
@@ -569,7 +818,7 @@ export const MealPlanGenerate: React.FC = () => {
               </article>
 
               {/* AI Quota Card */}
-              <article className="rounded-xl border border-surface-container bg-surface-container-low p-space-lg shadow-card">
+              <article className="rounded-2xl border border-surface-container bg-surface-container-low p-space-lg shadow-card">
                 <div className="mb-space-sm flex items-center justify-between pb-space-sm border-b border-surface-container">
                   <div className="flex items-center gap-space-xs">
                     <Icon name="bolt" className="text-[20px] text-primary" />
@@ -597,7 +846,7 @@ export const MealPlanGenerate: React.FC = () => {
                   </li>
                   <li className="flex items-start gap-space-xs">
                     <Icon name="checklist" className="shrink-0 text-[18px] text-primary" />
-                    <span>Thực đơn gồm 7 ngày × 3 bữa ({QUOTA.mealsPerPlan} bữa), lưu ở trạng thái bản nháp.</span>
+                    <span>Thực đơn gồm các bữa dinh dưỡng được lưu ở trạng thái bản nháp.</span>
                   </li>
                 </ul>
 
@@ -611,32 +860,9 @@ export const MealPlanGenerate: React.FC = () => {
                 )}
               </article>
             </aside>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
-
-      {/* AI Generating Fullscreen Overlay */}
-      {generating && (
-        <div
-          aria-labelledby="modalTitle"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 backdrop-blur-sm"
-          role="dialog"
-        >
-          <div className="mx-space-md flex w-full max-w-md flex-col items-center rounded-2xl bg-surface-container-lowest p-space-xl text-center shadow-2xl">
-            <div className="mb-space-md flex h-14 w-14 animate-pulse items-center justify-center rounded-full bg-primary-container text-on-primary">
-              <Icon name="smart_toy" className="text-[32px]" />
-            </div>
-            <h3 className="mb-space-xs font-headline-md text-headline-md text-primary" id="modalTitle">
-              Đang tạo thực đơn tuần
-            </h3>
-            <p className="font-body-md text-body-md text-on-surface-variant">
-              AI đang cân đối dinh dưỡng và chọn {QUOTA.mealsPerPlan} bữa cho bạn. Vui lòng chờ, thao tác này có thể mất vài
-              chục giây.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* VIP Upsell Dialog */}
       <VipUpsellDialog
@@ -670,9 +896,9 @@ export const MealPlanGenerate: React.FC = () => {
               Để sau
             </button>
             <Link
-              to={PATHS.ME.HEALTH}
+              to={PATHS.MEAL_PLANS.NEW}
               onClick={() => setProfileMessage(null)}
-              className="inline-flex items-center rounded-lg bg-primary-container px-4 py-2 font-label-md text-label-md text-on-primary hover:bg-primary"
+              className="inline-flex items-center rounded-lg bg-primary-container px-4 py-2 font-label-md text-label-md text-on-primary hover:bg-primary shadow-xs"
             >
               Cập nhật hồ sơ
             </Link>

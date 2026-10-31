@@ -67,18 +67,20 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
 
     const resolvedVideoUrl =
       item?.videoUrl ??
-      (post as { videoUrl?: string } | undefined)?.videoUrl;
+      (post as { videoUrl?: string } | undefined)?.videoUrl ??
+      (imageUrl?.includes('/video/upload/') ? imageUrl.replace(/\.jpg$/i, '.mp4') : undefined);
 
     const hasVideoProp =
       item?.hasVideo ??
       (item?.type === 'VIDEO') ??
       (post as { hasVideo?: boolean; type?: string } | undefined)?.hasVideo ??
       ((post as { type?: string } | undefined)?.type === 'VIDEO') ??
+      Boolean(resolvedVideoId) ??
       false;
 
     // Chỉ bài viết/công thức nào THỰC SỰ có video URL mới hiển thị nút xem video & kịch bản
-    const isVideo = Boolean(hasVideoProp && resolvedVideoUrl);
-    const activeVideoUrl = resolvedVideoUrl || '';
+    const isVideo = Boolean(hasVideoProp && (resolvedVideoUrl || resolvedVideoId));
+    const activeVideoUrl = resolvedVideoUrl || (imageUrl?.includes('/video/upload/') ? imageUrl.replace(/\.jpg$/i, '.mp4') : '');
 
     const [videoDuration, setVideoDuration] = useState<number>(
       (item as { durationSeconds?: number } | undefined)?.durationSeconds ?? 10
@@ -172,12 +174,14 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
               <span
                 className={cn(
                   'shrink-0 rounded-full px-2.5 py-0.5 font-label-sm text-label-sm font-semibold',
-                  isRecipe
+                  isVideo
                     ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
-                    : 'bg-surface-container text-on-surface-variant'
+                    : isRecipe
+                      ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
+                      : 'bg-surface-container text-on-surface-variant'
                 )}
               >
-                {isRecipe ? 'Công thức' : 'Bài viết'}
+                {isVideo ? 'Video' : isRecipe ? 'Công thức' : 'Bài viết'}
               </span>
             </div>
             {createdAt && (
@@ -191,7 +195,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
           </div>
         </header>
 
-        {imageUrl && !imgError ? (
+        {(imageUrl && !imgError) || isVideo ? (
           <>
             <h2 className="px-4 pb-2.5">
               <Link
@@ -206,7 +210,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
               <div className="relative w-full overflow-hidden border-y border-surface-container/60">
                 <SyncedVideoScriptPlayer
                   videoUrl={activeVideoUrl}
-                  posterUrl={imageUrl}
+                  posterUrl={imageUrl || undefined}
                   title={title}
                   segments={activeSegments}
                   autoPlay={true}
@@ -223,13 +227,19 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
                   aria-hidden="true"
                   className="block h-full w-full"
                 >
-                  <img
-                    src={imageUrl}
-                    alt={title}
-                    loading="lazy"
-                    onError={() => setImgError(true)}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-102"
-                  />
+                  {imageUrl && !imgError ? (
+                    <img
+                      src={imageUrl}
+                      alt={title}
+                      loading="lazy"
+                      onError={() => setImgError(true)}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-102"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-fixed/40 via-surface-container-low to-secondary-fixed/30">
+                      <Icon name="movie" className="text-[56px] text-primary/40" />
+                    </div>
+                  )}
                 </Link>
 
                 {/* Chỉ bài viết/công thức CÓ VIDEO mới hiển thị các nút này, chuẩn màu thương hiệu VeggieLife */}

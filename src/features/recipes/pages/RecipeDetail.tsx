@@ -162,7 +162,15 @@ const RecipeDetail: React.FC = () => {
       <article className="flex flex-col gap-space-xl">
         <header className="grid items-start gap-space-lg lg:grid-cols-2 lg:gap-space-xl">
           <figure className="relative overflow-hidden rounded-2xl bg-surface-container">
-            {data.imageUrl ? (
+            {data.type === 'VIDEO' && data.imageUrl?.includes('/video/upload/') ? (
+              <video
+                src={data.imageUrl.replace(/\.jpg$/i, '.mp4')}
+                poster={data.imageUrl}
+                controls
+                playsInline
+                className="aspect-[4/3] h-auto w-full object-cover"
+              />
+            ) : data.imageUrl ? (
               <img
                 src={data.imageUrl}
                 alt={`Món ${data.title}`}

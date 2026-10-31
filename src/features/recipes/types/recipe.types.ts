@@ -95,4 +95,7 @@ export type RecipeStatus =
   | 'DELETED';
 
 /** POST /videos (FN-POST-08): ảnh/video gắn vào công thức. */
-export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']>;
+export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']> & {
+  imageUrl?: string;
+  videoUrl?: string;
+};

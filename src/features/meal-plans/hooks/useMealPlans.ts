@@ -8,6 +8,7 @@ import {
   listMealPlans,
   setMealSlotCompleted,
   swapMealSlot,
+  updateMealPlanInstructions,
 } from '../api/mealPlans.api';
 import type { CreateMealPlanBody, MealPlanDetail, NutritionLevel, SwapSlotBody } from '../types/mealPlan.types';
 
@@ -115,5 +116,17 @@ export function useCompleteMealSlot(planId: number) {
       setCompleted(slotId, isCompleted);
     },
     onError: (_error, { slotId, isCompleted }) => setCompleted(slotId, !isCompleted),
+  });
+}
+
+/** Cập nhật lưu ý ngữ cảnh cho thực đơn và áp dụng AI. */
+export function useUpdateMealPlanInstructions(planId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (customInstructions: string) => updateMealPlanInstructions(planId, customInstructions),
+    onSuccess: (res) => {
+      queryClient.setQueryData(mealPlanKeys.detail(planId), res.data);
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.nutrition(planId) });
+    },
   });
 }

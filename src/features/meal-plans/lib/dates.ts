@@ -15,8 +15,14 @@ export function todayInVietnam(now = new Date()): string {
   return parts; // en-CA cho sẵn dạng YYYY-MM-DD
 }
 
+const cleanIso = (isoDate?: string | null): string => {
+  if (!isoDate) return todayInVietnam();
+  return isoDate.slice(0, 10);
+};
+
 const toUtc = (isoDate: string) => {
-  const [year, month, day] = isoDate.split('-').map(Number);
+  const clean = cleanIso(isoDate);
+  const [year, month, day] = clean.split('-').map(Number);
   return Date.UTC(year, month - 1, day);
 };
 
@@ -30,7 +36,7 @@ export const addDays = (isoDate: string, days: number) => fromUtc(toUtc(isoDate)
 /** 1 = Thứ Hai … 7 = Chủ nhật. */
 export const isoWeekday = (isoDate: string) => ((new Date(toUtc(isoDate)).getUTCDay() + 6) % 7) + 1;
 
-export const isMonday = (isoDate: string) => /^\d{4}-\d{2}-\d{2}$/.test(isoDate) && isoWeekday(isoDate) === 1;
+export const isMonday = (isoDate: string) => /^\d{4}-\d{2}-\d{2}$/.test(cleanIso(isoDate)) && isoWeekday(isoDate) === 1;
 
 /** Các Thứ Hai từ hôm nay trở đi (hôm nay là Thứ Hai thì tính luôn hôm nay). */
 export function upcomingMondays(count: number, today = todayInVietnam()): string[] {
@@ -40,14 +46,18 @@ export function upcomingMondays(count: number, today = todayInVietnam()): string
 }
 
 /** "2026-10-19" → "19/10". */
-export function formatDayMonth(isoDate: string): string {
-  const [, month, day] = isoDate.split('-');
+export function formatDayMonth(isoDate?: string | null): string {
+  if (!isoDate) return '';
+  const clean = isoDate.slice(0, 10);
+  const [, month, day] = clean.split('-');
   return `${day}/${month}`;
 }
 
 /** "2026-10-19" → "19/10/2026". */
-export function formatDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-');
+export function formatDate(isoDate?: string | null): string {
+  if (!isoDate) return '';
+  const clean = isoDate.slice(0, 10);
+  const [year, month, day] = clean.split('-');
   return `${day}/${month}/${year}`;
 }
 
@@ -138,6 +148,89 @@ export function getAvailableMondays(today = todayInVietnam()): AvailableMonday[]
     { iso: nextMon, label: `Tuần tới (${formatDayMonth(nextMon)})`, badge: 'Kế hoạch', isCurrentWeek: false },
     { iso: next2Mon, label: `Sau 2 tuần (${formatDayMonth(next2Mon)})`, isCurrentWeek: false },
   ];
+}
+
+/** Chuyển ngày ISO sang mã thứ: MON, TUE, WED, THU, FRI, SAT, SUN. */
+export function isoToDayOfWeek(isoDate: string): 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' {
+  const map: Record<number, 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN'> = {
+    1: 'MON',
+    2: 'TUE',
+    3: 'WED',
+    4: 'THU',
+    5: 'FRI',
+    6: 'SAT',
+    7: 'SUN',
+  };
+  return map[isoWeekday(isoDate)] ?? 'MON';
+}
+
+/**
+ * Hiển thị tiêu đề chuẩn theo yêu cầu:
+ * - Nếu ít hơn 1 tuần (< 7 ngày): không cần ghi từ ngày nào đến ngày nào, chỉ cần ghi "Thực đơn dinh dưỡng (N ngày)".
+ * - Nếu từ 7 ngày trở lên: "Thực đơn từ Thứ [X] DD/MM/YYYY đến Thứ [Y] DD/MM/YYYY (N ngày)".
+ */
+export function formatMealPlanTitle(startDate: string, daysCount: number): string {
+  if (!startDate) return '';
+  const safeDays = Math.max(1, daysCount);
+  if (safeDays < 7) {
+    return `Thực đơn dinh dưỡng (${safeDays} ngày)`;
+  }
+  const endDate = addDays(startDate.slice(0, 10), safeDays - 1);
+  const startDay = getWeekdayFull(startDate);
+  const endDay = getWeekdayFull(endDate);
+  return `Thực đơn từ ${startDay} ${formatDate(startDate)} đến ${endDay} ${formatDate(endDate)} (${safeDays} ngày)`;
+}
+
+/**
+ * Hiển thị tiêu đề thẻ ngày:
+ * - Nếu < 7 ngày: Ngày 1, Ngày 2, Ngày 3... (không ghi thứ, không ghi ngày bao nhiêu)
+ * - Nếu >= 7 ngày: Thứ + ngày/tháng (ví dụ: Thứ Ba, 04/11).
+ */
+export function formatDayCardHeader(isoDate: string, dayIndex?: number, totalDays = 7): string {
+  if (!isoDate) return '';
+  if (totalDays < 7 && typeof dayIndex === 'number') {
+    return `Ngày ${dayIndex + 1}`;
+  }
+  return `${getWeekdayFull(isoDate)}, ${formatDayMonth(isoDate)}`;
+}
+
+export interface CalendarDayItem {
+  index: number;
+  isoDate: string;
+  dayOfWeek: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+  weekdayFull: string;
+  weekdayShort: string;
+  dayMonth: string;
+  formattedDate: string;
+  header: string;
+  displayTitle: string;
+  displaySubtitle: string;
+  isToday: boolean;
+}
+
+/** Tạo danh sách các ngày thực tế từ startDate với số ngày mong muốn. */
+export function getCalendarDays(startDate: string, daysCount: number, today = todayInVietnam()): CalendarDayItem[] {
+  const safeDays = Math.max(1, daysCount);
+  const cleanStart = (startDate || today).slice(0, 10);
+
+  return Array.from({ length: safeDays }, (_, index) => {
+    const isoDate = addDays(cleanStart, index);
+    const weekdayFull = getWeekdayFull(isoDate);
+    const isLessThanWeek = safeDays < 7;
+    return {
+      index,
+      isoDate,
+      dayOfWeek: isoToDayOfWeek(isoDate),
+      weekdayFull,
+      weekdayShort: getWeekdayShort(isoDate),
+      dayMonth: formatDayMonth(isoDate),
+      formattedDate: formatDate(isoDate),
+      header: formatDayCardHeader(isoDate, index, safeDays),
+      displayTitle: isLessThanWeek ? `Ngày ${index + 1}` : weekdayFull,
+      displaySubtitle: isLessThanWeek ? '' : (isoDate === today ? 'Hôm nay' : formatDayMonth(isoDate)),
+      isToday: isoDate === today,
+    };
+  });
 }
 
 
