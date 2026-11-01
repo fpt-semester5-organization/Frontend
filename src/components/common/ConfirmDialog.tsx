@@ -30,7 +30,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   <Modal show={show} onHide={onCancel} title={title} size="sm" locked={loading}>
     <div className="flex flex-col gap-5 p-space-lg">
       <div className="font-body-md text-body-md text-on-surface-variant">{message}</div>
-      <div className="flex justify-end gap-3">
+      {/* Nhãn nút dài ở màn 360 px thì xuống dòng thay vì tràn khỏi hộp thoại. */}
+      <div className="flex flex-wrap justify-end gap-3">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
