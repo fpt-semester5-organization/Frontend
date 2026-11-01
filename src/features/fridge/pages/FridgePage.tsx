@@ -74,6 +74,49 @@ function cleanTechnicalCodes(text: string): string {
     .trim();
 }
 
+// Kiểm tra nguyên liệu có phải là đồ ăn mặn (thịt, cá, gia cầm, hải sản) cần loại trừ khỏi tủ lạnh chay
+function isNonVegetarianMeat(item: { name: string; foodGroup?: string | null; isRedMeat?: boolean }): boolean {
+  const name = (item.name || '').toLowerCase().trim();
+  if (
+    name.includes('chay') ||
+    name.includes('thực vật') ||
+    name.includes('thuần chay') ||
+    name.includes('vegan') ||
+    name.includes('plant-based') ||
+    name.includes('non-dairy')
+  ) {
+    return false;
+  }
+  // Trứng, sữa, nước uống, bánh ngọt KHÔNG PHẢI là đồ ăn mặn / thịt cá
+  if (
+    name.includes('trứng') || name.includes('hột gà') || name.includes('hột vịt') ||
+    name.includes('sữa') || name.includes('kem') || name.includes('phô mai') || name.includes('bơ') ||
+    name.includes('nước') || name.includes('trà') || name.includes('bánh')
+  ) {
+    return false;
+  }
+  if (item.isRedMeat) return true;
+  const fg = (item.foodGroup || '').toUpperCase().trim();
+  if (
+    fg.includes('RED_MEAT') || fg.includes('THỊT ĐỎ') ||
+    fg.includes('MEAT') || fg.includes('THỊT') ||
+    fg.includes('POULTRY') || fg.includes('GIA CẦM') ||
+    fg.includes('SEAFOOD') || fg.includes('HẢI SẢN') ||
+    fg.includes('THỦY HẢI SẢN') || fg.includes('FISH') || fg.includes('CÁ')
+  ) {
+    return true;
+  }
+  const meatKeywords = [
+    'thịt', 'bò', 'heo', 'lợn', 'gà', 'vịt', 'ngan', 'ngỗng', 'cừu', 'dê', 'bê',
+    'ba rọi', 'ba chỉ', 'sườn non', 'sườn heo', 'sườn bò', 'xương heo', 'xương bò',
+    'bò bít tết', 'beefsteak', 'beef', 'pork', 'chicken',
+    'cá ', 'cá hồi', 'cá thu', 'cá chép', 'cá lóc', 'cá tra', 'cá basa', 'cá ngừ', 'cá đuối', 'cá trích',
+    'tôm', 'cua', 'ghẹ', 'mực', 'bạch tuộc', 'hàu', 'sò', 'nghêu', 'ốc', 'sứa', 'hải sản',
+    'chả cá', 'chả lụa', 'giò lụa', 'xúc xích heo', 'xúc xích bò', 'lạp xưởng', 'pate gan', 'mỡ heo'
+  ];
+  return meatKeywords.some((k) => name.includes(k));
+}
+
 export const FridgePage: React.FC = () => {
   const authed = useAuthStore(selectIsAuthenticated);
   const vip = useAuthStore(selectIsVip);
@@ -223,7 +266,7 @@ export const FridgePage: React.FC = () => {
     detectMutation.mutate(selectedFile, {
       onSuccess: async (res) => {
         setDetectionResult(res);
-        setIsSavedToFridge(false);
+        setIsSavedToFridge(res.saved);
         if (authed && res.quota) {
           setMemberQuota(res.quota);
         }
@@ -241,7 +284,13 @@ export const FridgePage: React.FC = () => {
         }
 
         if (authed) {
-          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu trong tủ lạnh!`);
+          if (res.saved) {
+            await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
+            const savedCount = res.detected.filter((d) => d.inventoryId != null).length;
+            toast.success(`Đã nhận diện ${res.detected.length} món và tự động lưu ${savedCount} nguyên liệu vào tủ lạnh!`);
+          } else {
+            toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu trong tủ lạnh!`);
+          }
         } else {
           toast.info(`Đã nhận diện ${res.detected.length} nguyên liệu (kết quả dùng thử không lưu).`);
         }
@@ -337,10 +386,10 @@ export const FridgePage: React.FC = () => {
             })
           );
           savedCount++;
-        } else if (item.ingredientId) {
+        } else if (!isNonVegetarianMeat(item)) {
           operations.push(
             createFridgeItem({
-              ingredientId: item.ingredientId,
+              ingredientId: item.ingredientId ?? undefined,
               customItemName: itemDisplayName,
               freshnessStatus: item.freshnessStatus,
             })
@@ -560,7 +609,11 @@ export const FridgePage: React.FC = () => {
                   }
 
                   setDetectionResult(result.data);
-                  setIsSavedToFridge(false);
+                  const isSaved = authed && (result.data.saved ?? true);
+                  setIsSavedToFridge(isSaved);
+                  if (isSaved) {
+                    void queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
+                  }
                   if (result.data.quota) {
                     setMemberQuota(result.data.quota);
                   }
@@ -725,16 +778,15 @@ export const FridgePage: React.FC = () => {
                               </div>
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <FreshnessBadge status={item.freshnessStatus} size="sm" />
-                                {(item.isAnimalProduct || item.isRedMeat) && (
+                                {isNonVegetarianMeat(item) ? (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-[#fdeeed] px-2.5 py-0.5 text-xs font-semibold text-[#b42318] border border-[#fecdca]">
-                                    <Icon name="warning" className="text-[14px]" />
-                                    <span>Cảnh báo mặn</span>
+                                    <Icon name="block" className="text-[13px]" />
+                                    <span>Đồ ăn mặn (Không lưu vào kho)</span>
                                   </span>
-                                )}
-                                {!item.ingredientId && !item.isAnimalProduct && !item.isRedMeat && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f6efe9] px-2.5 py-0.5 text-xs font-semibold text-[#824d2d] border border-[#e5d5ca]">
-                                    <Icon name="info" className="text-[13px]" />
-                                    <span>Chưa có trong danh mục mẫu</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf3ec] px-2.5 py-0.5 text-xs font-semibold text-[#2d5a38] border border-[#c4dec8]">
+                                    <Icon name="check" className="text-[13px]" />
+                                    <span>Lưu vào tủ lạnh</span>
                                   </span>
                                 )}
                                 {item.confidence != null && (
@@ -844,35 +896,32 @@ export const FridgePage: React.FC = () => {
                       </span>
                     </Button>
 
-                    {isSavedToFridge && authed ? (
+                    {hasItems && (
                       <Button
                         variant="primary"
                         size="md"
-                        onClick={() => setMainTab('inventory')}
+                        onClick={() => {
+                          document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
                         type="button"
                         className="inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold"
+                      >
+                        <Icon name="soup_kitchen" className="text-[18px]" />
+                        <span>Xem gợi ý món ăn ({suggestionsQuery.data?.length ?? 0})</span>
+                      </Button>
+                    )}
+
+                    {authed && (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={() => setMainTab('inventory')}
+                        type="button"
+                        className="inline-flex items-center gap-2 font-semibold"
                       >
                         <Icon name="kitchen" className="text-[18px]" />
                         <span>Xem kho tủ lạnh</span>
                       </Button>
-                    ) : (
-                      hasItems && (
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          onClick={() => {
-                            setMainTab('inventory');
-                            setTimeout(() => {
-                              document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
-                            }, 100);
-                          }}
-                          type="button"
-                          className="inline-flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10"
-                        >
-                          <Icon name="soup_kitchen" className="text-[18px]" />
-                          <span>Xem gợi ý món ăn</span>
-                        </Button>
-                      )
                     )}
                   </div>
                 </div>
@@ -1117,257 +1166,258 @@ export const FridgePage: React.FC = () => {
                 })}
               </div>
             )}
+            </div>
+        </section>
+      )}
+
+      {/* SECTION GỢI Ý MÓN ĂN NẤU NGAY (EMPTY THE FRIDGE - FN-VIS-03) */}
+      {/* Hiển thị cho cả 2 tab (AI Vision & Kho tủ lạnh) để người dùng thấy gợi ý món ngay sau khi chụp ảnh */}
+      <div
+        id="recipe-suggestions-section"
+        className="mt-8 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm"
+      >
+        {/* Header section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline-variant/40">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]">
+              <Icon name="soup_kitchen" className="text-[24px]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline-sm text-lg font-bold text-on-surface">
+                  Món Chay Gợi Ý Nấu Ngay
+                </h3>
+                <span className="rounded-full bg-[#eaf3ec] px-2.5 py-0.5 text-xs font-semibold text-[#2d5a38] border border-[#c4dec8]">
+                  Empty the Fridge
+                </span>
+              </div>
+              <p className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                Gợi ý công thức đạt độ tương đồng nguyên liệu ≥ 70%, tự động ưu tiên giải cứu các món cần dùng sớm
+              </p>
+            </div>
           </div>
 
-          {/* SECTION GỢI Ý MÓN ĂN NẤU NGAY (EMPTY THE FRIDGE - FN-VIS-03) */}
-          <div
-            id="recipe-suggestions-section"
-            className="mt-8 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm"
-          >
-            {/* Header section */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-outline-variant/40">
-              <div className="flex items-start gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eaf3ec] text-[#2d5a38] border border-[#c4dec8]">
-                  <Icon name="soup_kitchen" className="text-[24px]" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-headline-sm text-lg font-bold text-on-surface">
-                      Món Chay Gợi Ý Nấu Ngay
-                    </h3>
-                    <span className="rounded-full bg-[#eaf3ec] px-2.5 py-0.5 text-xs font-semibold text-[#2d5a38] border border-[#c4dec8]">
-                      Empty the Fridge
-                    </span>
-                  </div>
-                  <p className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                    Gợi ý công thức đạt độ tương đồng nguyên liệu ≥ 70%, tự động ưu tiên giải cứu các món cần dùng sớm
-                  </p>
-                </div>
-              </div>
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void suggestionsQuery.refetch()}
+              disabled={suggestionsQuery.isFetching}
+              title="Tải lại danh sách gợi ý"
+              className="inline-flex items-center gap-1.5 text-xs"
+            >
+              <Icon
+                name="refresh"
+                className={`text-[16px] ${suggestionsQuery.isFetching ? 'animate-spin' : ''}`}
+              />
+              <span>Làm mới</span>
+            </Button>
 
-              {/* Action buttons */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Link
+              to={`${PATHS.MEAL_PLANS.NEW}?useFridge=true`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20 no-underline"
+              title="AI tự động sắp xếp 7 ngày thực đơn từ toàn bộ nguyên liệu trong tủ"
+            >
+              <Icon name="calendar_month" className="text-[16px]" />
+              <span>Lên thực đơn tuần</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Content area */}
+        <div className="mt-5">
+          {!authed ? (
+            <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-6 text-center">
+              <Icon name="lock" className="mx-auto text-[32px] text-on-surface-variant" />
+              <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
+                Yêu cầu đăng nhập
+              </p>
+              <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
+                Đăng nhập hoặc đăng ký tài khoản để hệ thống đối chiếu nguyên liệu trong tủ lạnh với kho công thức chay chuẩn.
+              </p>
+              <Button
+                variant="primary"
+                size="sm"
+                className="mt-3"
+                onClick={() => openSignupPrompt('quota')}
+              >
+                Đăng ký / Đăng nhập
+              </Button>
+            </div>
+          ) : !hasItems ? (
+            <div className="rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low p-6 text-center">
+              <Icon name="kitchen" className="mx-auto text-[32px] text-on-surface-variant" />
+              <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
+                Tủ lạnh hiện chưa có nguyên liệu nào
+              </p>
+              <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
+                Hãy quét ảnh tủ lạnh hoặc thêm nguyên liệu thủ công để hệ thống tính toán độ tương đồng và gợi ý món ngon cho bạn!
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                onClick={() => setMainTab('vision')}
+              >
+                <Icon name="center_focus_strong" className="text-[16px]" />
+                Nhận diện tủ lạnh
+              </Button>
+            </div>
+          ) : suggestionsQuery.isPending ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="flex flex-col gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-low p-4 animate-pulse"
+                >
+                  <div className="h-5 w-3/4 rounded bg-surface-container-high" />
+                  <div className="h-4 w-1/2 rounded bg-surface-container-high" />
+                  <div className="mt-2 h-9 w-full rounded-xl bg-surface-container-high" />
+                </div>
+              ))}
+            </div>
+          ) : suggestionsQuery.isError ? (
+            <div className="rounded-xl border border-[#fecdca] bg-[#fdeeed] p-4 text-[#b42318]">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <Icon name="error" className="text-[18px]" />
+                <span>Không thể tải gợi ý món ăn lúc này</span>
+              </div>
+              <p className="mt-1 font-body-sm text-xs opacity-90">
+                {cleanTechnicalCodes(apiErrorMessage(suggestionsQuery.error))}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 text-xs"
+                onClick={() => void suggestionsQuery.refetch()}
+              >
+                Thử lại
+              </Button>
+            </div>
+          ) : (suggestionsQuery.data ?? []).length === 0 ? (
+            <div className="rounded-2xl border border-outline-variant/50 bg-[#fbf9f6] p-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5efe6] text-[#8a532a]">
+                <Icon name="search_off" className="text-[28px]" />
+              </div>
+              <h4 className="mt-3 font-headline-sm text-base font-bold text-on-surface">
+                Chưa có công thức nào đạt độ tương đồng ≥ 70%
+              </h4>
+              <p className="mx-auto mt-1 max-w-md font-body-sm text-xs sm:text-sm text-on-surface-variant">
+                Kho tủ lạnh của bạn hiện có {allItemsQuery.data?.length ?? 0} nguyên liệu. Hãy thử bổ sung thêm một số nguyên liệu cơ bản (như đậu phụ, nấm rơm, mì sợi...) để mở khóa các công thức nấu ngay nhé!
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => void suggestionsQuery.refetch()}
-                  disabled={suggestionsQuery.isFetching}
-                  title="Tải lại danh sách gợi ý"
-                  className="inline-flex items-center gap-1.5 text-xs"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="inline-flex items-center gap-1.5"
                 >
-                  <Icon
-                    name="refresh"
-                    className={`text-[16px] ${suggestionsQuery.isFetching ? 'animate-spin' : ''}`}
-                  />
-                  <span>Làm mới</span>
+                  <Icon name="add" className="text-[16px]" />
+                  Thêm nguyên liệu thủ công
                 </Button>
-
-                <Link
-                  to={`${PATHS.MEAL_PLANS.NEW}?useFridge=true`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20 no-underline"
-                  title="AI tự động sắp xếp 7 ngày thực đơn từ toàn bộ nguyên liệu trong tủ"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setMainTab('vision')}
+                  className="inline-flex items-center gap-1.5"
                 >
-                  <Icon name="calendar_month" className="text-[16px]" />
-                  <span>Lên thực đơn tuần</span>
-                </Link>
+                  <Icon name="photo_camera" className="text-[16px]" />
+                  Quét thêm ảnh rau củ
+                </Button>
               </div>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(suggestionsQuery.data ?? []).map((suggestion) => {
+                const matchPercent = Math.round(suggestion.similarity * 100);
+                const isPerfectMatch = matchPercent >= 100;
 
-            {/* Content area */}
-            <div className="mt-5">
-              {!authed ? (
-                <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-6 text-center">
-                  <Icon name="lock" className="mx-auto text-[32px] text-on-surface-variant" />
-                  <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
-                    Yêu cầu đăng nhập
-                  </p>
-                  <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
-                    Đăng nhập hoặc đăng ký tài khoản để hệ thống đối chiếu nguyên liệu trong tủ lạnh với kho công thức chay chuẩn.
-                  </p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => openSignupPrompt('quota')}
+                return (
+                  <div
+                    key={suggestion.recipeId}
+                    className="group flex flex-col justify-between rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-3.5 sm:p-4 transition-all duration-200 hover:border-primary/50 hover:bg-surface-container-low hover:shadow-md"
                   >
-                    Đăng ký / Đăng nhập
-                  </Button>
-                </div>
-              ) : !hasItems ? (
-                <div className="rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low p-6 text-center">
-                  <Icon name="kitchen" className="mx-auto text-[32px] text-on-surface-variant" />
-                  <p className="mt-2 font-headline-sm text-sm font-bold text-on-surface">
-                    Tủ lạnh hiện chưa có nguyên liệu nào
-                  </p>
-                  <p className="mt-1 font-body-sm text-xs text-on-surface-variant">
-                    Hãy quét ảnh tủ lạnh hoặc thêm nguyên liệu thủ công để hệ thống tính toán độ tương đồng và gợi ý món ngon cho bạn!
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => setMainTab('vision')}
-                  >
-                    <Icon name="center_focus_strong" className="text-[16px]" />
-                    Nhận diện tủ lạnh
-                  </Button>
-                </div>
-              ) : suggestionsQuery.isPending ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="flex flex-col gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-low p-4 animate-pulse"
-                    >
-                      <div className="h-5 w-3/4 rounded bg-surface-container-high" />
-                      <div className="h-4 w-1/2 rounded bg-surface-container-high" />
-                      <div className="mt-2 h-9 w-full rounded-xl bg-surface-container-high" />
-                    </div>
-                  ))}
-                </div>
-              ) : suggestionsQuery.isError ? (
-                <div className="rounded-xl border border-[#fecdca] bg-[#fdeeed] p-4 text-[#b42318]">
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <Icon name="error" className="text-[18px]" />
-                    <span>Không thể tải gợi ý món ăn lúc này</span>
-                  </div>
-                  <p className="mt-1 font-body-sm text-xs opacity-90">
-                    {cleanTechnicalCodes(apiErrorMessage(suggestionsQuery.error))}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3 text-xs"
-                    onClick={() => void suggestionsQuery.refetch()}
-                  >
-                    Thử lại
-                  </Button>
-                </div>
-              ) : (suggestionsQuery.data ?? []).length === 0 ? (
-                <div className="rounded-2xl border border-outline-variant/50 bg-[#fbf9f6] p-6 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5efe6] text-[#8a532a]">
-                    <Icon name="search_off" className="text-[28px]" />
-                  </div>
-                  <h4 className="mt-3 font-headline-sm text-base font-bold text-on-surface">
-                    Chưa có công thức nào đạt độ tương đồng ≥ 70%
-                  </h4>
-                  <p className="mx-auto mt-1 max-w-md font-body-sm text-xs sm:text-sm text-on-surface-variant">
-                    Kho tủ lạnh của bạn hiện có {allItemsQuery.data?.length ?? 0} nguyên liệu. Hãy thử bổ sung thêm một số nguyên liệu cơ bản (như đậu phụ, nấm rơm, mì sợi...) để mở khóa các công thức nấu ngay nhé!
-                  </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setIsAddModalOpen(true)}
-                      className="inline-flex items-center gap-1.5"
-                    >
-                      <Icon name="add" className="text-[16px]" />
-                      Thêm nguyên liệu thủ công
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setMainTab('vision')}
-                      className="inline-flex items-center gap-1.5"
-                    >
-                      <Icon name="photo_camera" className="text-[16px]" />
-                      Quét thêm ảnh rau củ
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {(suggestionsQuery.data ?? []).map((suggestion) => {
-                    const matchPercent = Math.round(suggestion.similarity * 100);
-                    const isPerfectMatch = matchPercent >= 100;
-
-                    return (
-                      <div
-                        key={suggestion.recipeId}
-                        className="group flex flex-col justify-between rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-3.5 sm:p-4 transition-all duration-200 hover:border-primary/50 hover:bg-surface-container-low hover:shadow-md"
-                      >
-                        <div className="flex flex-col gap-2.5">
-                          {/* Thumbnail món ăn với huy hiệu nổi */}
-                          <div className="relative h-40 sm:h-44 w-full overflow-hidden rounded-xl bg-surface-container-high border border-outline-variant/30">
-                            {suggestion.imageUrl ? (
-                              <img
-                                src={suggestion.imageUrl}
-                                alt={suggestion.title}
-                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#f5efe6] text-[#8a532a]">
-                                <Icon name="soup_kitchen" className="text-[36px] opacity-70" />
-                              </div>
-                            )}
-
-                            {/* Huy hiệu độ tương đồng nổi ở góc phải trên ảnh */}
-                            <div className="absolute top-2.5 right-2.5 shadow-xs">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold backdrop-blur-md ${
-                                  isPerfectMatch
-                                    ? 'bg-[#eaf3ec]/95 text-[#2d5a38] border border-[#c4dec8]'
-                                    : 'bg-[#f4efe8]/95 text-[#734008] border border-[#e5d5ca]'
-                                }`}
-                              >
-                                {isPerfectMatch ? '✓ Đủ nguyên liệu' : `${matchPercent}% khớp`}
-                              </span>
-                            </div>
+                    <div className="flex flex-col gap-2.5">
+                      {/* Thumbnail món ăn với huy hiệu nổi */}
+                      <div className="relative h-40 sm:h-44 w-full overflow-hidden rounded-xl bg-surface-container-high border border-outline-variant/30">
+                        {suggestion.imageUrl ? (
+                          <img
+                            src={suggestion.imageUrl}
+                            alt={suggestion.title}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#f5efe6] text-[#8a532a]">
+                            <Icon name="soup_kitchen" className="text-[36px] opacity-70" />
                           </div>
+                        )}
 
-                          {/* Title */}
-                          <div>
-                            <h4
-                              className="font-headline-sm text-base font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-1"
-                              title={suggestion.title}
-                            >
-                              {suggestion.title}
-                            </h4>
-                          </div>
-
-                          {/* Priority badge for non-fresh items */}
-                          {suggestion.usesNonFreshItems && (
-                            <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#fef6ea] px-2.5 py-1 text-xs font-semibold text-[#935216] border border-[#f8dfbe]">
-                              <Icon name="bolt" className="text-[15px] text-[#b76e1a]" />
-                              <span>Ưu tiên giải cứu: Tận dụng đồ cần dùng sớm</span>
-                            </div>
-                          )}
-
-                          {/* Missing ingredients */}
-                          {suggestion.missingIngredients && suggestion.missingIngredients.length > 0 ? (
-                            <div className="rounded-xl bg-surface-container-low p-2.5 text-xs text-on-surface-variant">
-                              <span className="font-semibold text-on-surface">Còn thiếu: </span>
-                              <span>
-                                {suggestion.missingIngredients.map((m) => m.name).join(', ')}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="rounded-xl bg-[#eaf3ec]/60 p-2.5 text-xs font-medium text-[#2d5a38]">
-                              ✨ Bạn đã có đầy đủ nguyên liệu trong tủ để nấu món này!
-                            </div>
-                          )}
-                        </div>
-
-                        {/* CTA button */}
-                        <div className="mt-4 pt-3 border-t border-outline-variant/30">
-                          <Link
-                            to={PATHS.RECIPES.DETAIL(suggestion.recipeId)}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-center font-label-md text-xs sm:text-sm font-semibold text-on-primary no-underline shadow-xs transition hover:bg-primary/90"
+                        {/* Huy hiệu độ tương đồng nổi ở góc phải trên ảnh */}
+                        <div className="absolute top-2.5 right-2.5 shadow-xs">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold backdrop-blur-md ${
+                              isPerfectMatch
+                                ? 'bg-[#eaf3ec]/95 text-[#2d5a38] border border-[#c4dec8]'
+                                : 'bg-[#f4efe8]/95 text-[#734008] border border-[#e5d5ca]'
+                            }`}
                           >
-                            <span>Xem công thức & Nấu ngay</span>
-                            <Icon name="arrow_forward" className="text-[16px]" />
-                          </Link>
+                            {isPerfectMatch ? '✓ Đủ nguyên liệu' : `${matchPercent}% khớp`}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      {/* Title */}
+                      <div>
+                        <h4
+                          className="font-headline-sm text-base font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-1"
+                          title={suggestion.title}
+                        >
+                          {suggestion.title}
+                        </h4>
+                      </div>
+
+                      {/* Priority badge for non-fresh items */}
+                      {suggestion.usesNonFreshItems && (
+                        <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#fef6ea] px-2.5 py-1 text-xs font-semibold text-[#935216] border border-[#f8dfbe]">
+                          <Icon name="bolt" className="text-[15px] text-[#b76e1a]" />
+                          <span>Ưu tiên giải cứu: Tận dụng đồ cần dùng sớm</span>
+                        </div>
+                      )}
+
+                      {/* Missing ingredients */}
+                      {suggestion.missingIngredients && suggestion.missingIngredients.length > 0 ? (
+                        <div className="rounded-xl bg-surface-container-low p-2.5 text-xs text-on-surface-variant">
+                          <span className="font-semibold text-on-surface">Còn thiếu: </span>
+                          <span>
+                            {suggestion.missingIngredients.map((m) => m.name).join(', ')}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl bg-[#eaf3ec]/60 p-2.5 text-xs font-medium text-[#2d5a38]">
+                          ✨ Bạn đã có đầy đủ nguyên liệu trong tủ để nấu món này!
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CTA button */}
+                    <div className="mt-4 pt-3 border-t border-outline-variant/30">
+                      <Link
+                        to={PATHS.RECIPES.DETAIL(suggestion.recipeId)}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-center font-label-md text-xs sm:text-sm font-semibold text-on-primary no-underline shadow-xs transition hover:bg-primary/90"
+                      >
+                        <span>Xem công thức & Nấu ngay</span>
+                        <Icon name="arrow_forward" className="text-[16px]" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </div>
 
       {/* CÁC MODAL HỖ TRỢ */}
       {/* 1. Modal thêm thủ công nguyên liệu */}
