@@ -21,6 +21,15 @@ export const useMySubscription = (opts: { enabled?: boolean; pollMs?: number | f
     staleTime: 0,
   });
 
+/** Hủy đơn chờ thanh toán (cancel-pending); làm mới lịch sử giao dịch để thấy trạng thái Đã hủy. */
+export function useCancelPending() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.cancelPendingOrder(),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: subscriptionKeys.me }),
+  });
+}
+
 /** FN-SUB-02 — tạo đơn; sau đó làm mới lịch sử giao dịch. */
 export function useCheckout() {
   const qc = useQueryClient();
