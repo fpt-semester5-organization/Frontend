@@ -17,11 +17,70 @@ const LLMOPS = {
   dailyBudgetUsd: 12.5,
   usagePercent: 84.8,
   alertLevel: 'NONE',
+  totalPromptTokens: 150000,
+  totalCompletionTokens: 80000,
+  promptCostUsd: 0.0112,
+  completionCostUsd: 0.024,
+  userTierDistribution: {
+    vipTokens: 160000,
+    vipCostUsd: 0.0245,
+    memberTokens: 60000,
+    memberCostUsd: 0.0092,
+    systemTokens: 10000,
+    systemCostUsd: 0.0015,
+  },
+  topSpenders: [
+    {
+      userId: 101,
+      fullName: 'Trần Văn VIP',
+      email: 'tranvanvip@gmail.com',
+      role: 'VIP',
+      totalTokens: 120000,
+      totalCostUsd: 0.0184,
+      requestCount: 42,
+    },
+  ],
   series: [
     { date: '2026-10-05', feature: 'AI_CHAT', tokens: 120000, costUsd: 4.2 },
     { date: '2026-10-05', feature: 'MEAL_PLAN_GEN', tokens: 30000, costUsd: 1.2 },
     { date: '2026-10-06', feature: 'AI_CHAT', tokens: 80000, costUsd: 2.75 },
   ],
+};
+const LOGS = {
+  items: [
+    {
+      logId: 999,
+      userId: 101,
+      userFullName: 'Trần Văn VIP',
+      userEmail: 'tranvanvip@gmail.com',
+      userRole: 'VIP',
+      featureCode: 'AI_CHAT',
+      tokensConsumed: 1500,
+      costEstimateUsd: 0.0003,
+      requestStatus: 'SUCCESS',
+      errorMessage: null,
+      executionTimeMs: 820,
+      createdAt: '2026-10-06T14:30:00Z',
+    },
+    {
+      logId: 1000,
+      userId: 102,
+      userFullName: 'Lê Văn Lỗi',
+      userEmail: 'error@gmail.com',
+      userRole: 'MEMBER',
+      featureCode: 'AI_FRIDGE',
+      tokensConsumed: 0,
+      costEstimateUsd: 0.0,
+      requestStatus: 'ERROR',
+      errorMessage: '503 Service Unavailable: Gemini API rate limit exceeded.',
+      executionTimeMs: 120,
+      createdAt: '2026-10-06T15:00:00Z',
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 15,
+  totalPages: 1,
 };
 const METRICS = {
   modules: [
@@ -41,9 +100,10 @@ const KNOWLEDGE = {
 };
 
 const handler =
-  (overrides: Partial<Record<'llmops' | 'metrics' | 'knowledge' | 'reindex', ReturnType<MockHandler>>> = {}): MockHandler =>
+  (overrides: Partial<Record<'llmops' | 'logs' | 'metrics' | 'knowledge' | 'reindex', ReturnType<MockHandler>>> = {}): MockHandler =>
   (req) => {
     if (req.url === '/admin/llmops/dashboard') return overrides.llmops ?? { data: LLMOPS };
+    if (req.url === '/admin/llmops/logs') return overrides.logs ?? { data: LOGS };
     if (req.url === '/admin/ai/metrics') return overrides.metrics ?? { data: METRICS };
     if (req.url === '/admin/knowledge/status') return overrides.knowledge ?? { data: KNOWLEDGE };
     if (req.url === '/admin/knowledge/reindex') return overrides.reindex ?? { status: 202, message: 'Đã xếp job đồng bộ kho tri thức.', data: { jobId: 'kb_20261023_01' } };
@@ -128,5 +188,41 @@ describe('SCR-41 Giám sát AI', () => {
     renderWithProviders(<AdminAiPage />, ROUTE);
     expect(await screen.findByText('Chưa có dữ liệu chi phí')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xem bảng số liệu' })).not.toBeInTheDocument();
+  });
+
+  it('hiển thị phân rã Token Input/Output và thẻ Top Spenders khi có dữ liệu', async () => {
+    mockApi(handler());
+    renderWithProviders(<AdminAiPage />, ROUTE);
+
+    // WP-01: Token breakdown
+    expect(await screen.findByRole('progressbar', { name: 'Tỷ lệ Input vs Output' })).toBeInTheDocument();
+    expect(screen.getByText(/Input: 150 N/)).toBeInTheDocument();
+    expect(screen.getByText(/Output: 80 N/)).toBeInTheDocument();
+
+    // WP-03: Top Spenders card
+    expect(screen.getByText('Phân bổ theo Hạng Hội viên')).toBeInTheDocument();
+    expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
+    expect(screen.getByText('Trần Văn VIP')).toBeInTheDocument();
+    expect(screen.getByText('tranvanvip@gmail.com')).toBeInTheDocument();
+  });
+
+  it('chuyển tab Nhật ký cuộc gọi (Logs): hiển thị bảng log, mở modal xem chi tiết lỗi', async () => {
+    mockApi(handler());
+    renderWithProviders(<AdminAiPage />, ROUTE);
+
+    await userEvent.click(await screen.findByRole('tab', { name: /Nhật ký cuộc gọi/ }));
+    expect(await screen.findByText('Nhật ký cuộc gọi AI (Request Logs)')).toBeInTheDocument();
+    expect(screen.getByText('Lê Văn Lỗi')).toBeInTheDocument();
+    expect(screen.getByText('Tủ lạnh AI', { selector: 'td span' })).toBeInTheDocument();
+
+    // Mở modal xem chi tiết
+    const detailButtons = screen.getAllByRole('button', { name: /Xem chi tiết lượt gọi/ });
+    await userEvent.click(detailButtons[1]); // Lượt gọi 1000 có lỗi
+    expect(await screen.findByText('Chi tiết lượt gọi AI #1000')).toBeInTheDocument();
+    expect(screen.getByText(/Gemini API rate limit exceeded/)).toBeInTheDocument();
+
+    // Đóng modal
+    await userEvent.click(screen.getAllByRole('button', { name: 'Đóng' })[0]);
+    expect(screen.queryByText('Chi tiết lượt gọi AI #1000')).not.toBeInTheDocument();
   });
 });
