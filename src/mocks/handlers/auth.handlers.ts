@@ -52,4 +52,20 @@ export const authHandlers = [
     // Hồ sơ sức khỏe, dị ứng, SĐT, ảnh đại diện lấy từ profileDb (SCR-07..09).
     return ok(meDto(user), 'Lấy hồ sơ thành công.');
   }),
+
+  // FN-AUTH-04: Tra cứu văn bản và thỏa thuận pháp lý chuẩn hệ thống
+  http.get(api('/auth/legal-documents'), async () => {
+    await latency();
+    return ok(
+      {
+        userAgreementUrl: 'https://res.cloudinary.com/swrsuenp/image/upload/veggielife/legal/Ban_Cam_Ket_Va_Thoa_Thuan_Dang_Ky_Nguoi_Dung.png',
+        privacyPolicyUrl: 'https://res.cloudinary.com/swrsuenp/image/upload/veggielife/legal/Chinh_Sach_Bao_Mat_Du_Lieu_VeggieLife.png',
+        termsOfServiceUrl: 'https://res.cloudinary.com/swrsuenp/image/upload/veggielife/legal/Dieu_Khoan_Su_Dung_Dich_Vu_VeggieLife.png',
+        veganDisclaimerUrl: 'https://res.cloudinary.com/swrsuenp/image/upload/veggielife/legal/Quy_Chuan_Am_Thuc_Chay_Va_Mien_Tru_Y_Te_VeggieLife.png',
+        medicalDisclaimer: 'Khuyến nghị mang tính chất tham khảo dinh dưỡng, vui lòng tham vấn ý kiến bác sĩ chuyên khoa đối với các bệnh lý nền.',
+        updatedAt: '2026-10-31T00:00:00Z',
+      },
+      'Tra cứu tài liệu pháp lý thành công.'
+    );
+  }),
 ];

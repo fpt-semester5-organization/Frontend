@@ -22,3 +22,5 @@ export interface AnonymousResult {
   guestId: string;
   countryCode?: string;
 }
+
+export type { LegalDocumentsData, LegalDocType } from '@/features/legal/types/legal.types';

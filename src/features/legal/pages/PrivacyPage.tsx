@@ -1,26 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PATHS } from '@/routes/paths';
+import { useLegalDocuments } from '../hooks/useLegalDocuments';
+import { formatDateTime } from '@/lib/format';
+import type { LegalDocType } from '../types/legal.types';
 import {
   ShieldCheck,
   Lock,
   Eye,
-  Database,
-  UserCheck,
   FileText,
   ArrowLeft,
   ChevronRight,
-  Sparkles,
-  Server,
-  HelpCircle,
   Mail,
   Printer,
   CheckCircle2,
+  ExternalLink,
+  Download,
+  Calendar,
 } from 'lucide-react';
 
 export default function PrivacyPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string>('collection');
+  const [selectedScanDoc, setSelectedScanDoc] = useState<LegalDocType>('PRIVACY');
+
+  const { data: legalDocs } = useLegalDocuments();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -29,14 +33,49 @@ export default function PrivacyPage() {
 
   const sections = [
     { id: 'collection', title: '1. Dữ liệu chúng tôi thu thập' },
-    { id: 'purpose', title: '2. Mục đích sử dụng dữ liệu' },
-    { id: 'ai-vision', title: '3. Xử lý ảnh Quét tủ lạnh & Mã vạch' },
-    { id: 'health-profile', title: '4. Dữ liệu dinh dưỡng & Hồ sơ dị ứng' },
-    { id: 'sharing', title: '5. Chia sẻ thông tin & Bên thứ ba' },
-    { id: 'security', title: '6. Bảo mật và Lưu trữ dữ liệu' },
-    { id: 'user-rights', title: '7. Quyền của bạn với dữ liệu cá nhân' },
-    { id: 'contact', title: '8. Thay đổi chính sách & Kênh khiếu nại' },
+    { id: 'official-docs', title: '2. Văn bản pháp lý số hóa (Cloudinary)' },
+    { id: 'purpose', title: '3. Mục đích sử dụng dữ liệu' },
+    { id: 'ai-vision', title: '4. Xử lý ảnh Quét tủ lạnh & Mã vạch' },
+    { id: 'health-profile', title: '5. Dữ liệu dinh dưỡng & Hồ sơ dị ứng' },
+    { id: 'sharing', title: '6. Chia sẻ thông tin & Bên thứ ba' },
+    { id: 'security', title: '7. Bảo mật và Lưu trữ dữ liệu' },
+    { id: 'user-rights', title: '8. Quyền của bạn với dữ liệu cá nhân' },
+    { id: 'contact', title: '9. Thay đổi chính sách & Kênh khiếu nại' },
   ];
+
+  const scanTabs: Array<{
+    id: LegalDocType;
+    label: string;
+    url: string | undefined;
+    pdfPath: string;
+  }> = [
+    {
+      id: 'PRIVACY',
+      label: 'Chính sách bảo mật',
+      url: legalDocs?.privacyPolicyUrl,
+      pdfPath: '/legal/Chinh_Sach_Bao_Mat_Du_Lieu_VeggieLife.pdf',
+    },
+    {
+      id: 'TERMS',
+      label: 'Điều khoản dịch vụ',
+      url: legalDocs?.termsOfServiceUrl,
+      pdfPath: '/legal/Dieu_Khoan_Su_Dung_Dich_Vu_VeggieLife.pdf',
+    },
+    {
+      id: 'USER_AGREEMENT',
+      label: 'Bản cam kết người dùng',
+      url: legalDocs?.userAgreementUrl,
+      pdfPath: '/legal/Ban_Cam_Ket_Va_Thoa_Thuan_Dang_Ky_Nguoi_Dung.pdf',
+    },
+    {
+      id: 'VEGAN_DISCLAIMER',
+      label: 'Quy chuẩn ăn chay & Miễn trừ',
+      url: legalDocs?.veganDisclaimerUrl,
+      pdfPath: '/legal/Quy_Chuan_Am_Thuc_Chay_Va_Mien_Tru_Y_Te_VeggieLife.pdf',
+    },
+  ];
+
+  const currentScan = scanTabs.find((t) => t.id === selectedScanDoc) ?? scanTabs[0];
 
   const handleScrollTo = (id: string) => {
     setActiveSection(id);
@@ -62,7 +101,7 @@ export default function PrivacyPage() {
                 navigate(PATHS.HOME);
               }
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-surface-container-high bg-surface-container-lowest px-3 py-1.5 font-label-md text-label-md font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+            className="inline-flex items-center gap-2 rounded-lg border border-surface-container-high bg-surface-container-lowest px-3 py-1.5 font-label-md text-label-md font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Quay lại</span>
@@ -84,7 +123,9 @@ export default function PrivacyPage() {
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-fixed px-3 py-1 font-label-sm text-label-sm font-semibold text-on-primary-fixed">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>Cam kết an toàn dữ liệu cá nhân</span>
-                <span className="text-primary">• Cập nhật 10/2026</span>
+                <span className="text-primary">
+                  • {legalDocs?.updatedAt ? `Cập nhật: ${formatDateTime(legalDocs.updatedAt)}` : 'Cập nhật 10/2026'}
+                </span>
               </div>
               <h1 className="font-headline-lg text-headline-lg font-bold text-primary">
                 Chính Sách Bảo Mật Quyền Riêng Tư
@@ -107,7 +148,7 @@ export default function PrivacyPage() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest px-4 py-2 font-label-md text-label-md font-medium text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest px-4 py-2 font-label-md text-label-md font-medium text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface cursor-pointer"
                 title="In chính sách"
               >
                 <Printer className="h-4 w-4" />
@@ -140,34 +181,34 @@ export default function PrivacyPage() {
 
             <div className="rounded-xl border border-surface-container-high bg-surface-container-lowest/80 p-4">
               <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-tertiary-fixed text-on-tertiary-fixed">
-                <Database className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4" />
               </div>
-              <h4 className="font-label-lg text-label-lg font-semibold text-on-surface">Không bán dữ liệu</h4>
+              <h4 className="font-label-lg text-label-lg font-semibold text-on-surface">Tuân thủ PDPD</h4>
               <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-                Tuyệt đối không mua bán hay cung cấp thông tin người dùng cho các bên quảng cáo thứ ba.
+                Tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân nhạy cảm và thời gian ân hạn xóa.
               </p>
             </div>
 
             <div className="rounded-xl border border-surface-container-high bg-surface-container-lowest/80 p-4">
-              <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary-fixed-dim text-on-primary-fixed">
-                <UserCheck className="h-4 w-4" />
+              <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary-fixed text-on-primary-fixed">
+                <CheckCircle2 className="h-4 w-4" />
               </div>
               <h4 className="font-label-lg text-label-lg font-semibold text-on-surface">Quyền kiểm soát</h4>
               <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-                Bạn toàn quyền xem, chỉnh sửa hồ sơ sức khỏe hoặc yêu cầu xóa toàn bộ tài khoản bất cứ lúc nào.
+                Bạn toàn quyền cập nhật thông tin dị ứng hoặc gửi yêu cầu xóa tài khoản bất cứ lúc nào.
               </p>
             </div>
           </div>
         </header>
 
-        {/* Content & Sidebar */}
+        {/* Content & Table of Contents Sidebar */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-          {/* Left Sticky Sidebar: Table of contents */}
+          {/* Left Sticky Sidebar */}
           <aside className="lg:col-span-4">
             <div className="sticky top-[90px] space-y-4">
               <div className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-5 shadow-xs">
                 <h3 className="mb-3 flex items-center gap-2 font-headline-sm text-headline-sm text-primary">
-                  <ShieldCheck className="h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                   <span>Mục lục chính sách</span>
                 </h3>
                 <nav className="flex flex-col gap-1">
@@ -176,7 +217,7 @@ export default function PrivacyPage() {
                       key={sec.id}
                       type="button"
                       onClick={() => handleScrollTo(sec.id)}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-left font-body-sm text-body-sm transition-all ${
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-left font-body-sm text-body-sm transition-all cursor-pointer ${
                         activeSection === sec.id
                           ? 'bg-primary-container font-semibold text-on-primary shadow-xs'
                           : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
@@ -189,13 +230,13 @@ export default function PrivacyPage() {
                 </nav>
               </div>
 
-              {/* Data Protection Officer Box */}
+              {/* Data Protection Officer contact */}
               <div className="rounded-2xl border border-surface-container-high bg-surface-container-low p-5">
                 <h4 className="font-label-lg text-label-lg font-semibold text-on-surface">
-                  Đội ngũ Bảo vệ Dữ liệu (DPO)
+                  Cán bộ bảo vệ dữ liệu (DPO)
                 </h4>
                 <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-                  Nếu bạn muốn thực thi quyền riêng tư hoặc xóa dữ liệu sức khỏe, hãy liên hệ chuyên viên bảo mật của chúng tôi:
+                  Nếu bạn cần hỗ trợ về quyền riêng tư, truy xuất hoặc yêu cầu xóa dữ liệu cá nhân, vui lòng liên hệ:
                 </p>
                 <div className="mt-3 flex items-center gap-2 text-xs font-medium text-primary">
                   <Mail className="h-4 w-4" />
@@ -239,14 +280,106 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 2 */}
+            {/* Section 2: Official Digitized Documents from Backend */}
+            <section
+              id="official-docs"
+              className="scroll-mt-24 rounded-2xl border border-primary/20 bg-surface-container-lowest p-6 shadow-xs md:p-8"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
+                    2
+                  </span>
+                  <span>Văn bản pháp lý số hóa (Cloudinary)</span>
+                </h2>
+                {legalDocs?.updatedAt && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant font-medium">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span>Cập nhật: {formatDateTime(legalDocs.updatedAt)}</span>
+                  </span>
+                )}
+              </div>
+
+              <p className="font-body-md text-body-md text-on-surface-variant mb-4">
+                Xem bản scan văn bản chính thức được quản lý tập trung trên máy chủ Cloudinary của hệ thống:
+              </p>
+
+              {/* Document selection tabs */}
+              <div className="flex flex-wrap gap-2 mb-4 border-b border-surface-container-high pb-3">
+                {scanTabs.map((tab) => {
+                  const isSelected = selectedScanDoc === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSelectedScanDoc(tab.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs md:text-sm font-medium transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-primary text-on-primary font-semibold shadow-xs'
+                          : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                      }`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Document Preview Card */}
+              <div className="rounded-xl border border-surface-container-high bg-surface-container-low/40 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-label-md text-label-md font-semibold text-primary">
+                    {currentScan.label}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {currentScan.url && (
+                      <a
+                        href={currentScan.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-primary border border-primary/20 hover:bg-primary/10 transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Mở ảnh gốc Cloudinary</span>
+                      </a>
+                    )}
+                    <a
+                      href={currentScan.pdfPath}
+                      download
+                      className="inline-flex items-center gap-1 rounded bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-on-surface-variant border border-surface-container-high hover:bg-surface-container transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Tải file PDF</span>
+                    </a>
+                  </div>
+                </div>
+
+                {currentScan.url ? (
+                  <div className="overflow-hidden rounded-lg border border-surface-container-high bg-white shadow-xs flex justify-center">
+                    <img
+                      src={currentScan.url}
+                      alt={currentScan.label}
+                      className="w-full max-h-[550px] object-contain object-top"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-sm text-on-surface-variant">
+                    Đang kết nối API máy chủ Backend...
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Section 3 */}
             <section
               id="purpose"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  2
+                  3
                 </span>
                 <span>Mục đích sử dụng dữ liệu</span>
               </h2>
@@ -281,14 +414,14 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 3 */}
+            {/* Section 4 */}
             <section
               id="ai-vision"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  3
+                  4
                 </span>
                 <span>Xử lý ảnh Quét tủ lạnh & Mã vạch (AI Vision)</span>
               </h2>
@@ -310,14 +443,14 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 4 */}
+            {/* Section 5 */}
             <section
               id="health-profile"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  4
+                  5
                 </span>
                 <span>Dữ liệu dinh dưỡng & Hồ sơ dị ứng</span>
               </h2>
@@ -331,17 +464,22 @@ export default function PrivacyPage() {
                     Dữ liệu này chỉ được lưu trữ nội bộ nhằm phục vụ việc lọc và cảnh báo tự động khi bạn xem công thức nấu ăn hoặc quét thực phẩm. Dữ liệu này tuyệt đối <strong>không bao giờ</strong> được chia sẻ công khai trên trang cá nhân của bạn hoặc cung cấp cho bất kỳ đối tác thương mại nào.
                   </p>
                 </div>
+                {legalDocs?.medicalDisclaimer && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                    ⚠️ <strong>Khuyến cáo y khoa chuẩn hệ thống:</strong> {legalDocs.medicalDisclaimer}
+                  </div>
+                )}
               </div>
             </section>
 
-            {/* Section 5 */}
+            {/* Section 6 */}
             <section
               id="sharing"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  5
+                  6
                 </span>
                 <span>Chia sẻ thông tin & Bên thứ ba</span>
               </h2>
@@ -361,14 +499,14 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 6 */}
+            {/* Section 7 */}
             <section
               id="security"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  6
+                  7
                 </span>
                 <span>Bảo mật và Lưu trữ dữ liệu</span>
               </h2>
@@ -393,14 +531,14 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 7 */}
+            {/* Section 8 */}
             <section
               id="user-rights"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  7
+                  8
                 </span>
                 <span>Quyền của bạn với dữ liệu cá nhân</span>
               </h2>
@@ -420,14 +558,14 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* Section 8 */}
+            {/* Section 9 */}
             <section
               id="contact"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  8
+                  9
                 </span>
                 <span>Thay đổi chính sách & Kênh khiếu nại</span>
               </h2>

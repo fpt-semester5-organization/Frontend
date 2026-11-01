@@ -134,3 +134,6 @@ export async function bootstrapGuestSession() {
 }
 
 export type { ApiEnvelope };
+
+
+export { getLegalDocuments, DEFAULT_LEGAL_DOCUMENTS } from '@/features/legal/api/legal.api';

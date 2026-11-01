@@ -4,6 +4,7 @@
  * FN: FN-AUTH-04 · Nguyễn Văn Minh Tâm · Sprint 5
  * Giao diện: Stich-AI-45UI-Screen/SCR-02_auth-Register/code.html.
  */
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,11 +16,15 @@ import { AuthCard } from '../components/AuthCard';
 import { useApiFormErrors } from '../components/useApiFormErrors';
 import { readReturnUrl, useRegister } from '../hooks/useAuth';
 import { passwordStrength, registerSchema, type RegisterForm } from '../schemas/auth.schemas';
+import { LegalDocumentsModal } from '@/features/legal/components/LegalDocumentsModal';
+import type { LegalDocType } from '@/features/legal/types/legal.types';
 
 export function RegisterPage() {
   const reg = useRegister();
   const navigate = useNavigate();
   const location = useLocation();
+  const [previewDoc, setPreviewDoc] = useState<LegalDocType | null>(null);
+
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: { fullName: '', email: '', password: '', confirmPassword: '', agreeTerms: undefined as unknown as true },
@@ -48,62 +53,93 @@ export function RegisterPage() {
   );
 
   return (
-    <AuthCard
-      icon="potted_plant"
-      title="Tạo tài khoản mới"
-      footer={
-        <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Đã có tài khoản?{' '}
-          <Link to={PATHS.AUTH.LOGIN} state={location.state} className="ml-1 font-label-md text-label-md font-semibold text-primary hover:underline">
-            Đăng nhập
-          </Link>
-        </p>
-      }
-    >
-      <GoogleButton label="Tiếp tục với Google" />
-      <div className="relative my-space-md flex items-center justify-center">
-        <div className="h-px w-full bg-surface-container-highest" />
-        <span className="absolute bg-surface-container-lowest px-3 font-label-sm text-label-sm text-on-surface-variant">hoặc</span>
-      </div>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-space-md">
-        {formError && <FormAlert>{formError}</FormAlert>}
-        {errorCode === 'ERR_AUTH_EMAIL_EXISTS' && (
-          <FormAlert kind="info">
-            Email này đã có tài khoản. <Link to={PATHS.AUTH.LOGIN} className="font-semibold underline">Đăng nhập</Link> hoặc <Link to={PATHS.AUTH.FORGOT_PASSWORD} className="font-semibold underline">quên mật khẩu</Link>?
-          </FormAlert>
-        )}
-        <Field label="Họ và tên" required icon="badge" placeholder="Nguyễn Văn An" autoComplete="name" error={form.formState.errors.fullName?.message} {...form.register('fullName')} />
-        <Field label="Email đăng nhập" required icon="mail" type="email" placeholder="vanan@veggielife.vn" autoComplete="email" error={form.formState.errors.email?.message} {...form.register('email')} />
-        <PasswordField label="Mật khẩu" required placeholder="Mật khẩu" autoComplete="new-password" error={form.formState.errors.password?.message} hint={<StrengthBar {...strength} />} {...form.register('password')} />
-        <PasswordField label="Xác nhận mật khẩu" required placeholder="Nhập lại mật khẩu" autoComplete="new-password" error={form.formState.errors.confirmPassword?.message} {...form.register('confirmPassword')} />
-        <div className="flex flex-col gap-1">
-          <label className="mt-1 flex cursor-pointer select-none items-start gap-2.5 font-body-sm text-body-sm leading-tight text-on-surface-variant">
-            <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-primary-container" {...form.register('agreeTerms')} />
-            <span>
-              Tôi đồng ý với{' '}
-              <Link
-                to={PATHS.TERMS}
-                onClick={(e) => e.stopPropagation()}
-                className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
-                title="Điều khoản sử dụng"
-              >
-                Điều khoản
-              </Link>{' '}
-              và{' '}
-              <Link
-                to={PATHS.PRIVACY}
-                onClick={(e) => e.stopPropagation()}
-                className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary"
-                title="Chính sách bảo mật"
-              >
-                Chính sách bảo mật
-              </Link>
-            </span>
-          </label>
-          {form.formState.errors.agreeTerms && <p role="alert" className="font-label-sm text-label-sm text-error">{form.formState.errors.agreeTerms.message}</p>}
+    <>
+      <AuthCard
+        icon="potted_plant"
+        title="Tạo tài khoản mới"
+        footer={
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Đã có tài khoản?{' '}
+            <Link to={PATHS.AUTH.LOGIN} state={location.state} className="ml-1 font-label-md text-label-md font-semibold text-primary hover:underline">
+              Đăng nhập
+            </Link>
+          </p>
+        }
+      >
+        <GoogleButton label="Tiếp tục với Google" />
+        <div className="relative my-space-md flex items-center justify-center">
+          <div className="h-px w-full bg-surface-container-highest" />
+          <span className="absolute bg-surface-container-lowest px-3 font-label-sm text-label-sm text-on-surface-variant">hoặc</span>
         </div>
-        <SubmitButton loading={reg.isPending}>Tạo tài khoản</SubmitButton>
-      </form>
-    </AuthCard>
+        <form onSubmit={submit} noValidate className="flex flex-col gap-space-md">
+          {formError && <FormAlert>{formError}</FormAlert>}
+          {errorCode === 'ERR_AUTH_EMAIL_EXISTS' && (
+            <FormAlert kind="info">
+              Email này đã có tài khoản. <Link to={PATHS.AUTH.LOGIN} className="font-semibold underline">Đăng nhập</Link> hoặc <Link to={PATHS.AUTH.FORGOT_PASSWORD} className="font-semibold underline">quên mật khẩu</Link>?
+            </FormAlert>
+          )}
+          <Field label="Họ và tên" required icon="badge" placeholder="Nguyễn Văn An" autoComplete="name" error={form.formState.errors.fullName?.message} {...form.register('fullName')} />
+          <Field label="Email đăng nhập" required icon="mail" type="email" placeholder="vanan@veggielife.vn" autoComplete="email" error={form.formState.errors.email?.message} {...form.register('email')} />
+          <PasswordField label="Mật khẩu" required placeholder="Mật khẩu" autoComplete="new-password" error={form.formState.errors.password?.message} hint={<StrengthBar {...strength} />} {...form.register('password')} />
+          <PasswordField label="Xác nhận mật khẩu" required placeholder="Nhập lại mật khẩu" autoComplete="new-password" error={form.formState.errors.confirmPassword?.message} {...form.register('confirmPassword')} />
+          <div className="flex flex-col gap-1.5">
+            <label className="mt-1 flex cursor-pointer select-none items-start gap-2.5 font-body-sm text-body-sm leading-tight text-on-surface-variant">
+              <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-primary-container" {...form.register('agreeTerms')} />
+              <span>
+                Tôi đồng ý với{' '}
+                <Link
+                  to={PATHS.TERMS}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPreviewDoc('TERMS');
+                  }}
+                  className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary cursor-pointer"
+                  title="Điều khoản sử dụng"
+                >
+                  Điều khoản
+                </Link>{' '}
+                và{' '}
+                <Link
+                  to={PATHS.PRIVACY}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPreviewDoc('PRIVACY');
+                  }}
+                  className="font-semibold text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary-container hover:decoration-primary cursor-pointer"
+                  title="Chính sách bảo mật"
+                >
+                  Chính sách bảo mật
+                </Link>
+              </span>
+            </label>
+            <div className="pl-6.5">
+              <button
+                type="button"
+                onClick={() => setPreviewDoc('TERMS')}
+                className="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">description</span>
+                <span>Xem nhanh văn bản pháp lý chính thức</span>
+              </button>
+            </div>
+            {form.formState.errors.agreeTerms && <p role="alert" className="font-label-sm text-label-sm text-error">{form.formState.errors.agreeTerms.message}</p>}
+          </div>
+          <SubmitButton loading={reg.isPending}>Tạo tài khoản</SubmitButton>
+        </form>
+      </AuthCard>
+
+      {previewDoc && (
+        <LegalDocumentsModal
+          show={true}
+          onHide={() => setPreviewDoc(null)}
+          initialDoc={previewDoc}
+          onAgree={() => {
+            form.setValue('agreeTerms', true, { shouldValidate: true });
+          }}
+        />
+      )}
+    </>
   );
 }

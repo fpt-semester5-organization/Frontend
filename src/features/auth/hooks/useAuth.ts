@@ -88,3 +88,6 @@ export function useLogout() {
     onSettled: () => navigate(PATHS.HOME, { replace: true }),
   });
 }
+
+
+export { useLegalDocuments } from '@/features/legal/hooks/useLegalDocuments';
