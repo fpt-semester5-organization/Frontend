@@ -34,6 +34,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useRecipe } from '@/features/recipes/hooks/useRecipes';
 import type { RecipeListItem } from '@/features/recipes/types/recipe.types';
 import { SwapMealDialog } from '../components/SwapMealDialog';
+import { SwapHistoryModal } from '../components/SwapHistoryModal';
 import { DishSearchModal } from '../components/DishSearchModal';
 import {
   AiParsedChip,
@@ -46,6 +47,7 @@ import {
   useMealPlan,
   useMealPlanNutrition,
   useSwapMealSlot,
+  useSwapMealSlotByNote,
 } from '../hooks/useMealPlans';
 import {
   addDays,
@@ -115,6 +117,7 @@ const MealPlanSlotCard: React.FC<{
   onToggleComplete: () => void;
   onOpenSwap: () => void;
   onOpenSearchDb?: () => void;
+  onOpenHistory?: () => void;
   planId: number;
   currentDay: DayOfWeek;
 }> = ({
@@ -126,6 +129,7 @@ const MealPlanSlotCard: React.FC<{
   completePending,
   onToggleComplete,
   onOpenSwap,
+  onOpenHistory,
   planId,
   currentDay,
 }) => {
@@ -231,10 +235,17 @@ const MealPlanSlotCard: React.FC<{
                 </span>
               )}
               {swapCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed text-on-primary-fixed px-2.5 py-0.5 font-label-sm text-xs font-semibold border border-primary/20">
+                <button
+                  type="button"
+                  onClick={onOpenHistory}
+                  title="Bấm để xem lại món trước đó và đối chứng calo, lý do đổi"
+                  aria-label={`Xem lại món trước đó: Đã đổi ${swapCount === 1 ? '1 lần' : `${swapCount} lần`}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-fixed text-on-primary-fixed px-2.5 py-0.5 font-label-sm text-xs font-semibold border border-primary/30 transition-all hover:bg-primary-fixed-dim hover:shadow-2xs cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                >
                   <Icon name="history" className="text-[13px]" />
-                  Đã đổi {swapCount} lần
-                </span>
+                  <span>{swapCount === 1 ? 'Đã đổi 1 lần' : `Đã đổi ${swapCount} lần`}</span>
+                  <Icon name="open_in_new" className="text-[11px] opacity-80" />
+                </button>
               )}
             </div>
 
@@ -268,102 +279,24 @@ const MealPlanSlotCard: React.FC<{
               </div>
             )}
 
-            {/* Toàn bộ danh sách món đã đổi trước đó kèm nút thu gọn lại */}
-            {swapCount > 0 && fullHistoryList.length > 0 && (
-              <div className="mt-2.5 rounded-xl border border-surface-container bg-surface-container-low p-3 font-body-sm text-xs text-on-surface-variant transition-all">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 font-semibold text-on-surface">
-                    <Icon name="history" className="text-[16px] text-primary" />
-                    <span>Lịch sử các món đã đổi ({fullHistoryList.length}):</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-                    className="inline-flex items-center gap-1 font-label-sm font-semibold text-primary hover:text-primary-container transition-colors"
-                  >
-                    <span>{isHistoryExpanded ? 'Thu gọn lại' : 'Xem toàn bộ'}</span>
-                    <Icon
-                      name={isHistoryExpanded ? 'expand_less' : 'expand_more'}
-                      className="text-[16px]"
-                    />
-                  </button>
+            {/* Thanh xem lại món trước đó & đối chứng */}
+            {swapCount > 0 && (
+              <div className="mt-2.5 flex items-center justify-between rounded-xl border border-surface-container bg-surface-container-low px-3 py-2 text-xs">
+                <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                  <Icon name="history" className="text-[15px] text-primary shrink-0" />
+                  <span className="truncate">
+                    Món đã đổi {swapCount === 1 ? '1 lần' : `${swapCount} lần`}
+                    {fullHistoryList[0] ? ` (trước đó: ${fullHistoryList[0].title})` : ''}
+                  </span>
                 </div>
-
-                {isHistoryExpanded ? (
-                  <div className="mt-2.5 space-y-2 border-t border-surface-container pt-2 animate-fadeIn">
-                    {fullHistoryList.map((item, idx) => {
-                      const diff = item.diffFromCurrent ?? 0;
-                      return (
-                        <div
-                          key={`${item.recipeId}_${idx}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-container-lowest p-2 border border-surface-container"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-[10px] font-bold text-on-surface-variant">
-                              {idx + 1}
-                            </span>
-                            <Link
-                              to={PATHS.RECIPES.DETAIL(item.recipeId)}
-                              state={{ fromPlanId: planId, fromDay: currentDay }}
-                              className="font-bold text-primary hover:underline"
-                              title="Bấm để xem công thức món đã đổi"
-                            >
-                              {item.title}
-                            </Link>
-                            <span className="tabular-nums font-medium text-on-surface-variant">
-                              ({Math.round(item.caloriesKcal)} kcal)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={cn(
-                                'inline-flex items-center gap-0.5 rounded px-2 py-0.5 font-label-sm font-semibold text-[11px] border',
-                                diff < 0
-                                  ? 'bg-primary-fixed text-on-primary-fixed border-primary/20'
-                                  : diff > 0
-                                  ? 'bg-secondary-fixed text-on-secondary-fixed border-secondary/20'
-                                  : 'bg-surface-container text-on-surface-variant border-surface-container-high'
-                              )}
-                            >
-                              <Icon
-                                name={diff < 0 ? 'trending_down' : diff > 0 ? 'trending_up' : 'check'}
-                                className="text-[12px]"
-                              />
-                              {diff < 0
-                                ? `Món hiện tại ít hơn ${Math.abs(diff)} kcal`
-                                : diff > 0
-                                ? `Món hiện tại nhiều hơn ${diff} kcal`
-                                : 'Calo bằng nhau'}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setIsHistoryExpanded(false)}
-                        className="inline-flex items-center gap-1 font-label-sm text-[11px] font-semibold text-on-surface-variant hover:text-on-surface"
-                      >
-                        <Icon name="expand_less" className="text-[14px]" />
-                        <span>Thu gọn lại</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 font-body-sm text-xs text-on-surface-variant">
-                    <span className="text-on-surface-variant">Gần nhất:</span>
-                    <Link
-                      to={PATHS.RECIPES.DETAIL(fullHistoryList[0].recipeId)}
-                      state={{ fromPlanId: planId, fromDay: currentDay }}
-                      className="font-semibold text-primary hover:underline"
-                    >
-                      {fullHistoryList[0].title}
-                    </Link>
-                    <span className="tabular-nums font-medium">({Math.round(fullHistoryList[0].caloriesKcal)} kcal)</span>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={onOpenHistory}
+                  className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer shrink-0 ml-2"
+                >
+                  <span>Chi tiết món cũ</span>
+                  <Icon name="arrow_forward" className="text-[14px]" />
+                </button>
               </div>
             )}
           </div>
@@ -451,6 +384,7 @@ export const MealPlanDetail: React.FC = () => {
   const nutrition = useMealPlanNutrition(planId, nutritionLevel, !!plan.data);
   const activate = useActivateMealPlan(planId);
   const swap = useSwapMealSlot(planId);
+  const swapByNote = useSwapMealSlotByNote(planId);
   const complete = useCompleteMealSlot(planId);
   const exportPdf = useExportPdf(planId);
 
@@ -468,6 +402,7 @@ export const MealPlanDetail: React.FC = () => {
   const [swappedAway, setSwappedAway] = useState<Record<number, number[]>>({});
   const [dishSearchModalOpen, setDishSearchModalOpen] = useState<boolean>(false);
   const [searchTargetSlot, setSearchTargetSlot] = useState<MealSlot | null>(null);
+  const [historySlot, setHistorySlot] = useState<MealSlot | null>(null);
 
   // Context AI ban đầu của thực đơn (chỉ xem, không sửa context tổng tại đây)
   const [aiChips, setAiChips] = useState<AiParsedChip[]>([]);
@@ -1169,6 +1104,7 @@ export const MealPlanDetail: React.FC = () => {
                 onToggleComplete={() => toggleComplete(s)}
                 onOpenSwap={() => openSwap(s)}
                 onOpenSearchDb={() => openSearchDbModal(s)}
+                onOpenHistory={() => setHistorySlot(s)}
                 planId={planId}
                 currentDay={selectedDayCode}
               />
@@ -1186,10 +1122,19 @@ export const MealPlanDetail: React.FC = () => {
         swapCount={(swapSlot as unknown as { swapCount?: number })?.swapCount || swapHistories[swapSlot?.slotId ?? 0]?.swapCount}
         previousRecipe={(swapSlot as unknown as { previousRecipe?: SlotSwapInfo['previousRecipe'] })?.previousRecipe || swapHistories[swapSlot?.slotId ?? 0]?.previousRecipe}
         initialCustomNote={swapSlot ? slotNotes[swapSlot.slotId] : undefined}
-        submitting={swap.isPending}
+        submitting={swap.isPending || swapByNote.isPending}
         error={swapError}
         onCancel={() => setSwapSlot(null)}
         onConfirm={confirmSwap}
+      />
+
+      {/* MODAL 1.5: Chi tiết món trước đó & Lịch sử đổi món (FN-MEAL-03) */}
+      <SwapHistoryModal
+        slot={historySlot}
+        dayLabel={selectedDayCode ? (DAY_LABEL[selectedDayCode] || selectedDayCode) : undefined}
+        planId={planId}
+        fallbackHistory={historySlot ? swapHistories[historySlot.slotId] : undefined}
+        onClose={() => setHistorySlot(null)}
       />
 
       {/* MODAL 2: Modal tìm kiếm món ăn độc lập từ Database */}

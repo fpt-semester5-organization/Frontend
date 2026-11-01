@@ -100,12 +100,41 @@ const RECIPES: MockRecipe[] = [
   { recipeId: 308, title: 'Cơm chiên rau củ', mealType: 'DINNER', kcal: 460, imageUrl: SAGE, ingredients: [[1, 80], [25, 50], [29, 60], [40, 10], [41, 8]] },
 ];
 
+interface MockSwapHistory {
+  historyId: number;
+  slotId: number;
+  oldRecipeId: number;
+  oldRecipeTitle: string;
+  oldRecipeImageUrl: string | null;
+  oldRecipeCalories: number;
+  oldRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl: string | null;
+  } | null;
+  newRecipeId: number;
+  newRecipeTitle: string;
+  newRecipeImageUrl: string | null;
+  newRecipeCalories: number;
+  newRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl: string | null;
+  } | null;
+  swapReason: string | null;
+  caloriesDelta: number;
+  swappedAt: string;
+}
+
 interface MockSlot {
   slotId: number;
   dayOfWeek: (typeof DAYS)[number];
   mealType: MealType;
   recipeId: number;
   isCompleted: boolean;
+  swapHistories?: MockSwapHistory[];
 }
 
 interface MockPlan {
@@ -206,6 +235,43 @@ const plans: MockPlan[] = (() => {
     slot.isCompleted = dayIndex < todayIndex || (dayIndex === todayIndex && slot.mealType === 'BREAKFAST');
   });
   active.postDeployUsed = 3;
+
+  // Dữ liệu mẫu lịch sử đổi món cho assessment: Slot trưa Thứ 2 (đổi 1 lần)
+  const slotLunch = active.slots[1];
+  if (slotLunch) {
+    const oldRec = recipeById(201); // Cơm gạo lứt đậu phụ sốt cà (520 kcal)
+    const newRec = recipeById(slotLunch.recipeId);
+    slotLunch.swapHistories = [
+      {
+        historyId: 101,
+        slotId: slotLunch.slotId,
+        oldRecipeId: oldRec.recipeId,
+        oldRecipeTitle: oldRec.title,
+        oldRecipeImageUrl: oldRec.imageUrl,
+        oldRecipeCalories: oldRec.kcal,
+        oldRecipe: {
+          recipeId: oldRec.recipeId,
+          title: oldRec.title,
+          caloriesKcal: oldRec.kcal,
+          imageUrl: oldRec.imageUrl,
+        },
+        newRecipeId: newRec.recipeId,
+        newRecipeTitle: newRec.title,
+        newRecipeImageUrl: newRec.imageUrl,
+        newRecipeCalories: newRec.kcal,
+        newRecipe: {
+          recipeId: newRec.recipeId,
+          title: newRec.title,
+          caloriesKcal: newRec.kcal,
+          imageUrl: newRec.imageUrl,
+        },
+        swapReason: 'TASTE_PREFERENCE',
+        caloriesDelta: newRec.kcal - oldRec.kcal,
+        swappedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+      },
+    ];
+  }
+
   const draft = newPlan(2048, addDays(thisMonday, 7), 'PREMIUM', null, 'DRAFT');
   draft.preDeployUsed = 2;
   return [archived, active, draft];
@@ -283,6 +349,8 @@ const slotDto = (slot: MockSlot) => ({
   mealType: slot.mealType,
   isCompleted: slot.isCompleted,
   recipe: recipeDto(slot.recipeId),
+  swapCount: slot.swapHistories?.length ?? 0,
+  swapHistories: slot.swapHistories ?? [],
 });
 const planDto = (plan: MockPlan) => ({
   planId: plan.planId,
@@ -470,9 +538,44 @@ export const mealPlansHandlers = [
       return fail(403, 'ERR_QUOTA_MEAL_SWAP_EXCEEDED', `Bạn đã dùng hết ${EDIT_LIMIT} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`);
     }
 
+    const oldRecipeId = slot.recipeId;
+    const recordHistory = (oldRecId: number, newRecId: number, reasonStr?: string) => {
+      const oldR = recipeById(oldRecId);
+      const newR = recipeById(newRecId);
+      if (!slot.swapHistories) slot.swapHistories = [];
+      slot.swapHistories.unshift({
+        historyId: (slot.swapHistories[0]?.historyId ?? 0) + 1,
+        slotId: slot.slotId,
+        oldRecipeId: oldR.recipeId,
+        oldRecipeTitle: oldR.title,
+        oldRecipeImageUrl: oldR.imageUrl,
+        oldRecipeCalories: oldR.kcal,
+        oldRecipe: {
+          recipeId: oldR.recipeId,
+          title: oldR.title,
+          caloriesKcal: oldR.kcal,
+          imageUrl: oldR.imageUrl,
+        },
+        newRecipeId: newR.recipeId,
+        newRecipeTitle: newR.title,
+        newRecipeImageUrl: newR.imageUrl,
+        newRecipeCalories: newR.kcal,
+        newRecipe: {
+          recipeId: newR.recipeId,
+          title: newR.title,
+          caloriesKcal: newR.kcal,
+          imageUrl: newR.imageUrl,
+        },
+        swapReason: reasonStr ?? (typeof body.swapReason === 'string' ? body.swapReason : 'TASTE_PREFERENCE'),
+        caloriesDelta: newR.kcal - oldR.kcal,
+        swappedAt: new Date().toISOString(),
+      });
+    };
+
     // 1. Nếu người dùng chọn trực tiếp một món từ database
     if (body.newRecipeId && RECIPES.some((r) => r.recipeId === Number(body.newRecipeId))) {
       const chosen = recipeById(Number(body.newRecipeId));
+      recordHistory(oldRecipeId, chosen.recipeId, 'Chọn món trực tiếp từ cơ sở dữ liệu');
       slot.recipeId = chosen.recipeId;
       if (isDraft) plan.preDeployUsed += 1;
       else plan.postDeployUsed += 1;
@@ -492,6 +595,7 @@ export const mealPlansHandlers = [
       ) || RECIPES.find((r) => r.mealType === current.mealType && r.recipeId !== current.recipeId);
 
       if (aiCandidate) {
+        recordHistory(oldRecipeId, aiCandidate.recipeId, `Gợi ý AI theo lưu ý: ${body.customNote}`);
         slot.recipeId = aiCandidate.recipeId;
         if (isDraft) plan.preDeployUsed += 1;
         else plan.postDeployUsed += 1;
@@ -511,10 +615,42 @@ export const mealPlansHandlers = [
     if (!substitute) {
       return fail(422, 'ERR_MEAL_NO_SUBSTITUTE', 'Không còn món thay thế phù hợp (cùng trường phái, không dị ứng, chênh calo tối đa 15%).');
     }
+    recordHistory(oldRecipeId, substitute.recipeId, typeof body.swapReason === 'string' ? body.swapReason : undefined);
     slot.recipeId = substitute.recipeId;
     if (isDraft) plan.preDeployUsed += 1;
     else plan.postDeployUsed += 1;
     return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, 'Đã đổi món.');
+  }),
+
+  // GET /meal-plans/slots/{slotId}/swap-history — FN-MEAL-03
+  http.get(api('/meal-plans/slots/:slotId/swap-history'), async ({ request, params }) => {
+    await latency();
+    const me = currentUser(request);
+    if (!me) return unauthorized();
+    const slotId = Number(params.slotId);
+    let targetSlot: MockSlot | undefined;
+    for (const plan of plans) {
+      if (plan.userId === me.userId) {
+        const found = plan.slots.find((s) => s.slotId === slotId);
+        if (found) {
+          targetSlot = found;
+          break;
+        }
+      }
+    }
+    if (!targetSlot) return fail(404, 'ERR_MEAL_PLAN_NOT_FOUND', 'Bữa ăn không tồn tại hoặc không thuộc về bạn.');
+    return ok(targetSlot.swapHistories ?? [], 'OK');
+  }),
+
+  // GET /meal-plans/{id}/slots/{slotId}/swap-history — FN-MEAL-03
+  http.get(api('/meal-plans/:id/slots/:slotId/swap-history'), async ({ request, params }) => {
+    await latency();
+    const me = currentUser(request);
+    if (!me) return unauthorized();
+    const plan = findOwnPlan(params.id, me.userId);
+    const slot = plan?.slots.find((item) => item.slotId === Number(params.slotId));
+    if (!plan || !slot) return planNotFound();
+    return ok(slot.swapHistories ?? [], 'OK');
   }),
 
   // PATCH /meal-plans/{id}/slots/{slotId} — FN-MEAL-04 Đánh dấu đã ăn

@@ -8,6 +8,7 @@ import type {
   MealPlanDetail,
   MealPlanListItem,
   MealPlanNutrition,
+  MealSlotSwapHistoryItem,
   NutritionLevel,
   SwapSlotBody,
   SwapSlotResult,
@@ -50,6 +51,21 @@ export async function activateMealPlan(planId: number) {
 export async function swapMealSlot(planId: number, slotId: number, body: SwapSlotBody) {
   const res = await http.put<ApiEnvelope<SwapSlotResult>>(`/meal-plans/${planId}/slots/${slotId}`, body);
   return res.data;
+}
+
+/** POST /meal-plans/slots/{slotId}/swap-by-note — FN-MEAL-03 Đổi món theo ghi chú/khẩu vị người dùng bằng AI. */
+export async function swapMealSlotByNote(slotId: number, note: string, planId?: number, excludedRecipeIds?: number[]) {
+  const url = planId
+    ? `/meal-plans/${planId}/slots/${slotId}/swap-by-note`
+    : `/meal-plans/slots/${slotId}/swap-by-note`;
+  const res = await http.post<ApiEnvelope<SwapSlotResult>>(url, { note, excludedRecipeIds });
+  return res.data;
+}
+
+/** GET /meal-plans/slots/{slotId}/swap-history — FN-MEAL-03 Xem lịch sử các lần đổi món của một bữa ăn. */
+export async function getMealSlotSwapHistory(slotId: number) {
+  const res = await http.get<ApiEnvelope<MealSlotSwapHistoryItem[]>>(`/meal-plans/slots/${slotId}/swap-history`);
+  return res.data.data;
 }
 
 /** PATCH /meal-plans/{id}/slots/{slotId} — FN-MEAL-04 Đánh dấu đã ăn / chưa ăn. */

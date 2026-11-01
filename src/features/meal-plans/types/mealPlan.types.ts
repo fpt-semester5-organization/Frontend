@@ -4,7 +4,18 @@ import type { DeepRequired, Schemas } from '@/api/types';
 
 /** GET /meal-plans/{id} (FN-MEAL-02): 21 bữa, hạn mức chỉnh sửa trước/sau khi kích hoạt. */
 export type MealPlanDetail = DeepRequired<Schemas['GetMealPlanResponse']['data']>;
-export type MealSlot = MealPlanDetail['slots'][number];
+type RawMealSlot = MealPlanDetail['slots'][number];
+export type MealSlot = RawMealSlot & {
+  swapCount?: number;
+  swapHistories?: MealSlotSwapHistoryItem[];
+  previousRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl?: string | null;
+  } | null;
+  notes?: string | null;
+};
 export type MealPlanEdits = MealPlanDetail['edits'];
 export type PlanStatus = MealPlanDetail['planStatus'];
 export type BudgetTier = MealPlanDetail['budgetTier'];
@@ -26,6 +37,35 @@ export type SwapSlotBody = Schemas['UpdateMealPlanSlotRequest'] & {
 };
 export type SwapReason = NonNullable<SwapSlotBody['swapReason']>;
 export type SwapSlotResult = DeepRequired<Schemas['UpdateMealPlanSlotResponse']['data']>;
+
+/** GET /meal-plans/slots/{slotId}/swap-history (FN-MEAL-03): Lịch sử đối chứng các lần đổi món của một bữa ăn. */
+export interface MealSlotSwapHistoryItem {
+  historyId: number;
+  slotId: number;
+  oldRecipeId: number;
+  oldRecipeTitle: string;
+  oldRecipeImageUrl?: string | null;
+  oldRecipeCalories: number;
+  oldRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl?: string | null;
+  } | null;
+  newRecipeId: number;
+  newRecipeTitle: string;
+  newRecipeImageUrl?: string | null;
+  newRecipeCalories: number;
+  newRecipe?: {
+    recipeId: number;
+    title: string;
+    caloriesKcal: number;
+    imageUrl?: string | null;
+  } | null;
+  swapReason?: string | null;
+  caloriesDelta: number;
+  swappedAt: string;
+}
 
 /** PATCH /meal-plans/{id}/slots/{slotId} (FN-MEAL-04). */
 export type CompleteSlotResult = DeepRequired<Schemas['PatchMealPlanSlotResponse']['data']>;

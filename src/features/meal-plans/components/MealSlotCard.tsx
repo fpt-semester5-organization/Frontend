@@ -16,8 +16,10 @@ interface MealSlotCardProps {
   /** Còn hạn mức chỉnh sửa và thực đơn chưa lưu trữ. */
   canSwap: boolean;
   completing: boolean;
+  swapCount?: number;
   onToggleComplete: () => void;
   onSwap: () => void;
+  onOpenHistory?: () => void;
 }
 
 /** Một ô bữa ăn trong lưới 7 ngày × 3 bữa: ảnh, tên món, calo (VIP), đã ăn, đổi món. */
@@ -27,10 +29,13 @@ export const MealSlotCard: React.FC<MealSlotCardProps> = ({
   canComplete,
   canSwap,
   completing,
+  swapCount,
   onToggleComplete,
   onSwap,
+  onOpenHistory,
 }) => {
   const { recipe } = slot;
+  const count = slot.swapCount ?? swapCount ?? 0;
 
   return (
     <article
@@ -55,10 +60,24 @@ export const MealSlotCard: React.FC<MealSlotCardProps> = ({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
-          <Icon name={MEAL_ICON[slot.mealType]} className="text-[14px]" />
-          {MEAL_LABEL[slot.mealType]}
-        </span>
+        <div className="flex items-center justify-between gap-1">
+          <span className="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+            <Icon name={MEAL_ICON[slot.mealType]} className="text-[14px]" />
+            {MEAL_LABEL[slot.mealType]}
+          </span>
+          {count > 0 && (
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              title="Bấm để xem đối chứng món cũ và lý do đổi"
+              aria-label="Xem lại món trước đó"
+              className="inline-flex items-center gap-0.5 rounded-full bg-primary-fixed text-on-primary-fixed px-2 py-0.5 font-label-sm text-[11px] font-semibold hover:bg-primary-fixed-dim transition-colors cursor-pointer"
+            >
+              <Icon name="history" className="text-[12px]" />
+              <span>{count === 1 ? 'Đã đổi 1 lần' : `Đã đổi ${count} lần`}</span>
+            </button>
+          )}
+        </div>
         <Link
           to={PATHS.RECIPES.DETAIL(recipe.recipeId)}
           className="line-clamp-2 font-label-md text-label-md text-on-surface no-underline hover:text-primary"

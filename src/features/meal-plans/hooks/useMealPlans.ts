@@ -5,9 +5,11 @@ import {
   createMealPlan,
   getMealPlan,
   getMealPlanNutrition,
+  getMealSlotSwapHistory,
   listMealPlans,
   setMealSlotCompleted,
   swapMealSlot,
+  swapMealSlotByNote,
   updateMealPlanInstructions,
 } from '../api/mealPlans.api';
 import type { CreateMealPlanBody, MealPlanDetail, NutritionLevel, SwapSlotBody } from '../types/mealPlan.types';
@@ -18,6 +20,7 @@ export const mealPlanKeys = {
   list: (page: number) => [...mealPlanKeys.lists(), page] as const,
   detail: (planId: number) => [...mealPlanKeys.all, 'detail', planId] as const,
   nutrition: (planId: number) => [...mealPlanKeys.all, 'nutrition', planId] as const,
+  swapHistory: (slotId: number) => [...mealPlanKeys.all, 'swap-history', slotId] as const,
 };
 
 /** Không thử lại lỗi 4xx (404 không thuộc về bạn, 403 VIP...). */
@@ -39,6 +42,17 @@ export function useMealPlan(planId: number) {
     queryFn: () => getMealPlan(planId),
     enabled: Number.isInteger(planId) && planId > 0,
     retry: retryServerErrorsOnce,
+  });
+}
+
+/** Xem lịch sử đổi món của một bữa ăn (FN-MEAL-03). */
+export function useMealSlotSwapHistory(slotId: number, enabled = true) {
+  return useQuery({
+    queryKey: mealPlanKeys.swapHistory(slotId),
+    queryFn: () => getMealSlotSwapHistory(slotId),
+    enabled: enabled && Number.isInteger(slotId) && slotId > 0,
+    retry: retryServerErrorsOnce,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -93,6 +107,29 @@ export function useSwapMealSlot(planId: number) {
         return { ...plan, edits, slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)) };
       });
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.nutrition(planId) });
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.swapHistory(slot.slotId) });
+    },
+  });
+}
+
+/** Đổi món theo ghi chú/khẩu vị bằng AI: cập nhật slot trong cache, trừ lượt đổi, làm mới calo và lịch sử đổi món. */
+export function useSwapMealSlotByNote(planId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slotId, note, excludedRecipeIds }: { slotId: number; note: string; excludedRecipeIds?: number[] }) =>
+      swapMealSlotByNote(slotId, note, planId, excludedRecipeIds),
+    onSuccess: (res) => {
+      const { slot, swapsRemaining } = res.data;
+      queryClient.setQueryData<MealPlanDetail>(mealPlanKeys.detail(planId), (plan) => {
+        if (!plan) return plan;
+        const edits =
+          plan.planStatus === 'DRAFT'
+            ? { ...plan.edits, preDeployUsed: plan.edits.preDeployLimit - swapsRemaining }
+            : { ...plan.edits, postDeployUsed: plan.edits.postDeployLimit - swapsRemaining };
+        return { ...plan, edits, slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)) };
+      });
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.nutrition(planId) });
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.swapHistory(slot.slotId) });
     },
   });
 }
