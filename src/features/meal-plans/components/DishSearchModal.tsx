@@ -147,7 +147,7 @@ export const DishSearchModal: React.FC<DishSearchModalProps> = ({
             type="text"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Tìm theo tên món (ví dụ: bún riêu, canh nấm, đậu hũ sốt cà...)"
+            placeholder="Tìm công thức theo tên (ví dụ: bún riêu, canh nấm, đậu hũ sốt cà...)"
             autoFocus
             className="w-full rounded-xl border border-surface-container bg-surface-container-low pl-10 pr-10 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-hidden transition-all"
           />
@@ -226,6 +226,10 @@ export const DishSearchModal: React.FC<DishSearchModalProps> = ({
 
                 {/* Nội dung */}
                 <div className="min-w-0 flex-1">
+                  {/* Món ăn (tên chung) trên, tên công thức dưới. */}
+                  {recipe.foodName && (
+                    <p className="truncate text-[11px] text-on-surface-variant">{recipe.foodName}</p>
+                  )}
                   <h4 className="font-serif font-semibold text-xs sm:text-sm text-on-surface truncate">
                     {recipe.title}
                   </h4>

@@ -49,6 +49,24 @@ const switchUser = (userId: number) =>
   useAuthStore.setState((state) => ({ user: state.user && { ...state.user, userId, fullName: 'Lê Minh Chi' } }));
 
 describe('RecipeDetail (SCR-12)', () => {
+  it('phân biệt món ăn và tên công thức: hiện món ăn kèm link xem các công thức khác của món', async () => {
+    mockDetail((req) =>
+      req.url === '/recipes/512' ? { data: detail(512, { foodId: 9, foodName: 'Canh rong biển' }) } : undefined
+    );
+    renderDetail();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Canh nấm đậu phụ rong biển' })).toBeInTheDocument();
+    expect(screen.getByText('Canh rong biển')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xem các công thức khác của món này' })).toHaveAttribute('href', '/recipes?food=9');
+  });
+
+  it('công thức cũ chưa gắn món ăn thì không hiện dòng món ăn', async () => {
+    mockDetail();
+    renderDetail();
+    await screen.findByRole('heading', { level: 1, name: 'Canh nấm đậu phụ rong biển' });
+    expect(screen.queryByText(/Món ăn:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Xem các công thức khác của món này' })).not.toBeInTheDocument();
+  });
+
   it('hiện skeleton rồi đủ thông tin, nguyên liệu có định lượng, các bước, món tương tự và bình luận', async () => {
     mockDetail();
     renderDetail();

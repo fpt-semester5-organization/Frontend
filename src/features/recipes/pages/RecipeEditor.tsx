@@ -53,6 +53,8 @@ import type { MyRecipeStatus, RecipeStatus, UpdateRecipeBody } from '../types/re
 const RATE_LIMIT_LOCK_MS = 30 * 1000;
 
 const FIELD_ROOTS = [
+  'foodName',
+  'foodId',
   'title',
   'categoryId',
   'dietarySchoolId',
@@ -73,7 +75,8 @@ function applyRecipeFieldErrors(error: unknown, setError: UseFormSetError<Recipe
   for (const detail of apiError.details) {
     const root = FIELD_ROOTS.find((name) => name === detail.field.split(/[.[]/)[0]);
     if (!root) continue;
-    setError(root, { type: 'server', message: detail.message });
+    // Lỗi foodId (món đã bị xóa…) hiện dưới ô Món ăn.
+    setError(root === 'foodId' ? 'foodName' : root, { type: 'server', message: detail.message });
     applied = true;
   }
   return applied;
@@ -170,7 +173,10 @@ const RecipeEditor: React.FC = () => {
           ? [{ text: steps[0] }, { text: '' }]
           : [{ text: '' }, { text: '' }];
 
+    // Video chỉ cho một tên: dùng làm cả món ăn (người dùng chọn lại món có sẵn nếu trùng) và tên công thức.
     return {
+      foodId: null,
+      foodName: sttPrefill.title || '',
       title: sttPrefill.title || '',
       dietarySchoolId: '',
       categoryId: '',
@@ -222,6 +228,8 @@ const RecipeEditor: React.FC = () => {
           : [{ text: '' }, { text: '' }];
 
     setPrefillDefaults({
+      foodId: null,
+      foodName: sttPrefill.title || '',
       title: sttPrefill.title || '',
       dietarySchoolId: '',
       categoryId: '',
@@ -526,7 +534,7 @@ const RecipeEditor: React.FC = () => {
               Dữ liệu được bóc tách tự động từ video qua AI
             </h3>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Tên món, mô tả, danh sách nguyên liệu và các bước nấu đã được tự động điền từ video. Bạn hãy kiểm tra lại, chọn trường phái ăn chay và danh mục trước khi đăng bài.
+              Món ăn, tên công thức, mô tả, danh sách nguyên liệu và các bước nấu đã được tự động điền từ video. Bạn hãy kiểm tra lại (chọn món có sẵn nếu trùng), chọn trường phái ăn chay và danh mục trước khi đăng bài.
             </p>
           </div>
         </div>

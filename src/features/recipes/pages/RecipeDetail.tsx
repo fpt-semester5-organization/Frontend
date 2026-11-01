@@ -132,7 +132,7 @@ const RecipeDetail: React.FC = () => {
           <span>Quay lại</span>
         </button>
 
-        {/* Luôn một dòng (tên món dài thì cắt bớt) để đổi font không làm khối bên dưới nhảy (CLS). */}
+        {/* Luôn một dòng (tên công thức dài thì cắt bớt) để đổi font không làm khối bên dưới nhảy (CLS). */}
         <nav aria-label="Đường dẫn" className="flex min-w-0 max-w-full items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
           <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
             Trang chủ
@@ -173,7 +173,7 @@ const RecipeDetail: React.FC = () => {
             ) : data.imageUrl ? (
               <img
                 src={data.imageUrl}
-                alt={`Món ${data.title}`}
+                alt={`Ảnh công thức ${data.title}`}
                 width={960}
                 height={720}
                 // Ảnh món là phần tử lớn nhất màn đầu (LCP) nên tải ngay.
@@ -206,7 +206,23 @@ const RecipeDetail: React.FC = () => {
               )}
             </div>
 
-            <h1 className="font-headline-lg text-headline-lg-mobile break-words text-on-surface sm:text-headline-lg">{data.title}</h1>
+            <div className="flex flex-col gap-1">
+              {/* Món ăn (Foods) là tên chung; h1 là tên riêng của công thức này. */}
+              {data.foodName && (
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-label-md text-label-md text-on-surface-variant">
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="restaurant_menu" className="text-[18px]" />
+                    Món ăn: <span className="text-on-surface">{data.foodName}</span>
+                  </span>
+                  {data.foodId && (
+                    <Link to={`${PATHS.RECIPES.ROOT}?food=${data.foodId}`} className="text-primary hover:underline">
+                      Xem các công thức khác của món này
+                    </Link>
+                  )}
+                </p>
+              )}
+              <h1 className="font-headline-lg text-headline-lg-mobile break-words text-on-surface sm:text-headline-lg">{data.title}</h1>
+            </div>
             {data.description && (
               <p className="font-body-lg text-body-lg leading-relaxed whitespace-pre-line text-on-surface-variant">
                 {data.description}

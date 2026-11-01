@@ -5,7 +5,7 @@ import { addRecentCreatedItem, updateRecentCreatedItem } from '@/features/commun
 import { getAttachmentKind } from '@/features/community/types/community.schemas';
 import { createRecipe, deleteRecipe, updateRecipe, uploadRecipeMedia } from '../api/recipes.api';
 import type { CreateRecipeBody, DeleteRecipeMode, UpdateRecipeBody } from '../types/recipe.types';
-import { recipeKeys } from './recipeKeys';
+import { masterKeys, recipeKeys } from './recipeKeys';
 
 export function useCreateRecipe() {
   const queryClient = useQueryClient();
@@ -31,6 +31,8 @@ export function useCreateRecipe() {
 
       queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
       queryClient.invalidateQueries({ queryKey: communityKeys.postLists() });
+      // Món mới (gửi foodName) vừa được Backend tạo: gợi ý món phải có món đó.
+      if (body.foodName) queryClient.invalidateQueries({ queryKey: masterKeys.foods() });
     },
   });
 }
@@ -39,10 +41,11 @@ export function useUpdateRecipe() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ recipeId, body }: { recipeId: number; body: UpdateRecipeBody }) => updateRecipe(recipeId, body),
-    onSuccess: (_res, { recipeId }) => {
+    onSuccess: (_res, { recipeId, body }) => {
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
       queryClient.invalidateQueries({ queryKey: communityKeys.postLists() });
+      if (body.foodName) queryClient.invalidateQueries({ queryKey: masterKeys.foods() });
     },
   });
 }

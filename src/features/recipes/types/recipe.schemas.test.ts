@@ -6,6 +6,7 @@ import {
   recipeFormSchema,
   schoolConflict,
   toRecipeBody,
+  toUpdateBody,
   type IngredientRowValues,
   type RecipeFormValues,
 } from './recipe.schemas';
@@ -32,6 +33,8 @@ const row = (patch: Partial<IngredientRowValues> = {}): IngredientRowValues => (
 
 const valid: RecipeFormValues = {
   ...EMPTY_RECIPE_FORM,
+  foodId: 7,
+  foodName: 'Đậu phụ chiên sả',
   title: 'Đậu phụ chiên sả ớt',
   dietarySchoolId: '1',
   categoryId: '4',
@@ -63,7 +66,8 @@ describe('recipeFormSchema (SCR-13, BR-USR-05)', () => {
     const errors = messages(EMPTY_RECIPE_FORM);
     expect(errors).toEqual(
       expect.arrayContaining([
-        'title: Tên món cần ít nhất 10 ký tự.',
+        'foodName: Chọn món ăn có sẵn hoặc nhập tên món mới.',
+        'title: Tên công thức cần ít nhất 10 ký tự.',
         'dietarySchoolId: Vui lòng chọn trường phái ăn chay.',
         'categoryId: Vui lòng chọn danh mục món.',
         'cookTimeMinutes: Thời gian nấu phải lớn hơn 0 phút.',
@@ -95,6 +99,7 @@ describe('recipeFormSchema (SCR-13, BR-USR-05)', () => {
 describe('toRecipeBody', () => {
   it('đổi sang số, bỏ trường tùy chọn để trống, isOptional chỉ gửi khi bật', () => {
     expect(toRecipeBody({ ...valid, ingredients: [row(), row({ ingredientId: 2, isOptional: true, unit: ' quả ' })] }, false)).toEqual({
+      foodId: 7,
       title: 'Đậu phụ chiên sả ớt',
       categoryId: 4,
       dietarySchoolId: 1,
@@ -108,9 +113,25 @@ describe('toRecipeBody', () => {
     });
   });
 
+  it('món có sẵn gửi foodId; món mới gửi foodName để Backend tạo', () => {
+    expect(toRecipeBody(valid, false)).toMatchObject({ foodId: 7 });
+    expect(toRecipeBody(valid, false)).not.toHaveProperty('foodName');
+    const created = toRecipeBody({ ...valid, foodId: null, foodName: '  Bún riêu chay ' }, false);
+    expect(created).toMatchObject({ foodName: 'Bún riêu chay' });
+    expect(created).not.toHaveProperty('foodId');
+  });
+
   it('gửi đủ trường tùy chọn khi có nhập', () => {
     const body = toRecipeBody({ ...valid, description: ' Thơm ', prepTimeMinutes: '0', servings: '2', difficultyLevel: 'HARD' }, true);
     expect(body).toMatchObject({ description: 'Thơm', prepTimeMinutes: 0, servings: 2, difficultyLevel: 'HARD', submit: true });
+  });
+});
+
+describe('toUpdateBody', () => {
+  it('đổi món ăn thì chỉ gửi trường món; không đổi thì không gửi', () => {
+    expect(toUpdateBody({ ...valid, foodId: 3, foodName: 'Cháo đậu xanh' }, { foodId: true, foodName: true })).toEqual({ foodId: 3 });
+    expect(toUpdateBody({ ...valid, foodId: null, foodName: 'Phở cuốn chay' }, { foodName: true })).toEqual({ foodName: 'Phở cuốn chay' });
+    expect(toUpdateBody(valid, { title: true })).toEqual({ title: 'Đậu phụ chiên sả ớt' });
   });
 });
 

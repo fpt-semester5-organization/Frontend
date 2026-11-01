@@ -78,6 +78,14 @@ export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item
             )}
           </div>
         )}
+        {/* Món ăn (Foods) là tên chung; tiêu đề bên dưới là tên riêng của công thức. */}
+        {item.foodName && (
+          <p className="flex min-w-0 items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+            <Icon name="restaurant_menu" className="text-[16px]" />
+            <span className="sr-only">Món ăn: </span>
+            <span className="truncate">{item.foodName}</span>
+          </p>
+        )}
         <h3 className="font-headline-sm text-headline-sm text-on-surface">
           {/* Liên kết phủ cả thẻ; mục VIDEO cũng mở trang công thức vì API không trả videoId. */}
           <Link

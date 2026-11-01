@@ -14,4 +14,8 @@ export const masterKeys = {
   dietarySchools: () => ['master', 'dietary-schools'] as const,
   categories: () => ['master', 'categories'] as const,
   ingredients: (keyword: string) => ['master', 'ingredients', keyword] as const,
+  /** Món ăn (Foods): gợi ý theo từ khóa và chi tiết một món. Đăng công thức có món mới thì làm mới. */
+  foods: () => ['master', 'foods'] as const,
+  foodSearch: (keyword: string) => [...masterKeys.foods(), 'search', keyword] as const,
+  food: (id: number) => [...masterKeys.foods(), 'detail', id] as const,
 };

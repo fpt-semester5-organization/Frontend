@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FormProvider, useForm, useWatch, type UseFormSetError } from 'react-hook-form';
+import { FormProvider, useController, useForm, useWatch, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -18,6 +18,7 @@ import {
   recipeFormSchema,
   type RecipeFormValues,
 } from '../types/recipe.schemas';
+import { FoodCombobox } from './FoodCombobox';
 import { RecipeIngredientFields } from './RecipeIngredientFields';
 import { RecipeStepFields } from './RecipeStepFields';
 
@@ -124,10 +125,12 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     if (categories.data) setValue('categoryId', getValues('categoryId'));
   }, [categories.data, setValue, getValues]);
 
-  const [title, description, schoolId, servings, ingredients] = useWatch({
+  const [title, description, schoolId, servings, ingredients, foodId] = useWatch({
     control,
-    name: ['title', 'description', 'dietarySchoolId', 'servings', 'ingredients'],
+    name: ['title', 'description', 'dietarySchoolId', 'servings', 'ingredients', 'foodId'],
   });
+  // Ô món ăn tự điều khiển giá trị; useController để lỗi validate vẫn focus được vào ô.
+  const { field: foodField } = useController({ control, name: 'foodName' });
   const school = schools.data?.find((item) => item.dietarySchoolId === Number(schoolId));
   const estimate = estimateCalories(ingredients ?? []);
   const perServing = Number(servings) > 0 ? Math.round(estimate.kcal / Number(servings)) : null;
@@ -156,9 +159,42 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             <SectionTitle id="recipe-basic" index="01" title="Thông tin cơ bản" />
             <div className="flex flex-col gap-space-md">
               <div className="flex flex-col gap-1.5">
+                <label htmlFor="recipe-food" className={LABEL}>
+                  Món ăn <span className="text-secondary">*</span>
+                </label>
+                <FoodCombobox
+                  id="recipe-food"
+                  allowCreate
+                  value={{ foodId: foodId ?? null, foodName: foodField.value ?? '' }}
+                  onChange={(next, food) => {
+                    const validate = !!errors.foodName;
+                    setValue('foodId', next.foodId, { shouldDirty: true });
+                    foodField.onChange(next.foodName);
+                    if (validate) void form.trigger('foodName');
+                    // Món có sẵn đã thuộc một danh mục: điền sẵn nếu người dùng chưa chọn danh mục.
+                    if (food && !getValues('categoryId')) setValue('categoryId', String(food.categoryId), { shouldDirty: true });
+                  }}
+                  placeholder="Tìm món có sẵn hoặc gõ tên món mới, VD: Bún bò Huế chay"
+                  invalid={!!errors.foodName}
+                  describedBy="recipe-food-hint"
+                  disabled={busy}
+                  inputRef={foodField.ref}
+                  onBlur={foodField.onBlur}
+                />
+                <p id="recipe-food-hint" className="font-body-sm text-body-sm text-on-surface-variant">
+                  {foodId
+                    ? 'Công thức sẽ hiện cùng các công thức khác của món này.'
+                    : foodField.value?.trim()
+                      ? 'Món mới: hệ thống tạo món khi lưu công thức.'
+                      : 'Món ăn là tên chung; một món có thể có nhiều công thức nấu khác nhau.'}
+                </p>
+                <FieldError>{errors.foodName?.message}</FieldError>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <label htmlFor="recipe-title" className={LABEL}>
-                    Tên món <span className="text-secondary">*</span>
+                    Tên công thức <span className="text-secondary">*</span>
                   </label>
                   <span className="font-label-sm text-label-sm text-outline tabular-nums">
                     {title?.length ?? 0} / {RECIPE_TITLE_MAX}
@@ -168,12 +204,16 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                   id="recipe-title"
                   type="text"
                   maxLength={RECIPE_TITLE_MAX}
-                  placeholder="Ví dụ: Đậu hũ kho nấm hương"
+                  placeholder="Ví dụ: Bún bò Huế chay nước dùng nấm, ít dầu"
                   aria-invalid={!!errors.title || undefined}
+                  aria-describedby="recipe-title-hint"
                   disabled={busy}
                   {...register('title')}
                   className={cn(INPUT_CLASS, 'h-12 font-headline-sm text-headline-sm', errors.title && INPUT_ERROR_CLASS)}
                 />
+                <p id="recipe-title-hint" className="font-body-sm text-body-sm text-on-surface-variant">
+                  Tên riêng cho cách nấu của bạn, để phân biệt với các công thức khác cùng món.
+                </p>
                 <FieldError>{errors.title?.message}</FieldError>
               </div>
 

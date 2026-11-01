@@ -28,9 +28,16 @@ async function pickIngredient(index: number, text: string, name: string) {
   await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${name}`) }));
 }
 
-/** Điền form hợp lệ: Thuần chay, Món chiên, nấu 20 phút, 300 g đậu phụ, 2 bước. */
+/** Chọn món ăn trong ô combobox (món có sẵn, hoặc dòng "Thêm món mới"). */
+async function pickFood(text: string, option: string | RegExp) {
+  await userEvent.type(screen.getByRole('combobox', { name: /Món ăn/ }), text);
+  await userEvent.click(await screen.findByRole('option', { name: option }));
+}
+
+/** Điền form hợp lệ: món "Đậu phụ chiên sả", Thuần chay, Món chiên, nấu 20 phút, 300 g đậu phụ, 2 bước. */
 async function fillValidForm() {
-  await userEvent.type(screen.getByLabelText(/Tên món/), 'Đậu phụ chiên sả ớt');
+  await pickFood('đậu phụ', 'Đậu phụ chiên sả');
+  await userEvent.type(screen.getByLabelText(/Tên công thức/), 'Đậu phụ chiên sả ớt');
   await screen.findByRole('option', { name: 'Thuần chay' });
   await userEvent.selectOptions(screen.getByLabelText(/Trường phái ăn chay/), '1');
   await screen.findByRole('option', { name: 'Món chiên' });
@@ -43,6 +50,7 @@ async function fillValidForm() {
 }
 
 const EXPECTED_BODY = {
+  foodId: 7,
   title: 'Đậu phụ chiên sả ớt',
   categoryId: 4,
   dietarySchoolId: 1,
@@ -73,7 +81,7 @@ describe('RecipeEditor (SCR-13)', () => {
     expect(useUiStore.getState().signupPrompt.open).toBe(true);
     await userEvent.click(draftButton());
     expect(writes(calls)).toHaveLength(0);
-    expect(screen.queryByText('Tên món cần ít nhất 10 ký tự.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tên công thức cần ít nhất 10 ký tự.')).not.toBeInTheDocument();
   });
 
   describe('Thành viên', () => {
@@ -83,7 +91,8 @@ describe('RecipeEditor (SCR-13)', () => {
       const calls = mockRecipesApi();
       renderEditor();
       await userEvent.click(submitButton());
-      expect(await screen.findByText('Tên món cần ít nhất 10 ký tự.')).toBeInTheDocument();
+      expect(await screen.findByText('Tên công thức cần ít nhất 10 ký tự.')).toBeInTheDocument();
+      expect(screen.getByText('Chọn món ăn có sẵn hoặc nhập tên món mới.')).toBeInTheDocument();
       expect(screen.getByText('Vui lòng chọn trường phái ăn chay.')).toBeInTheDocument();
       expect(screen.getByText('Thời gian nấu phải lớn hơn 0 phút.')).toBeInTheDocument();
       expect(screen.getByText(/Chọn nguyên liệu từ danh sách gợi ý/)).toBeInTheDocument();
@@ -110,6 +119,47 @@ describe('RecipeEditor (SCR-13)', () => {
       expect(await screen.findByText('Đã mở chi tiết 700')).toBeInTheDocument();
       expect(writes(calls)[1]).toMatchObject({ method: 'PUT', url: '/recipes/700', body: { ...EXPECTED_BODY, submit: true } });
       expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Đã đăng công thức.');
+    });
+
+    it('món ăn và tên công thức là hai trường riêng; chọn món có sẵn thì điền sẵn danh mục của món', async () => {
+      mockRecipesApi();
+      renderEditor();
+      expect(screen.getByRole('combobox', { name: /Món ăn/ })).toBeInTheDocument();
+      expect(screen.getByLabelText(/Tên công thức/)).not.toBe(screen.getByRole('combobox', { name: /Món ăn/ }));
+      await screen.findByRole('option', { name: 'Món chiên' });
+      await pickFood('đậu phụ', 'Đậu phụ chiên sả');
+      expect(screen.getByRole('combobox', { name: /Món ăn/ })).toHaveValue('Đậu phụ chiên sả');
+      expect(screen.getByText('Công thức sẽ hiện cùng các công thức khác của món này.')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Danh mục món/)).toHaveValue('4');
+      // Tên công thức không bị ghi đè bởi tên món.
+      expect(screen.getByLabelText(/Tên công thức/)).toHaveValue('');
+    });
+
+    it('món chưa có: chọn "Thêm món mới" thì gửi foodName để Backend tạo, không gửi foodId', async () => {
+      const calls = mockRecipesApi((req) => (req.method === 'POST' && req.url === '/recipes' ? created('DRAFT') : undefined));
+      renderEditor();
+      await fillValidForm();
+      const food = screen.getByRole('combobox', { name: /Món ăn/ });
+      await userEvent.clear(food);
+      await pickFood('Bún riêu chay', /Thêm món mới/);
+      expect(screen.getByText('Món mới: hệ thống tạo món khi lưu công thức.')).toBeInTheDocument();
+
+      await userEvent.click(draftButton());
+      await waitFor(() => expect(writes(calls)).toHaveLength(1));
+      const body = writes(calls)[0].body as Record<string, unknown>;
+      expect(body).toMatchObject({ foodName: 'Bún riêu chay', title: 'Đậu phụ chiên sả ớt' });
+      expect(body).not.toHaveProperty('foodId');
+    });
+
+    it('ô món ăn dùng được bằng bàn phím: ↓ chọn gợi ý, Enter xác nhận', async () => {
+      mockRecipesApi();
+      renderEditor();
+      const food = screen.getByRole('combobox', { name: /Món ăn/ });
+      await userEvent.type(food, 'cháo');
+      await screen.findByRole('option', { name: 'Cháo đậu xanh' });
+      await userEvent.keyboard('{ArrowDown}{Enter}');
+      expect(food).toHaveValue('Cháo đậu xanh');
+      expect(food).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('tải ảnh lên sau khi có recipeId; chờ kiểm duyệt thì báo chưa công khai', async () => {
@@ -144,7 +194,7 @@ describe('RecipeEditor (SCR-13)', () => {
       const title = await screen.findByText('Nguyên liệu không hợp với trường phái đã chọn');
       const alert = title.closest('[role="alert"]') as HTMLElement;
       expect(within(alert).getByText('“Trứng gà” không phù hợp trường phái Thuần chay.')).toBeInTheDocument();
-      expect(screen.getByLabelText(/Tên món/)).toHaveValue('Đậu phụ chiên sả ớt');
+      expect(screen.getByLabelText(/Tên công thức/)).toHaveValue('Đậu phụ chiên sả ớt');
     });
 
     it('400 ERR_VALIDATION: lỗi server hiện dưới đúng trường', async () => {
@@ -155,7 +205,7 @@ describe('RecipeEditor (SCR-13)', () => {
               errorCode: 'ERR_VALIDATION',
               message: 'Dữ liệu đầu vào không hợp lệ.',
               details: [
-                { field: 'title', message: 'Tên món đã tồn tại.' },
+                { field: 'title', message: 'Tên công thức đã tồn tại.' },
                 { field: 'ingredients[0].quantity', message: 'Định lượng vượt giới hạn.' },
               ],
             }
@@ -164,7 +214,7 @@ describe('RecipeEditor (SCR-13)', () => {
       renderEditor();
       await fillValidForm();
       await userEvent.click(draftButton());
-      expect(await screen.findByText('Tên món đã tồn tại.')).toBeInTheDocument();
+      expect(await screen.findByText('Tên công thức đã tồn tại.')).toBeInTheDocument();
       expect(screen.getByText('Định lượng vượt giới hạn.')).toBeInTheDocument();
     });
 

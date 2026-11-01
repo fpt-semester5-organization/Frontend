@@ -19,6 +19,12 @@ export const INGREDIENTS = [
   { ingredientId: 3, name: 'Sả', standardUnit: 'g', foodGroup: 'PLANT', isAllium: false, caloriesPer100g: 99 },
 ];
 
+/** Món ăn (Foods): tên chung, mỗi món có nhiều công thức. */
+export const FOODS = [
+  { foodId: 3, foodName: 'Cháo đậu xanh', categoryId: 1 },
+  { foodId: 7, foodName: 'Đậu phụ chiên sả', categoryId: 4 },
+];
+
 export const listItem = (id: number, extra: Record<string, unknown> = {}) => ({
   recipeId: id,
   type: 'RECIPE',
@@ -56,6 +62,15 @@ export function mockRecipesApi(handler: (req: MockRequest) => MockResponse | und
     if (custom) return custom;
     if (req.url === '/dietary-schools') return { data: SCHOOLS };
     if (req.url === '/categories') return { data: CATEGORIES };
+    if (req.url === '/foods/search') {
+      const q = String((req.params as { q?: string }).q ?? '').toLowerCase();
+      return { data: FOODS.filter((food) => food.foodName.toLowerCase().includes(q)) };
+    }
+    const food = req.url.match(/^\/foods\/(\d+)$/);
+    if (food) {
+      const found = FOODS.find((item) => item.foodId === Number(food[1]));
+      return found ? { data: found } : { status: 404, errorCode: 'ERR_CONTENT_NOT_FOUND', message: 'Không tìm thấy món ăn.' };
+    }
     if (req.url === '/ingredients') {
       const keyword = String((req.params as { keyword?: string }).keyword ?? '').toLowerCase();
       const items = INGREDIENTS.filter((item) => item.name.toLowerCase().includes(keyword));

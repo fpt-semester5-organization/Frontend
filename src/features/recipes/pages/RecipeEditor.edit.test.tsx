@@ -12,6 +12,8 @@ import RecipeEditor from './RecipeEditor';
 const own = (status: string, extra: Record<string, unknown> = {}) =>
   detail(540, {
     title: 'Cháo đậu xanh hạt sen',
+    foodId: 3,
+    foodName: 'Cháo đậu xanh',
     authorId: 1024,
     status,
     categoryId: 1,
@@ -63,7 +65,7 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
       const calls = renderEdit(own('DRAFT'), (req) =>
         req.method === 'PUT' ? { message: 'Đã lưu nháp.', data: { recipeId: 540, status: 'DRAFT', moderated: false } } : undefined
       );
-      const title = await screen.findByLabelText(/Tên món/);
+      const title = await screen.findByLabelText(/Tên công thức/);
       expect(title).toHaveValue('Cháo đậu xanh hạt sen');
       await screen.findByRole('option', { name: 'Thuần chay' });
       await waitFor(() => expect(screen.getByLabelText(/Trường phái ăn chay/)).toHaveValue('1'));
@@ -91,7 +93,7 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
       const calls = renderEdit(own('DRAFT'), (req) =>
         req.method === 'PUT' ? { message: 'Đã đăng công thức.', data: { recipeId: 540, status: 'APPROVED_ACTIVE', moderated: true } } : undefined
       );
-      await screen.findByLabelText(/Tên món/);
+      await screen.findByLabelText(/Tên công thức/);
       await userEvent.click(screen.getByRole('button', { name: /Gửi duyệt & đăng/ }));
       expect(await screen.findByText('Đã mở chi tiết 540')).toBeInTheDocument();
       expect(writes(calls)[0]).toMatchObject({ method: 'PUT', url: '/recipes/540', body: { submit: true } });
@@ -101,7 +103,7 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
       const calls = renderEdit(own('APPROVED_ACTIVE'), (req) =>
         req.method === 'PUT' ? { message: 'Cập nhật thành công.', data: { recipeId: 540, status: 'APPROVED_ACTIVE', moderated: true } } : undefined
       );
-      await screen.findByLabelText(/Tên món/);
+      await screen.findByLabelText(/Tên công thức/);
       expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
       expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Bạn chưa thay đổi nội dung nào.');
@@ -115,6 +117,36 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
       expect(writes(calls)[0].body).toEqual({ cookTimeMinutes: 30 });
     });
 
+    it('điền sẵn món ăn của công thức; đổi sang món khác thì chỉ gửi foodId', async () => {
+      const calls = renderEdit(own('DRAFT'), (req) =>
+        req.method === 'PUT' ? { message: 'Đã lưu nháp.', data: { recipeId: 540, status: 'DRAFT', moderated: false } } : undefined
+      );
+      const food = await screen.findByRole('combobox', { name: /Món ăn/ });
+      expect(food).toHaveValue('Cháo đậu xanh');
+      await userEvent.clear(food);
+      await userEvent.type(food, 'đậu phụ');
+      await userEvent.click(await screen.findByRole('option', { name: 'Đậu phụ chiên sả' }));
+      await userEvent.click(screen.getByRole('button', { name: /Lưu nháp/ }));
+      await waitFor(() => expect(writes(calls)[0]?.body).toEqual({ foodId: 7, submit: false }));
+    });
+
+    it('công thức cũ chưa gắn món ăn: phải chọn món trước khi gửi duyệt', async () => {
+      const calls = renderEdit(own('DRAFT', { foodId: null, foodName: null }), (req) =>
+        req.method === 'PUT' ? { message: 'Đã đăng công thức.', data: { recipeId: 540, status: 'APPROVED_ACTIVE', moderated: true } } : undefined
+      );
+      const food = await screen.findByRole('combobox', { name: /Món ăn/ });
+      expect(food).toHaveValue('');
+      await userEvent.click(screen.getByRole('button', { name: /Gửi duyệt & đăng/ }));
+      expect(await screen.findByText('Chọn món ăn có sẵn hoặc nhập tên món mới.')).toBeInTheDocument();
+      expect(writes(calls)).toHaveLength(0);
+
+      await userEvent.type(food, 'cháo');
+      await userEvent.click(await screen.findByRole('option', { name: 'Cháo đậu xanh' }));
+      await userEvent.click(screen.getByRole('button', { name: /Gửi duyệt & đăng/ }));
+      expect(await screen.findByText('Đã mở chi tiết 540')).toBeInTheDocument();
+      expect(writes(calls)[0].body).toEqual({ foodId: 3, submit: true });
+    });
+
     it('bản bị từ chối có trứng gắn nhãn Thuần chay: cảnh báo ngay khi mở', async () => {
       renderEdit(own('REJECTED', { ingredients: [{ ingredientId: 2, name: 'Trứng gà', quantity: 2, unit: 'quả', isOptional: false }] }));
       expect(await screen.findByText(/Thuần chay không dùng trứng/)).toBeInTheDocument();
@@ -124,7 +156,7 @@ describe('RecipeEditor — chế độ sửa (/recipes/:id/edit)', () => {
     it('không phải tác giả thì không sửa được', async () => {
       renderEdit(own('APPROVED_ACTIVE', { authorId: 2048 }));
       expect(await screen.findByRole('heading', { name: 'Bạn không thể sửa công thức này' })).toBeInTheDocument();
-      expect(screen.queryByLabelText(/Tên món/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Tên công thức/)).not.toBeInTheDocument();
     });
 
     it('đang bị ẩn chờ Admin thì báo khóa, không hiện form', async () => {
