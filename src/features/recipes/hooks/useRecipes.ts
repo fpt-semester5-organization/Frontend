@@ -1,14 +1,17 @@
 import { keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { toApiError } from '@/lib/apiError';
 import {
+  getFood,
   getRecipe,
   listCategories,
   listDietarySchools,
   listIngredients,
   listRecipes,
   listRelatedRecipes,
+  searchFoods,
 } from '../api/recipes.api';
 import type { Ingredient, RecipeIngredientLine, RecipeListParams } from '../types/recipe.types';
+import { FOOD_NAME_MAX } from '../types/recipe.schemas';
 import { masterKeys, recipeKeys } from './recipeKeys';
 
 /** Không thử lại lỗi 4xx; 5xx thử lại 1 lần. */
@@ -77,6 +80,30 @@ export function useCategories() {
     queryKey: masterKeys.categories(),
     queryFn: listCategories,
     staleTime: 60 * 60 * 1000,
+    retry: retryServerErrorsOnce,
+  });
+}
+
+/** Gợi ý món ăn (GET /foods/search); `enabled` = ô chọn món đang mở. Từ khóa rỗng vẫn gọi để gợi ý món phổ biến. */
+export function useFoodSearch(keyword: string, enabled: boolean) {
+  const term = keyword.trim().slice(0, FOOD_NAME_MAX);
+  return useQuery({
+    queryKey: masterKeys.foodSearch(term),
+    queryFn: () => searchFoods(term),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: retryServerErrorsOnce,
+  });
+}
+
+/** Một món ăn (GET /foods/{id}); id không hợp lệ thì không gọi. */
+export function useFood(id: number | null | undefined) {
+  return useQuery({
+    queryKey: masterKeys.food(id ?? 0),
+    queryFn: () => getFood(id as number),
+    enabled: Number.isInteger(id) && (id as number) > 0,
+    staleTime: 30 * 60 * 1000,
     retry: retryServerErrorsOnce,
   });
 }

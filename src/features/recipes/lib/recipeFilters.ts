@@ -14,6 +14,8 @@ const SORTS: RecipeSort[] = ['POPULAR', 'NEWEST'];
 /** Bộ lọc kho công thức (SCR-11), đọc/ghi qua query string để chia sẻ được đường dẫn. */
 export interface RecipeFilters {
   keyword: string;
+  /** Công thức của một món ăn (Foods); `?food=` trên URL. */
+  foodId: number | null;
   ingredient: string;
   dietarySchoolId: number | null;
   categoryId: number | null;
@@ -25,6 +27,7 @@ export interface RecipeFilters {
 
 export const DEFAULT_RECIPE_FILTERS: RecipeFilters = {
   keyword: '',
+  foodId: null,
   ingredient: '',
   dietarySchoolId: null,
   categoryId: null,
@@ -45,6 +48,7 @@ export function parseRecipeFilters(search: URLSearchParams): RecipeFilters {
   const sort = search.get('sort') as RecipeSort | null;
   return {
     keyword: (search.get('q') ?? '').trim().slice(0, KEYWORD_MAX),
+    foodId: positiveInt(search.get('food')),
     ingredient: (search.get('ingredient') ?? '').trim().slice(0, INGREDIENT_MAX),
     dietarySchoolId: positiveInt(search.get('school')),
     categoryId: positiveInt(search.get('category')),
@@ -59,6 +63,7 @@ export function parseRecipeFilters(search: URLSearchParams): RecipeFilters {
 export function serializeRecipeFilters(filters: RecipeFilters): URLSearchParams {
   const out = new URLSearchParams();
   if (filters.keyword) out.set('q', filters.keyword);
+  if (filters.foodId) out.set('food', String(filters.foodId));
   if (filters.ingredient) out.set('ingredient', filters.ingredient);
   if (filters.dietarySchoolId) out.set('school', String(filters.dietarySchoolId));
   if (filters.categoryId) out.set('category', String(filters.categoryId));
@@ -73,6 +78,7 @@ export function serializeRecipeFilters(filters: RecipeFilters): URLSearchParams 
 export function toListParams(filters: RecipeFilters): RecipeListParams {
   return {
     ...(filters.keyword ? { keyword: filters.keyword } : {}),
+    ...(filters.foodId ? { foodId: filters.foodId } : {}),
     ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
     ...(filters.dietarySchoolId ? { dietarySchoolId: filters.dietarySchoolId } : {}),
     ...(filters.ingredient ? { ingredient: filters.ingredient } : {}),
@@ -88,6 +94,7 @@ export function toListParams(filters: RecipeFilters): RecipeListParams {
 export const hasActiveRecipeFilters = (filters: RecipeFilters) =>
   Boolean(
     filters.keyword ||
+      filters.foodId ||
       filters.ingredient ||
       filters.dietarySchoolId ||
       filters.categoryId ||

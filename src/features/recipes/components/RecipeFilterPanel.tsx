@@ -10,7 +10,9 @@ import {
   hasActiveRecipeFilters,
   type RecipeFilters,
 } from '../lib/recipeFilters';
+import { useFood } from '../hooks/useRecipes';
 import type { DietarySchool, FoodCategory, RecipeContentType, RecipeSort } from '../types/recipe.types';
+import { FoodCombobox, type FoodValue } from './FoodCombobox';
 
 interface RecipeFilterPanelProps {
   filters: RecipeFilters;
@@ -34,14 +36,28 @@ const SORT_OPTIONS: { value: RecipeSort; label: string }[] = [
 const LABEL = 'font-label-sm text-label-sm text-on-surface-variant';
 const SELECT = cn(INPUT_CLASS, 'h-11 cursor-pointer py-0 pr-8');
 
-/** Bảng lọc SCR-11: từ khóa, nguyên liệu, trường phái, danh mục, thời gian nấu, định dạng, sắp xếp (FN-POST-01). */
+/**
+ * Bảng lọc SCR-11: từ khóa (tên/mô tả công thức), món ăn, nguyên liệu, trường phái, danh mục, thời gian nấu, định dạng,
+ * sắp xếp (FN-POST-01). Từ khóa chỉ tìm trong tên và mô tả công thức; muốn xem mọi công thức của một món thì lọc theo món.
+ */
 export const RecipeFilterPanel: React.FC<RecipeFilterPanelProps> = ({ filters, schools, categories, onChange, onReset }) => {
   const [keyword, setKeyword] = useState(filters.keyword);
   const [ingredient, setIngredient] = useState(filters.ingredient);
+  const food = useFood(filters.foodId);
+  const foodName = filters.foodId ? food.data?.foodName : undefined;
+  const [foodInput, setFoodInput] = useState<FoodValue>({ foodId: filters.foodId, foodName: foodName ?? '' });
 
   // URL đổi (quay lại, xóa bộ lọc) thì ô nhập theo URL.
   useEffect(() => setKeyword(filters.keyword), [filters.keyword]);
   useEffect(() => setIngredient(filters.ingredient), [filters.ingredient]);
+  useEffect(() => setFoodInput({ foodId: filters.foodId, foodName: foodName ?? '' }), [filters.foodId, foodName]);
+
+  /** Chọn món thì lọc ngay; xóa trắng ô thì bỏ lọc món; đang gõ dở thì chưa lọc. */
+  const changeFood = (next: FoodValue) => {
+    setFoodInput(next);
+    if (next.foodId !== null) onChange({ foodId: next.foodId });
+    else if (!next.foodName.trim() && filters.foodId) onChange({ foodId: null });
+  };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -52,6 +68,7 @@ export const RecipeFilterPanel: React.FC<RecipeFilterPanelProps> = ({ filters, s
   const categoryName = categories?.find((c) => c.categoryId === filters.categoryId)?.categoryName;
   const chips = [
     filters.keyword && { key: 'keyword', label: `“${filters.keyword}”`, clear: { keyword: '' } },
+    filters.foodId && { key: 'food', label: `Món: ${foodName ?? '…'}`, clear: { foodId: null } },
     filters.ingredient && { key: 'ingredient', label: `Có ${filters.ingredient}`, clear: { ingredient: '' } },
     filters.dietarySchoolId && { key: 'school', label: schoolName ?? 'Trường phái', clear: { dietarySchoolId: null } },
     filters.categoryId && { key: 'category', label: categoryName ?? 'Danh mục', clear: { categoryId: null } },
@@ -68,7 +85,7 @@ export const RecipeFilterPanel: React.FC<RecipeFilterPanelProps> = ({ filters, s
       <form role="search" onSubmit={submit} className="flex flex-col gap-space-sm md:flex-row">
         <div className="relative min-w-0 flex-[2]">
           <label htmlFor="recipe-keyword" className="sr-only">
-            Tìm theo tên món
+            Tìm công thức theo tên hoặc mô tả
           </label>
           <Icon name="search" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[20px] text-outline" />
           <input
@@ -77,10 +94,16 @@ export const RecipeFilterPanel: React.FC<RecipeFilterPanelProps> = ({ filters, s
             value={keyword}
             maxLength={KEYWORD_MAX}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="Tìm món chay (VD: canh nấm, đậu hũ kho)…"
+            placeholder="Tìm công thức (VD: canh nấm, đậu hũ kho)…"
             enterKeyHint="search"
             className={cn(INPUT_CLASS, 'h-11 pl-10')}
           />
+        </div>
+        <div className="min-w-0 flex-1">
+          <label htmlFor="recipe-food-filter" className="sr-only">
+            Lọc theo món ăn
+          </label>
+          <FoodCombobox id="recipe-food-filter" value={foodInput} onChange={changeFood} placeholder="Món ăn…" />
         </div>
         <div className="relative min-w-0 flex-1">
           <label htmlFor="recipe-ingredient" className="sr-only">

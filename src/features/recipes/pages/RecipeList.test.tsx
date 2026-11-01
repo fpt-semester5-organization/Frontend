@@ -73,7 +73,7 @@ describe('RecipeList (SCR-11)', () => {
       page: 2,
       size: 12,
     });
-    expect(screen.getByRole('searchbox', { name: 'Tìm theo tên món' })).toHaveValue('canh');
+    expect(screen.getByRole('searchbox', { name: 'Tìm công thức theo tên hoặc mô tả' })).toHaveValue('canh');
     expect(await screen.findByRole('button', { name: 'Bỏ lọc Thuần chay' })).toBeInTheDocument();
   });
 
@@ -93,11 +93,58 @@ describe('RecipeList (SCR-11)', () => {
     await userEvent.selectOptions(screen.getByLabelText('Thời gian nấu'), '30');
     await waitFor(() => expect(recipeCalls(calls).at(-1)).toMatchObject({ dietarySchoolId: 1, maxCookTime: 30, page: 1 }));
 
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Tìm theo tên món' }), 'đậu hũ');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Tìm công thức theo tên hoặc mô tả' }), 'đậu hũ');
     await userEvent.type(screen.getByRole('searchbox', { name: 'Có nguyên liệu' }), 'nấm');
     await userEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
     await waitFor(() => expect(recipeCalls(calls).at(-1)).toMatchObject({ keyword: 'đậu hũ', ingredient: 'nấm', page: 1 }));
     expect(await screen.findByRole('heading', { name: 'Kết quả cho “đậu hũ”' })).toBeInTheDocument();
+  });
+
+  it('thẻ công thức hiện món ăn (tên chung) phía trên tên công thức', async () => {
+    mockRecipesApi((req) =>
+      req.url === '/recipes'
+        ? { data: [listItem(1, { foodId: 7, foodName: 'Đậu phụ chiên sả', title: 'Đậu phụ chiên sả ớt kiểu Huế' })], meta: { page: 1, size: 12, total: 1 } }
+        : undefined
+    );
+    renderPage(<RecipeList />, { route: '/recipes' });
+    const card = (await screen.findByRole('link', { name: 'Đậu phụ chiên sả ớt kiểu Huế' })).closest('article')!;
+    expect(within(card).getByText('Đậu phụ chiên sả')).toBeInTheDocument();
+  });
+
+  it('lọc theo món ăn: link ?food= gửi foodId, hiện tên món trên ô lọc và chip bỏ lọc', async () => {
+    const calls = mockRecipesApi(pagedRecipes);
+    renderPage(
+      <>
+        <RecipeList />
+        <LocationProbe />
+      </>,
+      { route: '/recipes?food=7' }
+    );
+    await screen.findByText('Món chay số 1');
+    expect(recipeCalls(calls)[0]).toMatchObject({ foodId: 7 });
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Lọc theo món ăn' })).toHaveValue('Đậu phụ chiên sả'));
+    await userEvent.click(screen.getByRole('button', { name: 'Bỏ lọc Món: Đậu phụ chiên sả' }));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(recipeCalls(calls).at(-1)).not.toHaveProperty('foodId'));
+  });
+
+  it('chọn món trong ô lọc thì lọc ngay theo món đó', async () => {
+    const calls = mockRecipesApi(pagedRecipes);
+    renderPage(
+      <>
+        <RecipeList />
+        <LocationProbe />
+      </>,
+      { route: '/recipes' }
+    );
+    await screen.findByText('Món chay số 1');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Lọc theo món ăn' }), 'cháo');
+    const option = await screen.findByRole('option', { name: 'Cháo đậu xanh' });
+    // Bộ lọc kho công thức chỉ chọn món có sẵn, không có dòng "Thêm món mới".
+    expect(screen.queryByRole('option', { name: /Thêm món mới/ })).not.toBeInTheDocument();
+    await userEvent.click(option);
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?food=3'));
+    await waitFor(() => expect(recipeCalls(calls).at(-1)).toMatchObject({ foodId: 3, page: 1 }));
   });
 
   it('bấm số trang thì tải trang đó', async () => {

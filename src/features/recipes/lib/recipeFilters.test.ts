@@ -15,10 +15,11 @@ describe('parseRecipeFilters', () => {
 
   it('đọc đủ các tham số hợp lệ', () => {
     const f = parseRecipeFilters(
-      new URLSearchParams('q= canh &ingredient=nấm&school=1&category=2&time=30&type=VIDEO&sort=NEWEST&page=3')
+      new URLSearchParams('q= canh &food=7&ingredient=nấm&school=1&category=2&time=30&type=VIDEO&sort=NEWEST&page=3')
     );
     expect(f).toEqual({
       keyword: 'canh',
+      foodId: 7,
       ingredient: 'nấm',
       dietarySchoolId: 1,
       categoryId: 2,
@@ -30,7 +31,7 @@ describe('parseRecipeFilters', () => {
   });
 
   it('bỏ qua giá trị sai thay vì gửi 400 lên server', () => {
-    const f = parseRecipeFilters(new URLSearchParams('school=-1&category=abc&time=601&type=PODCAST&sort=RANDOM&page=0'));
+    const f = parseRecipeFilters(new URLSearchParams('food=0&school=-1&category=abc&time=601&type=PODCAST&sort=RANDOM&page=0'));
     expect(f).toEqual(DEFAULT_RECIPE_FILTERS);
   });
 
@@ -48,12 +49,16 @@ describe('serializeRecipeFilters', () => {
   });
 
   it('đọc lại được đúng bộ lọc đã ghi', () => {
-    const f = { ...DEFAULT_RECIPE_FILTERS, keyword: 'đậu hũ', categoryId: 4, contentType: 'RECIPE' as const, page: 5 };
+    const f = { ...DEFAULT_RECIPE_FILTERS, keyword: 'đậu hũ', foodId: 7, categoryId: 4, contentType: 'RECIPE' as const, page: 5 };
     expect(parseRecipeFilters(serializeRecipeFilters(f))).toEqual(f);
   });
 });
 
 describe('toListParams', () => {
+  it('lọc theo món ăn gửi foodId (GET /recipes?foodId=)', () => {
+    expect(toListParams({ ...DEFAULT_RECIPE_FILTERS, foodId: 7 })).toMatchObject({ foodId: 7 });
+  });
+
   it('bỏ trường rỗng, luôn có sort, contentType, page, size', () => {
     expect(toListParams({ ...DEFAULT_RECIPE_FILTERS, ingredient: 'nấm', page: 2 })).toEqual({
       ingredient: 'nấm',
@@ -69,5 +74,6 @@ describe('hasActiveRecipeFilters', () => {
   it('sắp xếp và số trang không tính là đang lọc', () => {
     expect(hasActiveRecipeFilters({ ...DEFAULT_RECIPE_FILTERS, sort: 'NEWEST', page: 4 })).toBe(false);
     expect(hasActiveRecipeFilters({ ...DEFAULT_RECIPE_FILTERS, categoryId: 1 })).toBe(true);
+    expect(hasActiveRecipeFilters({ ...DEFAULT_RECIPE_FILTERS, foodId: 7 })).toBe(true);
   });
 });

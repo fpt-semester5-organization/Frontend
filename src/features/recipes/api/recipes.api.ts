@@ -5,6 +5,7 @@ import type {
   DeleteRecipeMode,
   DeleteRecipeResult,
   DietarySchool,
+  Food,
   FoodCategory,
   Ingredient,
   IngredientListParams,
@@ -49,6 +50,21 @@ export async function getRecipe(id: number): Promise<RecipeDetail> {
 export async function listRelatedRecipes(id: number, limit = 6): Promise<RelatedRecipe[]> {
   const res = await http.get<ApiEnvelope<{ recipes?: RelatedRecipe[] }>>(`/recipes/${id}/related`, { params: { limit } });
   return Array.isArray(res.data.data?.recipes) ? res.data.data.recipes : [];
+}
+
+/**
+ * GET /foods/search?q= — gợi ý món ăn cho ô chọn món khi soạn công thức và bộ lọc kho công thức.
+ * Backend tìm theo tên chứa từ khóa, tối đa 10 món; từ khóa rỗng trả 10 món đầu theo bảng chữ cái.
+ */
+export async function searchFoods(keyword: string): Promise<Food[]> {
+  const res = await http.get<ApiEnvelope<Food[]>>('/foods/search', { params: { q: keyword } });
+  return Array.isArray(res.data.data) ? res.data.data : [];
+}
+
+/** GET /foods/{id} — tên món để hiện trên bộ lọc khi mở link `?food=`. */
+export async function getFood(id: number): Promise<Food> {
+  const res = await http.get<ApiEnvelope<Food>>(`/foods/${id}`);
+  return res.data.data;
 }
 
 /** GET /dietary-schools — FN-PROF-08 danh mục 07 trường phái. */

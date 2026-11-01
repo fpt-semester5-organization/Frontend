@@ -2,9 +2,27 @@ import type { ApiOperations, DeepRequired, Schemas } from '@/api/types';
 
 // Mọi type lấy từ src/api/generated (sinh từ docs/08. OpenAPI); chỉ bổ sung chỗ OpenAPI bỏ trống.
 
+/**
+ * Món ăn (Foods, Backend #86 ngày 30/10/2026): khái niệm chung như "Bún bò Huế chay", một món có nhiều công thức.
+ * Công thức (Recipes) là cách nấu cụ thể, có tên riêng (`title`) và trỏ về món qua `foodId`.
+ * OpenAPI (docs/08) chưa có các trường này; lấy theo Backend develop d937976.
+ */
+export interface Food {
+  foodId: number;
+  foodName: string;
+  categoryId: number;
+}
+
+/** Trường món ăn trong công thức; công thức tạo trước khi có bảng Foods thì không có (null). */
+export interface RecipeFoodFields {
+  foodId?: number | null;
+  foodName?: string | null;
+}
+
 /** Một mục của GET /recipes (FN-POST-01): công thức hoặc video công khai. */
-export type RecipeListItem = DeepRequired<Schemas['ListRecipesResponse']['data'][number]>;
-export type RecipeListParams = NonNullable<ApiOperations['listRecipes']['parameters']['query']>;
+export type RecipeListItem = DeepRequired<Schemas['ListRecipesResponse']['data'][number]> & RecipeFoodFields;
+/** `foodId`: lọc công thức của một món (Backend có, OpenAPI chưa có). */
+export type RecipeListParams = NonNullable<ApiOperations['listRecipes']['parameters']['query']> & { foodId?: number };
 export type RecipeContentType = NonNullable<RecipeListParams['contentType']>;
 export type RecipeSort = NonNullable<RecipeListParams['sort']>;
 
@@ -30,7 +48,8 @@ export interface RecipeOwnerFields {
 
 /** GET /recipes/{id} (FN-POST-02). Các trường không bắt buộc của công thức có thể rỗng. */
 export type RecipeDetail = Omit<RecipeDetailRaw, 'imageUrl' | 'description' | 'servings' | 'prepTimeMinutes' | 'ingredients'> &
-  RecipeOwnerFields & {
+  RecipeOwnerFields &
+  RecipeFoodFields & {
     imageUrl: string | null;
     description: string | null;
     servings: number | null;
@@ -68,9 +87,14 @@ export interface RecipeIngredientInput {
   isOptional?: boolean;
 }
 
-/** POST /recipes (FN-POST-03). */
+/**
+ * POST /recipes (FN-POST-03). Món ăn gửi `foodId` (chọn món có sẵn) hoặc `foodName` (món mới: Backend tự tạo,
+ * trùng tên không phân biệt hoa thường thì dùng món đã có).
+ */
 export type CreateRecipeBody = Omit<Schemas['CreateRecipeRequest'], 'ingredients'> & {
   ingredients: RecipeIngredientInput[];
+  foodId?: number;
+  foodName?: string;
 };
 
 /**
@@ -81,7 +105,7 @@ export type CreateRecipeBody = Omit<Schemas['CreateRecipeRequest'], 'ingredients
 export type UpdateRecipeBody = Partial<CreateRecipeBody>;
 
 export type DifficultyLevel = NonNullable<CreateRecipeBody['difficultyLevel']>;
-export type RecipeSaveResult = DeepRequired<Schemas['CreateRecipeResponse']['data']>;
+export type RecipeSaveResult = DeepRequired<Schemas['CreateRecipeResponse']['data']> & RecipeFoodFields;
 export type RecipeUpdateResult = DeepRequired<Schemas['UpdateRecipeResponse']['data']>;
 
 /** Recipes.Status theo vòng đời BR-ADM-CNT-001. */

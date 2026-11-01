@@ -5,6 +5,8 @@ import type { CreateRecipeBody, DietarySchool, DifficultyLevel, Ingredient, Reci
 
 export const RECIPE_TITLE_MIN = 10;
 export const RECIPE_TITLE_MAX = 100;
+/** Foods.Food_Name là NVARCHAR(150). */
+export const FOOD_NAME_MAX = 150;
 export const RECIPE_DESCRIPTION_MAX = 1000;
 export const RECIPE_STEPS_MIN = 2;
 /** Ingredients.Standard_Unit là NVARCHAR(20) (Data Dictionary). */
@@ -35,11 +37,22 @@ const ingredientRowSchema = z.object({
 });
 
 export const recipeFormSchema = z.object({
+  /**
+   * Món ăn (Foods) mà công thức thuộc về. `foodId` có khi chọn món có sẵn; null là món mới (gửi `foodName`, Backend tự tạo).
+   * Backend cho phép bỏ trống để tương thích dữ liệu cũ, nhưng công thức mới bắt buộc chọn món để gom được các công thức cùng món.
+   */
+  foodId: z.number().int().positive().nullable(),
+  foodName: z
+    .string()
+    .trim()
+    .min(1, 'Chọn món ăn có sẵn hoặc nhập tên món mới.')
+    .max(FOOD_NAME_MAX, `Tên món ăn tối đa ${FOOD_NAME_MAX} ký tự.`),
+  /** Tên riêng của công thức (Recipes.Title), khác tên món ăn. */
   title: z
     .string()
     .trim()
-    .min(RECIPE_TITLE_MIN, `Tên món cần ít nhất ${RECIPE_TITLE_MIN} ký tự.`)
-    .max(RECIPE_TITLE_MAX, `Tên món tối đa ${RECIPE_TITLE_MAX} ký tự.`),
+    .min(RECIPE_TITLE_MIN, `Tên công thức cần ít nhất ${RECIPE_TITLE_MIN} ký tự.`)
+    .max(RECIPE_TITLE_MAX, `Tên công thức tối đa ${RECIPE_TITLE_MAX} ký tự.`),
   dietarySchoolId: z.string().refine((value) => isWhole(value, 1), 'Vui lòng chọn trường phái ăn chay.'),
   categoryId: z.string().refine((value) => isWhole(value, 1), 'Vui lòng chọn danh mục món.'),
   description: z.string().trim().max(RECIPE_DESCRIPTION_MAX, `Mô tả tối đa ${RECIPE_DESCRIPTION_MAX} ký tự.`),
@@ -78,6 +91,8 @@ export const emptyIngredientRow = (): IngredientRowValues => ({
 });
 
 export const EMPTY_RECIPE_FORM: RecipeFormValues = {
+  foodId: null,
+  foodName: '',
   title: '',
   dietarySchoolId: '',
   categoryId: '',
@@ -90,9 +105,14 @@ export const EMPTY_RECIPE_FORM: RecipeFormValues = {
   instructions: [{ text: '' }, { text: '' }],
 };
 
+/** Món ăn gửi lên: món có sẵn gửi `foodId`, món mới gửi `foodName` để Backend tạo. */
+export const toFoodBody = (values: Pick<RecipeFormValues, 'foodId' | 'foodName'>): Pick<CreateRecipeBody, 'foodId' | 'foodName'> =>
+  values.foodId ? { foodId: values.foodId } : { foodName: values.foodName.trim() };
+
 /** Form → thân POST/PUT /recipes; trường tùy chọn để trống thì không gửi. */
 export function toRecipeBody(values: RecipeFormValues, submit: boolean): CreateRecipeBody {
   return {
+    ...toFoodBody(values),
     title: values.title.trim(),
     categoryId: Number(values.categoryId),
     dietarySchoolId: Number(values.dietarySchoolId),
@@ -123,6 +143,7 @@ export function toUpdateBody(
 ): UpdateRecipeBody {
   const full = toRecipeBody(values, false);
   const body: UpdateRecipeBody = {};
+  if (dirty.foodId || dirty.foodName) Object.assign(body, toFoodBody(values));
   if (dirty.title) body.title = full.title;
   if (dirty.categoryId) body.categoryId = full.categoryId;
   if (dirty.dietarySchoolId) body.dietarySchoolId = full.dietarySchoolId;
@@ -142,6 +163,8 @@ export function toFormValues(recipe: RecipeDetail, infos: Map<number, Ingredient
   const steps = recipe.instructions.map((text) => ({ text }));
   while (steps.length < RECIPE_STEPS_MIN) steps.push({ text: '' });
   return {
+    foodId: recipe.foodId ?? null,
+    foodName: recipe.foodName ?? '',
     title: recipe.title,
     dietarySchoolId: recipe.dietarySchoolId ? String(recipe.dietarySchoolId) : '',
     categoryId: recipe.categoryId ? String(recipe.categoryId) : '',
