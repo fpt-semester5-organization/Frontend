@@ -16,7 +16,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api/v1/ai-stt': {
-        target: 'http://127.0.0.1:8082',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/v1\/ai-stt/, ''),
@@ -25,7 +25,7 @@ export default defineConfig({
         },
       },
       '/ai-stt': {
-        target: 'http://127.0.0.1:8082',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/ai-stt/, ''),

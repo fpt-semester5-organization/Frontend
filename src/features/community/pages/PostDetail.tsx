@@ -14,9 +14,10 @@ import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { SyncedVideoScriptPlayer } from '@/features/videos/components/SyncedVideoScriptPlayer';
 import { useVideoTranscript } from '@/features/videos/hooks/useVideoTranscript';
-import { extractVideoDirectlyWithAi } from '@/features/videos/api/videos.api';
+import { extractAndSaveVideoRecipe } from '@/features/videos/api/videos.api';
 import { splitRawTranscriptToSegments } from '@/features/videos/lib/sampleTranscripts';
 import type { TranscriptSegment } from '@/features/videos/types/transcript.types';
+import type { ExtractedRecipe } from '@/features/videos/types/video.types';
 import type { PostVideoAttachment } from '../types/community.types';
 import { CommentSection } from '../components/CommentSection';
 import { LinkedRecipes } from '../components/PostAttachments';
@@ -54,7 +55,7 @@ interface PostDetailMediaProps {
 
 /**
  * Hiển thị media chính của bài viết chi tiết:
- * - Nếu bài viết có video: hiển thị SyncedVideoScriptPlayer (đồng bộ kịch bản lời thoại từ CSDL/AI) thay thế ảnh tĩnh.
+ * - Nếu bài viết có video: hiển thị SyncedVideoScriptPlayer kèm công thức tóm tắt tự động tải từ CSDL hoặc bóc tách 1 lần và lưu Backend.
  * - Nếu là bài viết ảnh thông thường: hiển thị ảnh minh họa.
  */
 const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, video }) => {
@@ -68,18 +69,23 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
   });
 
   const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
+  const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
 
+  // Chỉ gọi AI STT đúng 1 lần nếu CSDL Backend chưa có, sau đó tự động LƯU XUỐNG BACKEND luôn
   useEffect(() => {
     if (videoUrl && !isTranscriptLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
-      extractVideoDirectlyWithAi(videoUrl)
+      extractAndSaveVideoRecipe(videoId, videoUrl)
         .then((res) => {
           if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
+          if (res.recipe) setAiLiveRecipe(res.recipe);
         })
         .catch((err) => {
           console.warn('AI STT direct call error in PostDetail:', err);
         });
     }
-  }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript]);
+  }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript, videoId]);
+
+  const activeRecipe = transcriptData?.transcript?.extractedRecipe || aiLiveRecipe;
 
   const { activeSegments, transcriptSource } = useMemo(() => {
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
@@ -90,7 +96,7 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
           end: s.end,
           text: s.text,
         })),
-        transcriptSource: 'CSDL VeggieLife (Đồng bộ)',
+        transcriptSource: 'CSDL VeggieLife (Đã lưu)',
       };
     }
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.rawTranscript) {
@@ -107,7 +113,7 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
       if (parsed.length > 0) {
         return {
           activeSegments: parsed,
-          transcriptSource: 'AI Faster-Whisper Live',
+          transcriptSource: 'AI Faster-Whisper (Đã lưu CSDL)',
         };
       }
     }
@@ -126,6 +132,8 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
           posterUrl={video.thumbnailUrl || imageUrl}
           title={title}
           segments={activeSegments}
+          recipe={activeRecipe}
+          rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
           autoPlay={true}
           onDurationChange={setDuration}
           subtitleSource={transcriptSource}

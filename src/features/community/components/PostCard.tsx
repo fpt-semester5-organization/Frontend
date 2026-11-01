@@ -8,8 +8,9 @@ import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
 import { SyncedVideoScriptPlayer } from '@/features/videos/components/SyncedVideoScriptPlayer';
 import { useVideoTranscript } from '@/features/videos/hooks/useVideoTranscript';
-import { extractVideoDirectlyWithAi } from '@/features/videos/api/videos.api';
+import { extractAndSaveVideoRecipe } from '@/features/videos/api/videos.api';
 import type { TranscriptSegment } from '@/features/videos/types/transcript.types';
+import type { ExtractedRecipe } from '@/features/videos/types/video.types';
 import { splitRawTranscriptToSegments } from '@/features/videos/lib/sampleTranscripts';
 import type { CommunityFeedItem, PostListItem } from '../types/community.types';
 import { VoteButton } from './VoteButton';
@@ -92,9 +93,9 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
     });
 
     const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
+    const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
 
-    // Kích hoạt gọi AI STT Microservice trực tiếp (/api/v1/ai-stt/stt/video-to-recipe)
-    // khi xem video mà CSDL chưa có hoặc đang chờ
+    // Kích hoạt gọi AI STT đúng 1 lần nếu CSDL chưa có, tự động LƯU XUỐNG BACKEND luôn
     useEffect(() => {
       if (
         isVideo &&
@@ -104,17 +105,20 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
         !transcriptData?.transcript?.rawTranscript &&
         !aiLiveTranscript
       ) {
-        extractVideoDirectlyWithAi(activeVideoUrl)
+        extractAndSaveVideoRecipe(resolvedVideoId ?? 0, activeVideoUrl)
           .then((res) => {
             if (res.rawTranscript) {
               setAiLiveTranscript(res.rawTranscript);
             }
+            if (res.recipe) {
+              setAiLiveRecipe(res.recipe);
+            }
           })
           .catch((err) => {
-            console.warn('AI STT direct call error:', err);
+            console.warn('AI STT direct call error in PostCard:', err);
           });
       }
-    }, [isVideo, showSyncedVideo, activeVideoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript]);
+    }, [isVideo, showSyncedVideo, activeVideoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript, resolvedVideoId]);
 
     const { activeSegments, transcriptSource } = React.useMemo(() => {
       // 1. Phân đoạn thời gian từ Database (/api/v1/videos/{id}/transcript)
@@ -213,6 +217,8 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
                   posterUrl={imageUrl || undefined}
                   title={title}
                   segments={activeSegments}
+                  recipe={transcriptData?.transcript?.extractedRecipe || aiLiveRecipe}
+                  rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
                   autoPlay={true}
                   onClose={() => setShowSyncedVideo(false)}
                   onDurationChange={setVideoDuration}
