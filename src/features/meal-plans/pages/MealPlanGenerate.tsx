@@ -218,6 +218,7 @@ export const MealPlanGenerate: React.FC = () => {
     createPlan.mutate(
       {
         startDate: values.startDate,
+        durationDays: values.numberOfDays,
         numberOfDays: values.numberOfDays,
         budgetTier: values.budgetTier,
         useFridge: values.useFridge,
