@@ -9,6 +9,8 @@ import { formatNumber } from '@/lib/format';
 import { notifySuccess } from '@/lib/notify';
 import { AdminPageHeader, AdminQueryError, CARD, CONTROL, ServerMessageDialog, StatRow, StatusBadge, TD, TH, TableShell } from '../components/AdminUi';
 import { CostLegend, CostTable, DailyCostChart, FeatureCostBars } from '../components/CostChart';
+import { TopSpendersCard } from '../components/TopSpendersCard';
+import { LlmopsLogTable } from '../components/LlmopsLogTable';
 import { useAiMetrics, useKnowledgeStatus, useLlmopsDashboard, useReindexKnowledge } from '../hooks/useAdminAi';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { AI_MODULE_LABEL, CIRCUIT_STATE, KNOWLEDGE_SCOPE_LABEL, KNOWLEDGE_SOURCE_LABEL, aiModuleLabel } from '../lib/labels';
@@ -104,6 +106,7 @@ const AdminAiPage: React.FC = () => {
 
 const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
   const dashboard = useLlmopsDashboard({ from, to });
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
   const [view, setView] = useState<'day' | 'feature'>('day');
   const [showTable, setShowTable] = useState(false);
   const matrix = useMemo(() => buildCostMatrix(dashboard.data?.series ?? []), [dashboard.data]);
@@ -133,6 +136,12 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
   const level = budgetLevel(data.usagePercent);
   const meterColor = level === 'throttled' ? 'bg-error' : level === 'warning' ? 'bg-warning' : 'bg-primary';
 
+  const promptTokens = data.totalPromptTokens ?? 0;
+  const completionTokens = data.totalCompletionTokens ?? 0;
+  const hasTokenBreakdown = promptTokens + completionTokens > 0;
+  const promptPercent = hasTokenBreakdown ? (promptTokens / (promptTokens + completionTokens)) * 100 : 0;
+  const completionPercent = hasTokenBreakdown ? (completionTokens / (promptTokens + completionTokens)) * 100 : 0;
+
   return (
     <section aria-labelledby="cost-title" className={cn('flex flex-col gap-space-md', dashboard.isPlaceholderData && 'opacity-60 transition-opacity')}>
       <h2 id="cost-title" className="font-headline-sm text-headline-sm text-on-surface">
@@ -147,7 +156,9 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
         </FormAlert>
       )}
 
+      {/* 3 Thẻ thống kê chính */}
       <div className="grid gap-space-md sm:grid-cols-3">
+        {/* Thẻ 1: Chi phí hôm nay */}
         <div className={cn(CARD, 'flex flex-col gap-2 p-space-md')}>
           <p className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay</p>
           <p className="font-headline-md text-headline-md text-on-surface">{formatUsd(data.todayCostUsd)}</p>
@@ -167,65 +178,156 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
             {formatNumber(data.usagePercent)}% của ngân sách {formatUsd(data.dailyBudgetUsd)}/ngày
           </p>
         </div>
+
+        {/* Thẻ 2: Tổng chi phí trong kỳ */}
         <div className={cn(CARD, 'flex flex-col gap-1 p-space-md')}>
           <p className="font-label-md text-label-md text-on-surface-variant">Tổng chi phí trong kỳ</p>
           <p className="font-headline-md text-headline-md text-on-surface">{formatUsd(matrix.total.costUsd)}</p>
           <p className="font-body-sm text-body-sm text-on-surface-variant">{matrix.dates.length} ngày có dữ liệu</p>
         </div>
+
+        {/* Thẻ 3: Token trong kỳ (kèm phân rã Input vs Output) */}
         <div className={cn(CARD, 'flex flex-col gap-1 p-space-md')}>
           <p className="font-label-md text-label-md text-on-surface-variant">Token trong kỳ</p>
           <p className="font-headline-md text-headline-md text-on-surface">{formatTokens(matrix.total.tokens)}</p>
           <p className="font-body-sm text-body-sm text-on-surface-variant">{formatNumber(matrix.total.tokens)} token</p>
-        </div>
-      </div>
-
-      <div className={cn(CARD, 'flex flex-col gap-space-md p-space-md sm:p-space-lg')}>
-        <div className="flex flex-wrap items-center justify-between gap-space-sm">
-          <h3 className="font-label-lg text-label-lg text-on-surface">{view === 'day' ? 'Chi phí theo ngày (USD)' : 'Chi phí theo tính năng (USD, cả kỳ)'}</h3>
-          <div role="group" aria-label="Cách xem" className="flex rounded-lg bg-surface-container p-0.5">
-            {(['day', 'feature'] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={view === option}
-                onClick={() => setView(option)}
-                className={cn(
-                  'rounded-md px-3 py-1.5 font-label-md text-label-md transition-colors',
-                  view === option ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
-                )}
+          {hasTokenBreakdown && (
+            <div className="mt-2 flex flex-col gap-1.5 border-t border-surface-container pt-2">
+              <div
+                role="progressbar"
+                aria-label="Tỷ lệ Input vs Output"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={100}
+                className="flex h-2 w-full overflow-hidden rounded-full bg-surface-container"
               >
-                {option === 'day' ? 'Theo ngày' : 'Theo tính năng'}
-              </button>
-            ))}
-          </div>
+                <div
+                  title={`Input: ${promptPercent.toFixed(1)}%`}
+                  style={{ width: `${promptPercent}%` }}
+                  className="h-full bg-info transition-all"
+                />
+                <div
+                  title={`Output: ${completionPercent.toFixed(1)}%`}
+                  style={{ width: `${completionPercent}%` }}
+                  className="h-full bg-secondary transition-all"
+                />
+              </div>
+              <div className="flex items-center justify-between font-body-xs text-body-xs text-on-surface-variant">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-info" />
+                  Input: {formatTokens(promptTokens)} ({formatUsd(data.promptCostUsd ?? 0)})
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-secondary" />
+                  Output: {formatTokens(completionTokens)} ({formatUsd(data.completionCostUsd ?? 0)})
+                </span>
+              </div>
+            </div>
+          )}
         </div>
-
-        {data.series.length === 0 ? (
-          <EmptyState icon="query_stats" title="Chưa có dữ liệu chi phí" description="Không có lượt gọi AI nào trong khoảng thời gian đã chọn. Thử chọn khoảng dài hơn." />
-        ) : view === 'day' ? (
-          <>
-            <CostLegend features={matrix.features} />
-            <DailyCostChart matrix={matrix} dailyBudgetUsd={data.dailyBudgetUsd} />
-          </>
-        ) : (
-          <FeatureCostBars matrix={matrix} />
-        )}
-
-        {data.series.length > 0 && (
-          <div className="flex flex-col gap-space-sm">
-            <button
-              type="button"
-              aria-expanded={showTable}
-              onClick={() => setShowTable((value) => !value)}
-              className="inline-flex items-center gap-1 self-start font-label-md text-label-md text-primary"
-            >
-              <Icon name={showTable ? 'expand_less' : 'table_view'} className="text-[18px]" />
-              {showTable ? 'Ẩn bảng số liệu' : 'Xem bảng số liệu'}
-            </button>
-            {showTable && <CostTable matrix={matrix} />}
-          </div>
-        )}
       </div>
+
+      {/* Tabs chuyển đổi giữa Tổng quan & Biểu đồ và Nhật ký cuộc gọi */}
+      <div className="flex border-b border-surface-container gap-6">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            'flex items-center gap-2 pb-3 font-label-lg text-label-lg transition-colors border-b-2 -mb-px',
+            activeTab === 'overview'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          )}
+        >
+          <Icon name="monitoring" className="text-[20px]" />
+          Tổng quan & Biểu đồ
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'logs'}
+          onClick={() => setActiveTab('logs')}
+          className={cn(
+            'flex items-center gap-2 pb-3 font-label-lg text-label-lg transition-colors border-b-2 -mb-px',
+            activeTab === 'logs'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          )}
+        >
+          <Icon name="receipt_long" className="text-[20px]" />
+          Nhật ký cuộc gọi (Logs)
+        </button>
+      </div>
+
+      {activeTab === 'overview' ? (
+        <>
+          {/* Khối Biểu đồ chi phí */}
+          <div className={cn(CARD, 'flex flex-col gap-space-md p-space-md sm:p-space-lg')}>
+            <div className="flex flex-wrap items-center justify-between gap-space-sm">
+              <h3 className="font-label-lg text-label-lg text-on-surface">
+                {view === 'day' ? 'Chi phí theo ngày (USD)' : 'Chi phí theo tính năng (USD, cả kỳ)'}
+              </h3>
+              <div role="group" aria-label="Cách xem" className="flex rounded-lg bg-surface-container p-0.5">
+                {(['day', 'feature'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={view === option}
+                    onClick={() => setView(option)}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 font-label-md text-label-md transition-colors',
+                      view === option ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+                    )}
+                  >
+                    {option === 'day' ? 'Theo ngày' : 'Theo tính năng'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {data.series.length === 0 ? (
+              <EmptyState
+                icon="query_stats"
+                title="Chưa có dữ liệu chi phí"
+                description="Không có lượt gọi AI nào trong khoảng thời gian đã chọn. Thử chọn khoảng dài hơn."
+              />
+            ) : view === 'day' ? (
+              <>
+                <CostLegend features={matrix.features} />
+                <DailyCostChart matrix={matrix} dailyBudgetUsd={data.dailyBudgetUsd} />
+              </>
+            ) : (
+              <FeatureCostBars matrix={matrix} />
+            )}
+
+            {data.series.length > 0 && (
+              <div className="flex flex-col gap-space-sm">
+                <button
+                  type="button"
+                  aria-expanded={showTable}
+                  onClick={() => setShowTable((value) => !value)}
+                  className="inline-flex items-center gap-1 self-start font-label-md text-label-md text-primary"
+                >
+                  <Icon name={showTable ? 'expand_less' : 'table_view'} className="text-[18px]" />
+                  {showTable ? 'Ẩn bảng số liệu' : 'Xem bảng số liệu'}
+                </button>
+                {showTable && <CostTable matrix={matrix} />}
+              </div>
+            )}
+          </div>
+
+          {/* Khối Phân bổ Hạng & Top Spenders */}
+          <TopSpendersCard
+            tierDistribution={data.userTierDistribution}
+            topSpenders={data.topSpenders}
+          />
+        </>
+      ) : (
+        /* Khối Nhật ký cuộc gọi AI */
+        <LlmopsLogTable from={from} to={to} />
+      )}
     </section>
   );
 };

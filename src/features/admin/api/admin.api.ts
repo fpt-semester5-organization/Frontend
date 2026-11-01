@@ -25,6 +25,8 @@ import type {
   KnowledgeStatus,
   LlmopsDashboard,
   LlmopsFilters,
+  LlmopsLogFilters,
+  LlmopsLogsResponse,
   ReconcileBody,
   ReconcileResult,
   UpdateDietarySchoolBody,
@@ -158,6 +160,10 @@ export async function getAdminLlmopsDashboard(filters: LlmopsFilters): Promise<L
   const data = await unwrap<LlmopsDashboard>(http.get('/admin/llmops/dashboard', { params: compactParams(filters) }));
   return { ...data, series: Array.isArray(data?.series) ? data.series : [] };
 }
+
+/** GET /admin/llmops/logs — FN-ADM-16 (nhật ký AIQuotaLogs phân trang). */
+export const getAdminLlmopsLogs = (filters: LlmopsLogFilters) =>
+  unwrap<LlmopsLogsResponse>(http.get('/admin/llmops/logs', { params: compactParams(filters) }));
 
 /** GET /admin/knowledge/status — FN-CHAT-07 (trạng thái kho vector Qdrant). */
 export async function getAdminKnowledgeStatus(): Promise<KnowledgeStatus> {
