@@ -34,18 +34,18 @@ export default defineConfig({
         },
       },
       '/api': {
-        target: 'http://localhost:5137',
+        target: 'http://127.0.0.1:5137',
         changeOrigin: true,
         secure: false,
       },
       '/hubs': {
-        target: 'http://localhost:5137',
+        target: 'http://127.0.0.1:5137',
         changeOrigin: true,
         secure: false,
         ws: true,
       },
       '/swagger': {
-        target: 'http://localhost:5137',
+        target: 'http://127.0.0.1:5137',
         changeOrigin: true,
         secure: false,
       },

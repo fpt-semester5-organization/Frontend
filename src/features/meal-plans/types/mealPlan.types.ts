@@ -16,6 +16,7 @@ export type MealPlanListItem = DeepRequired<Schemas['ListMealPlansResponse']['da
 
 /** POST /meal-plans (FN-MEAL-01). */
 export type CreateMealPlanBody = Schemas['CreateMealPlanRequest'] & {
+  durationDays?: number;
   numberOfDays?: number;
 };
 
