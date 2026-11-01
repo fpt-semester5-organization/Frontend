@@ -5,7 +5,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { MEDICAL_DISCLAIMER, QUOTA } from '@/constants/quota';
 import { toApiError } from '@/lib/apiError';
 import { formatDateTime } from '@/lib/format';
-import { notifySuccess, notifyApiError, getErrorMessage } from '@/lib/notify';
+import { notifySuccess, notifyInfo, notifyApiError, getErrorMessage } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { useGuestStore } from '@/stores/guest.store';
@@ -29,28 +29,6 @@ import type { ChatMessage, ContextType } from '../types/chat.types';
  * Hỏi "màn hẹp" thay vì "màn rộng" để môi trường không có matchMedia (test) vẫn coi là màn rộng như trước.
  */
 const isNarrowScreen = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1023px)').matches;
-
-const SHORTCUTS = [
-  {
-    label: 'Dị ứng & Kiêng cữ',
-    desc: 'Cài đặt thực phẩm cần tránh',
-    to: PATHS.ME.DIETARY_PREFERENCES,
-    icon: 'no_food',
-  },
-  {
-    label: 'Mục tiêu thể trạng',
-    desc: 'Cập nhật cân nặng, calo mục tiêu',
-    to: PATHS.ME.HEALTH,
-    icon: 'monitor_heart',
-  },
-  {
-    label: 'Món chay đã lưu',
-    desc: 'Xem các công thức bạn đã lưu',
-    to: PATHS.ME.RECIPES,
-    icon: 'bookmark',
-  },
-];
-
 
 interface BentoPrompt {
   id: string;
@@ -143,7 +121,7 @@ export const ChatPage: React.FC = () => {
   const del = useDeleteSession();
 
   const [histOpen, setHistOpen] = useState(() => !isNarrowScreen());
-  const [profOpen, setProfOpen] = useState(() => !isNarrowScreen());
+  const [showMenu, setShowMenu] = useState(false);
 
   // Trạng thái tìm kiếm, lọc và ghim phiên hội thoại (phong cách Gemini)
   const [showSearch, setShowSearch] = useState(false);
@@ -197,7 +175,6 @@ export const ChatPage: React.FC = () => {
     // Màn hẹp: chọn phiên hoặc tạo cuộc trò chuyện mới thì đóng lớp phủ để thấy khung chat.
     if (isNarrowScreen()) {
       setHistOpen(false);
-      setProfOpen(false);
     }
   }, [routeId]);
 
@@ -375,28 +352,83 @@ export const ChatPage: React.FC = () => {
     });
   };
 
+  const isCurrentPinned = activeId ? pinnedIds.includes(activeId) : false;
+
+  const handleCopyChat = async () => {
+    if (messages.length === 0) return;
+    const textToCopy = messages
+      .map(
+        (m) =>
+          `[${m.senderType === 'USER' ? 'Người dùng' : 'Cố vấn Dinh dưỡng VeggieLife'} - ${formatDateTime(m.createdAt)}]\n${m.content}`
+      )
+      .join('\n\n---\n\n');
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      notifySuccess('Đã sao chép nội dung cuộc trò chuyện vào bộ nhớ tạm.');
+    } catch {
+      notifyInfo('Không thể sao chép tự động, vui lòng chọn văn bản thủ công.');
+    }
+    setShowMenu(false);
+  };
+
+  const handleDownloadChat = () => {
+    if (messages.length === 0) return;
+    const currentSession = sessions.data?.items.find((s) => s.sessionId === activeId);
+    const title = currentSession?.title || 'Phien-tu-van-dinh-duong';
+    const textToDownload = [
+      `VeggieLife - Nhật ký tư vấn dinh dưỡng chay`,
+      `Chủ đề: ${title}`,
+      `Thời gian xuất: ${new Date().toLocaleString('vi-VN')}`,
+      `============================================================\n`,
+      ...messages.map(
+        (m) =>
+          `[${m.senderType === 'USER' ? 'Người dùng' : 'Cố vấn VeggieLife'} - ${formatDateTime(m.createdAt)}]\n${m.content}\n`
+      ),
+      `============================================================`,
+      `* Lưu ý: Mọi thông tin tư vấn chỉ mang tính tham khảo dinh dưỡng thuần chay, không thay thế chẩn đoán y khoa.`,
+    ].join('\n');
+
+    const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9-]/g, '_')}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowMenu(false);
+  };
+
+  const handlePrintChat = () => {
+    setShowMenu(false);
+    // Đợi 150ms để React đóng menu và unmount dropdown khỏi DOM trước khi in
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   return (
-    <div className="relative flex h-[calc(100dvh-72px)] w-full overflow-hidden bg-surface">
+    <div className="relative flex h-[calc(100dvh-72px)] w-full overflow-hidden bg-surface print:h-auto print:overflow-visible print:bg-white">
       {/* 1. Panel Trái: Lịch sử hội thoại & Tài khoản (Phong cách Gemini) */}
       <aside
         aria-label="Lịch sử chat"
-        className={`flex shrink-0 flex-col bg-surface-container-low transition-[width] duration-300 max-lg:absolute max-lg:inset-y-0 max-lg:z-20 max-lg:shadow-xl ${
+        className={`flex shrink-0 flex-col border-r border-outline-variant/20 bg-surface-container-low transition-[width] duration-300 print:hidden max-lg:absolute max-lg:inset-y-0 max-lg:z-20 max-lg:shadow-xl ${
           histOpen ? 'w-72' : 'w-14 max-lg:hidden'
         }`}
       >
         {histOpen ? (
           <>
-            {/* Header: Logo VeggieLife + Search Icon + Collapse Icon */}
+            {/* Header: Logo Trợ lý Dinh dưỡng + Search Icon + Collapse Icon */}
             <div className="flex items-center justify-between px-3.5 py-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-2xs">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">psychology</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-primary to-emerald-600 text-on-primary shadow-2xs">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">auto_awesome</span>
                 </div>
-                <span className="font-headline-sm text-sm font-bold tracking-tight text-on-surface">
-                  VeggieLife
+                <span className="truncate font-headline-sm text-xs sm:text-[13px] font-bold tracking-tight text-on-surface" title="Trợ lý Dinh dưỡng">
+                  Trợ lý Dinh dưỡng
                 </span>
               </div>
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <IconBtn
                   icon={showSearch ? 'search_off' : 'search'}
                   label={showSearch ? 'Đóng tìm kiếm' : 'Tìm kiếm cuộc trò chuyện'}
@@ -665,65 +697,184 @@ export const ChatPage: React.FC = () => {
         )}
       </aside>
 
-      {/* 2. Khung Chat Trung Tâm */}
-      <section aria-label="Khung chat" className="flex min-w-0 flex-1 flex-col p-2 lg:p-4">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-sm">
-          {/* Header trung tâm */}
-          <header className="flex shrink-0 items-center justify-between border-b border-outline-variant/30 bg-surface-container-low px-4 py-3">
-            <div className="flex items-center gap-2">
-              <IconBtn
-                icon="history"
-                label="Lịch sử chat"
-                onClick={() => {
-                  setHistOpen(!histOpen);
-                  if (isNarrowScreen()) setProfOpen(false);
-                }}
-                className="lg:hidden"
-              />
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-xs">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">psychology_alt</span>
-                </div>
-                <div>
-                  <h1 className="font-headline-sm text-base sm:text-headline-sm font-bold text-on-surface">Cố vấn Dinh dưỡng Chay</h1>
-                  <span className="inline-flex items-center gap-1.5 font-label-sm text-xs text-primary font-medium">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-                    </span>
-                    Tư vấn dinh dưỡng & thực đơn chay
-                  </span>
-                </div>
+      {/* 2. Khung Chat Trung Tâm (Không gian mở phong cách Google Gemini) */}
+      <section aria-label="Khung chat" className="relative flex min-w-0 flex-1 flex-col h-full bg-surface-container-lowest print:h-auto print:overflow-visible">
+        {/* Header điều hướng trên cùng (Google Gemini Style) */}
+        <header className="flex h-12 shrink-0 items-center justify-between px-3 sm:px-4 border-b border-outline-variant/10 bg-surface-container-lowest print:hidden">
+          {/* Mobile: Nút mở lịch sử + Logo */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <IconBtn
+              icon="history"
+              label="Lịch sử chat"
+              onClick={() => setHistOpen(!histOpen)}
+            />
+            <div className="flex items-center gap-1.5">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-on-primary shadow-xs">
+                <span aria-hidden="true" className="material-symbols-outlined text-[15px]">auto_awesome</span>
               </div>
+              <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">Trợ lý Dinh dưỡng</span>
+            </div>
+          </div>
+
+          {/* Desktop: Placeholder căn lề */}
+          <div className="hidden lg:block" />
+
+          {/* Nút 3 chấm tùy chọn cuộc trò chuyện (Google Gemini 3-dot dropdown) */}
+          {activeId ? (
+            <div className="relative">
+              <button
+                type="button"
+                id="btn-chat-options"
+                onClick={() => setShowMenu((prev) => !prev)}
+                aria-label="Tùy chọn cuộc trò chuyện"
+                aria-expanded={showMenu}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">more_vert</span>
+              </button>
+
+              {/* Menu dropdown phong cách Gemini */}
+              {showMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setShowMenu(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    role="menu"
+                    aria-label="Tùy chọn cuộc trò chuyện"
+                    className="absolute right-0 top-full mt-1.5 z-40 w-56 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-1.5 shadow-lg animate-in fade-in zoom-in-95 duration-100 print:hidden"
+                  >
+                    {/* 1. Ghim / Bỏ ghim */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(e) => {
+                        togglePin(e, activeId);
+                        setShowMenu(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`material-symbols-outlined text-[19px] text-on-surface-variant ${
+                          isCurrentPinned ? 'rotate-[-45deg] text-primary' : ''
+                        }`}
+                      >
+                        push_pin
+                      </span>
+                      <span>{isCurrentPinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</span>
+                    </button>
+
+                    {/* 2. Sao chép cuộc trò chuyện */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleCopyChat}
+                      disabled={messages.length === 0}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 cursor-pointer"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-on-surface-variant">
+                        content_copy
+                      </span>
+                      <span>Sao chép cuộc trò chuyện</span>
+                    </button>
+
+                    {/* 3. Tải bản ghi (.txt) */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleDownloadChat}
+                      disabled={messages.length === 0}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 cursor-pointer"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-on-surface-variant">
+                        download
+                      </span>
+                      <span>Tải bản ghi (.txt)</span>
+                    </button>
+
+                    {/* 4. In / Lưu PDF */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handlePrintChat}
+                      disabled={messages.length === 0}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 cursor-pointer"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-on-surface-variant">
+                        print
+                      </span>
+                      <span>In / Lưu PDF</span>
+                    </button>
+
+                    <div className="my-1 border-t border-outline-variant/20" />
+
+                    {/* 5. Xóa cuộc trò chuyện */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        const curr = sessions.data?.items.find((s) => s.sessionId === activeId);
+                        setSessionToDelete({ id: activeId, title: curr?.title || 'Phiên tư vấn' });
+                        setShowMenu(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-error">
+                        delete
+                      </span>
+                      <span>Xóa cuộc trò chuyện</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div />
+          )}
+        </header>
+
+        {/* Vùng tin nhắn dạng cuộn (Scrollable Message Stream) - Căn giữa rộng rãi max-w-5xl */}
+        <div
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto print:h-auto print:overflow-visible print:p-0"
+          aria-live="polite"
+        >
+          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 print:max-w-full print:p-0">
+            {/* Tiêu đề in ấn chính thức (Chỉ hiển thị khi In / Lưu PDF) */}
+            <div className="hidden print:block pb-4 mb-4 border-b border-outline-variant/40">
+              <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                <div className="flex items-center gap-1.5 font-bold text-sm text-primary">
+                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                  <span>VeggieLife • Trợ lý Dinh dưỡng Chay</span>
+                </div>
+                <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
+              </div>
+              <h1 className="mt-2 text-lg font-bold text-on-surface">
+                {sessions.data?.items.find((s) => s.sessionId === activeId)?.title || 'Nhật ký tư vấn dinh dưỡng'}
+              </h1>
             </div>
 
-            <div className="flex items-center gap-1">
-              <IconBtn
-                icon="badge"
-                label="Hồ sơ & Lối tắt"
-                onClick={() => {
-                  setProfOpen(!profOpen);
-                  if (isNarrowScreen()) setHistOpen(false);
-                }}
-                className="lg:hidden"
-              />
-            </div>
-          </header>
-
-          {/* Vùng tin nhắn */}
-          <div
-            className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-6"
-            aria-live="polite"
-          >
             {routeId && messagesQ.isPending ? (
               <div className="flex flex-col gap-4">
                 <div className="h-12 w-2/3 self-end rounded-2xl bg-surface-container animate-pulse" />
                 <div className="h-32 w-5/6 rounded-2xl bg-surface-container animate-pulse" />
               </div>
             ) : messages.length === 0 && !pendingText ? (
-              <div className="m-auto flex w-full max-w-3xl flex-col gap-6 py-4">
+              <div className="my-auto flex w-full flex-col gap-6 py-6 print:hidden">
                 {/* Header dẫn nhập */}
                 <div className="flex flex-col items-start text-left">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    <h1 className="font-label-md text-xs font-bold uppercase tracking-wider text-primary">
+                      Cố vấn Dinh dưỡng Chay
+                    </h1>
+                    <span className="text-primary/40">•</span>
+                    <span className="font-label-sm text-xs text-on-surface-variant font-medium">
+                      Tư vấn dinh dưỡng & thực đơn chay
+                    </span>
+                  </div>
                   <h2 className="font-headline-sm text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
                     Bạn muốn tìm hiểu gì về dinh dưỡng hôm nay?
                   </h2>
@@ -788,7 +939,7 @@ export const ChatPage: React.FC = () => {
                     type="button"
                     onClick={() => void messagesQ.fetchNextPage()}
                     disabled={messagesQ.isFetchingNextPage}
-                    className="self-center rounded-full bg-surface-container px-3.5 py-1 font-label-sm text-xs text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50"
+                    className="self-center rounded-full bg-surface-container px-3.5 py-1 font-label-sm text-xs text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50 print:hidden"
                   >
                     {messagesQ.isFetchingNextPage ? 'Đang tải…' : 'Tải tin cũ hơn'}
                   </button>
@@ -812,7 +963,7 @@ export const ChatPage: React.FC = () => {
 
                 {pendingText && (
                   <>
-                    <div className="flex max-w-[90%] items-start justify-end gap-3 self-end sm:max-w-[80%]">
+                    <div className="flex max-w-[85%] items-start justify-end gap-3 self-end sm:max-w-[75%] print:hidden">
                       <div className="rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-on-primary opacity-80 shadow-xs">
                         <p className="whitespace-pre-wrap break-words font-body-md text-body-md leading-relaxed">
                           {pendingText}
@@ -820,7 +971,7 @@ export const ChatPage: React.FC = () => {
                       </div>
                     </div>
                     <div
-                      className="flex items-center gap-2 self-start rounded-2xl rounded-tl-none bg-surface-container-low px-4 py-3 font-body-sm text-xs text-on-surface-variant"
+                      className="flex items-center gap-2 self-start rounded-2xl rounded-tl-none bg-surface-container-low px-4 py-3 font-body-sm text-xs text-on-surface-variant print:hidden"
                       role="status"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px] text-primary">
@@ -835,58 +986,61 @@ export const ChatPage: React.FC = () => {
               </>
             )}
           </div>
+        </div>
 
-          {/* Banner thông báo lỗi gửi tin — Luôn hiển thị độc lập với danh sách tin nhắn */}
-          {sendError && (
-            <div
-              className={`mx-3 mb-2 rounded-xl border p-3 shadow-xs sm:mx-4 ${
-                sendError.unsafe
-                  ? 'border-warning/30 bg-warning-container text-on-warning-container'
-                  : 'border-error/30 bg-error-container text-on-error-container'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-label-md text-xs font-semibold sm:text-sm">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
-                    {sendError.unsafe ? 'gpp_maybe' : 'error'}
+        {/* Chân trang nhập tin - Floating Capsule chuẩn Google Gemini */}
+        <footer className="shrink-0 bg-surface-container-lowest px-4 pb-4 pt-2 print:hidden">
+          <div className="mx-auto flex w-full max-w-5xl flex-col">
+            {/* Banner thông báo lỗi gửi tin */}
+            {sendError && (
+              <div
+                className={`mb-3 rounded-2xl border p-3 shadow-xs ${
+                  sendError.unsafe
+                    ? 'border-warning/30 bg-warning-container text-on-warning-container'
+                    : 'border-error/30 bg-error-container text-on-error-container'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-label-md text-xs font-semibold sm:text-sm">
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
+                      {sendError.unsafe ? 'gpp_maybe' : 'error'}
+                    </span>
+                    {sendError.unsafe
+                      ? 'Nội dung không phù hợp quy chuẩn'
+                      : sendError.retryable
+                      ? 'Dịch vụ AI tạm gián đoạn'
+                      : 'Không thể gửi câu hỏi'}
                   </span>
-                  {sendError.unsafe
-                    ? 'Nội dung không phù hợp quy chuẩn'
-                    : sendError.retryable
-                    ? 'Dịch vụ AI tạm gián đoạn'
-                    : 'Không thể gửi câu hỏi'}
-                </span>
-                <div className="flex items-center gap-2">
-                  {sendError.retryable && (
+                  <div className="flex items-center gap-2">
+                    {sendError.retryable && (
+                      <button
+                        type="button"
+                        onClick={() => void send(lastSentText)}
+                        className="rounded-lg bg-surface-container-lowest px-2.5 py-1 font-label-sm text-xs font-bold text-on-surface shadow-xs transition hover:bg-surface-container active:scale-95"
+                      >
+                        Gửi lại
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => void send(lastSentText)}
-                      className="rounded-lg bg-surface-container-lowest px-2.5 py-1 font-label-sm text-xs font-bold text-on-surface shadow-xs transition hover:bg-surface-container active:scale-95"
+                      onClick={() => setSendError(null)}
+                      aria-label="Đóng thông báo lỗi"
+                      className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-black/5"
                     >
-                      Gửi lại
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">close</span>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSendError(null)}
-                    aria-label="Đóng thông báo lỗi"
-                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-black/5"
-                  >
-                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">close</span>
-                  </button>
+                  </div>
                 </div>
+                <p className="mt-1 font-body-sm text-xs opacity-90">{sendError.message}</p>
               </div>
-              <p className="mt-1 font-body-sm text-xs opacity-90">{sendError.message}</p>
-            </div>
-          )}
+            )}
 
-          {/* Chân trang nhập tin */}
-          <footer className="border-t border-outline-variant/30 bg-surface-container-low p-3 sm:p-4">
+            {/* Input Capsule bo tròn phong cách Gemini */}
             <div
-              className={`flex items-end rounded-2xl border bg-surface-container-lowest p-2 shadow-xs transition-all ${
+              className={`flex items-end rounded-3xl border bg-surface-container-low/70 px-4 py-2.5 transition-all shadow-2xs ${
                 inputError
                   ? 'border-error ring-1 ring-error'
-                  : 'border-outline-variant/30 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary'
+                  : 'border-outline-variant/30 hover:border-outline-variant/60 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:ring-1 focus-within:ring-primary focus-within:shadow-xs'
               }`}
             >
               <textarea
@@ -903,7 +1057,7 @@ export const ChatPage: React.FC = () => {
                 rows={1}
                 maxLength={MESSAGE_MAX + 100}
                 placeholder="Nhập câu hỏi của bạn về dinh dưỡng, món chay, cách nấu..."
-                className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-2.5 py-1.5 font-body-md text-sm leading-relaxed text-on-surface placeholder:text-on-surface-variant focus:outline-none disabled:opacity-50"
+                className="max-h-36 min-w-0 flex-1 resize-none bg-transparent py-1 font-body-md text-sm leading-relaxed text-on-surface placeholder:text-on-surface-variant focus:outline-none disabled:opacity-50"
               />
               <button
                 type="button"
@@ -911,7 +1065,7 @@ export const ChatPage: React.FC = () => {
                 onClick={() => void send()}
                 disabled={sending || input.trim().length === 0}
                 aria-label="Gửi câu hỏi"
-                className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-xs transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                className="ml-2 mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary shadow-xs transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:bg-surface-container-highest disabled:text-on-surface-variant"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                   {sending ? 'hourglass_top' : 'send'}
@@ -919,188 +1073,28 @@ export const ChatPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-2 px-1">
-              <p className="flex items-center gap-1 font-label-sm text-[11px] text-on-surface-variant">
-                <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-outline">info</span>
-                {MEDICAL_DISCLAIMER}
-              </p>
-            </div>
+            {/* Disclaimer y khoa căn giữa tinh tế */}
+            <p className="mt-2 text-center font-label-sm text-[11px] text-on-surface-variant/75">
+              {MEDICAL_DISCLAIMER}
+            </p>
             {inputError && (
-              <p role="alert" className="mt-1 px-1 font-label-sm text-xs text-error">
+              <p role="alert" className="mt-1 text-center font-label-sm text-xs text-error">
                 {inputError}
               </p>
             )}
-          </footer>
-        </div>
+          </div>
+        </footer>
       </section>
 
-      {/* Màn hẹp: nền mờ dưới panel đang mở, bấm để đóng (màn rộng panel nằm cạnh khung chat nên không cần). */}
-      {(histOpen || profOpen) && (
+      {/* Màn hẹp: nền mờ dưới panel lịch sử đang mở, bấm để đóng */}
+      {histOpen && (
         <button
           type="button"
-          aria-label="Đóng bảng bên"
-          onClick={() => {
-            setHistOpen(false);
-            setProfOpen(false);
-          }}
-          className="absolute inset-0 z-10 bg-black/30 lg:hidden"
+          aria-label="Đóng bảng lịch sử"
+          onClick={() => setHistOpen(false)}
+          className="absolute inset-0 z-10 bg-black/30 lg:hidden print:hidden"
         />
       )}
-
-      {/* 3. Panel Phải: Hồ sơ sức khỏe & Lối tắt điều hướng */}
-      <aside
-        aria-label="Hồ sơ và lối tắt"
-        className={`flex shrink-0 flex-col bg-surface-container-low transition-[width] duration-300 max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:shadow-xl ${
-          profOpen ? 'w-80' : 'w-14 max-lg:hidden'
-        }`}
-      >
-        {profOpen ? (
-          <>
-            <div className="flex items-center justify-between border-b border-outline-variant/30 px-4 py-3">
-              <span className="font-headline-sm text-headline-sm text-on-surface">Hồ sơ & Lối tắt</span>
-              <IconBtn icon="right_panel_close" label="Thu gọn hồ sơ" onClick={() => setProfOpen(false)} />
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-              {/* Thẻ Hồ sơ sức khỏe */}
-              <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-3.5 shadow-xs">
-                {!authed ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[17px]">vital_signs</span>
-                      </div>
-                      <span className="font-label-md text-sm font-bold text-on-surface">
-                        Hồ sơ Dinh dưỡng Cá nhân
-                      </span>
-                    </div>
-                    <p className="font-body-sm text-xs text-on-surface-variant leading-relaxed">
-                      Đăng nhập để nhận lời khuyên dinh dưỡng phù hợp với thể trạng và mục tiêu sức khỏe của bạn.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                      <div className="rounded-lg bg-surface-container-low/70 p-2 border border-outline-variant/20">
-                        <span className="text-on-surface-variant block text-[11px]">Kcalo mục tiêu</span>
-                        <span className="font-mono font-bold text-primary">---- kcal</span>
-                      </div>
-                      <div className="rounded-lg bg-surface-container-low/70 p-2 border border-outline-variant/20">
-                        <span className="text-on-surface-variant block text-[11px]">Mục tiêu</span>
-                        <span className="font-semibold text-on-surface">Cân bằng</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openSignupPrompt()}
-                      className="w-full rounded-xl bg-primary px-3 py-2 font-label-sm text-xs font-semibold text-on-primary shadow-xs transition hover:opacity-90 active:scale-[0.98]"
-                    >
-                      Đăng nhập thiết lập hồ sơ
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary font-label-md text-sm font-bold text-on-primary shadow-xs">
-                        {(user?.fullName || 'User')
-                          .split(' ')
-                          .slice(-2)
-                          .map((w) => w[0])
-                          .join('')
-                          .toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-label-md text-sm font-semibold text-on-surface">
-                            {user?.fullName}
-                          </span>
-                          {isVip && (
-                            <span className="rounded bg-secondary/15 px-1.5 py-0.2 font-mono text-[10px] font-bold text-secondary">
-                              VIP
-                            </span>
-                          )}
-                        </div>
-                        <span className="font-label-sm text-xs text-on-surface-variant">
-                          Thành viên thực dưỡng VeggieLife
-                        </span>
-                      </div>
-                      <Link
-                        to={PATHS.ME.HEALTH}
-                        className="font-label-sm text-xs font-semibold text-primary hover:underline"
-                      >
-                        Sửa
-                      </Link>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                      <div className="rounded-lg bg-surface-container-low p-2">
-                        <span className="text-on-surface-variant block text-[11px]">Mục tiêu</span>
-                        <span className="font-semibold text-on-surface">Tăng cơ & Cân bằng</span>
-                      </div>
-                      <div className="rounded-lg bg-surface-container-low p-2">
-                        <span className="text-on-surface-variant block text-[11px]">Kcalo mục tiêu</span>
-                        <span className="font-mono font-bold text-primary">1850 kcal/ngày</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Lối tắt thao tác nhanh */}
-              <div className="flex flex-col gap-1.5">
-                <span className="px-1 font-label-sm text-xs font-semibold text-on-surface-variant">
-                  Tính năng hữu ích
-                </span>
-                {SHORTCUTS.map((s) => (
-                  <Link
-                    key={s.label}
-                    to={s.to}
-                    onClick={(e) => {
-                      if (!authed) {
-                        e.preventDefault();
-                        openSignupPrompt();
-                      }
-                    }}
-                    className="group flex items-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 !no-underline transition hover:border-primary/40 hover:bg-surface-container-lowest hover:shadow-xs"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-on-primary">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] !no-underline">{s.icon}</span>
-                    </div>
-                    <div className="min-w-0 flex-1 !no-underline">
-                      <span className="block font-label-md text-sm font-semibold text-on-surface !no-underline">
-                        {s.label}
-                      </span>
-                      <span className="block font-body-sm text-[11px] text-on-surface-variant truncate !no-underline">
-                        {s.desc}
-                      </span>
-                    </div>
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-outline-variant transition-transform group-hover:translate-x-1 group-hover:text-primary !no-underline">
-                      chevron_right
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-2 py-3">
-            <IconBtn icon="right_panel_open" label="Mở hồ sơ" onClick={() => setProfOpen(true)} />
-            {SHORTCUTS.map((s) => (
-              <Link
-                key={s.label}
-                to={s.to}
-                title={s.label}
-                onClick={(e) => {
-                  if (!authed) {
-                    e.preventDefault();
-                    openSignupPrompt();
-                  }
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container !no-underline"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[20px] !no-underline">{s.icon}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </aside>
 
       {/* Hộp xác nhận xóa phiên */}
       <ConfirmDialog

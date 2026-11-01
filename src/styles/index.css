@@ -338,3 +338,67 @@ button:not(:disabled):active {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   Quy chuẩn in ấn và Xuất PDF toàn diện (Print & PDF Export)
+   ========================================================================== */
+@media print {
+  /* 1. Ẩn toàn bộ thành phần điều hướng, layout và nút tương tác */
+  header,
+  footer,
+  nav,
+  aside,
+  #main-header,
+  .service-banner,
+  .main-footer,
+  button,
+  #btn-chat-options,
+  [role="menu"],
+  [aria-label="Lịch sử chat"],
+  [aria-label="Tùy chọn cuộc trò chuyện"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* 2. Giải phóng triệt để các khung cuộn và chiều cao cố định để in toàn bộ tin nhắn */
+  html,
+  body,
+  #root,
+  .flex,
+  main,
+  #main-content,
+  section,
+  [aria-label="Khung chat"],
+  [aria-live="polite"],
+  [aria-live="polite"] > div {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. Trang in khổ A4 chuẩn với lề cân đối */
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm 16mm 14mm;
+  }
+
+  /* 4. Giữ màu nền và viền nhẹ của tin nhắn khi in */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 5. Không ngắt trang giữa chừng một tin nhắn */
+  .chat-bubble-container,
+  [aria-live="polite"] > div > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1.25rem !important;
+  }
+}
+

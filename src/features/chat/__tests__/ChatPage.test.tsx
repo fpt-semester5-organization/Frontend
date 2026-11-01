@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '@/test/test-utils';
 import { useAuthStore } from '@/stores/auth.store';
 import { useGuestStore } from '@/stores/guest.store';
@@ -55,66 +56,70 @@ describe('ChatPage Screen & Integration Tests', () => {
     });
   });
 
-  describe('2. Kiểm thử Panel 3 (Hồ sơ & Lối tắt)', () => {
-    it('hiển thị "Kcalo mục tiêu" dạng "---- kcal" đối với Khách vãng lai', () => {
-      renderWithProviders(<ChatPage />);
-
-      expect(screen.getByText('Kcalo mục tiêu')).toBeInTheDocument();
-      expect(screen.getByText('---- kcal')).toBeInTheDocument();
-      expect(screen.getByText('Đăng nhập thiết lập hồ sơ')).toBeInTheDocument();
-    });
-
-    it('hiển thị "Kcalo mục tiêu" dạng "1850 kcal/ngày" đối với Thành viên đã đăng nhập', () => {
-      useAuthStore.setState({
-        user: {
-          userId: 1,
-          email: 'member@veggielife.vn',
-          fullName: 'Minh Tâm',
-          role: 'MEMBER',
-          isVip: false,
-        },
-        sessionStatus: 'ready',
-        isAuthenticated: true,
-      });
-
-      renderWithProviders(<ChatPage />);
-
-      expect(screen.getByText('Kcalo mục tiêu')).toBeInTheDocument();
-      expect(screen.getByText('1850 kcal/ngày')).toBeInTheDocument();
-      expect(screen.getAllByText('Minh Tâm').length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('hiển thị 3 lối tắt dinh dưỡng cá nhân hóa với class "!no-underline" để triệt tiêu gạch chân Bootstrap', () => {
-      renderWithProviders(<ChatPage />);
-
-      const shortcut1 = screen.getByRole('link', { name: /Dị ứng & Kiêng cữ/i });
-      const shortcut2 = screen.getByRole('link', { name: /Mục tiêu thể trạng/i });
-      const shortcut3 = screen.getByRole('link', { name: /Món chay đã lưu/i });
-
-      expect(shortcut1).toBeInTheDocument();
-      expect(shortcut1).toHaveAttribute('href', PATHS.ME.DIETARY_PREFERENCES);
-      expect(shortcut1.className).toContain('!no-underline');
-
-      expect(shortcut2).toBeInTheDocument();
-      expect(shortcut2).toHaveAttribute('href', PATHS.ME.HEALTH);
-      expect(shortcut2.className).toContain('!no-underline');
-
-      expect(shortcut3).toBeInTheDocument();
-      expect(shortcut3).toHaveAttribute('href', PATHS.ME.RECIPES);
-      expect(shortcut3.className).toContain('!no-underline');
-    });
-
-    it('khi Khách bấm vào lối tắt cá nhân hóa, kích hoạt modal yêu cầu đăng nhập', async () => {
+  describe('2. Kiểm thử Menu tùy chọn cuộc trò chuyện (Phong cách Google Gemini 3-dot)', () => {
+    it('khi đang trong phiên trò chuyện, hiển thị nút tùy chọn (more_vert) và mở menu khi bấm', async () => {
       const user = userEvent.setup();
-      const openSignupPromptSpy = vi.fn();
-      useUiStore.setState({ openSignupPrompt: openSignupPromptSpy });
+      renderWithProviders(
+        <Routes>
+          <Route path="/chat/:sessionId" element={<ChatPage />} />
+        </Routes>,
+        { route: '/chat/10' }
+      );
 
+      const optionsBtn = screen.getByRole('button', { name: /Tùy chọn cuộc trò chuyện/i });
+      expect(optionsBtn).toBeInTheDocument();
+
+      await user.click(optionsBtn);
+
+      expect(screen.getByRole('menuitem', { name: /Ghim cuộc trò chuyện/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Sao chép cuộc trò chuyện/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Tải bản ghi/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /In \/ Lưu PDF/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Xóa cuộc trò chuyện/i })).toBeInTheDocument();
+    });
+
+    it('bấm "Ghim cuộc trò chuyện" trong menu kích hoạt ghim và cập nhật nhãn', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <Routes>
+          <Route path="/chat/:sessionId" element={<ChatPage />} />
+        </Routes>,
+        { route: '/chat/10' }
+      );
+
+      const optionsBtn = screen.getByRole('button', { name: /Tùy chọn cuộc trò chuyện/i });
+      await user.click(optionsBtn);
+
+      const pinItem = screen.getByRole('menuitem', { name: /Ghim cuộc trò chuyện/i });
+      await user.click(pinItem);
+
+      // Bấm mở lại menu để kiểm tra nhãn đã đổi thành "Bỏ ghim"
+      await user.click(optionsBtn);
+      expect(screen.getByRole('menuitem', { name: /Bỏ ghim cuộc trò chuyện/i })).toBeInTheDocument();
+    });
+
+    it('bấm "Xóa cuộc trò chuyện" trong menu mở dialog xác nhận xóa', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <Routes>
+          <Route path="/chat/:sessionId" element={<ChatPage />} />
+        </Routes>,
+        { route: '/chat/10' }
+      );
+
+      const optionsBtn = screen.getByRole('button', { name: /Tùy chọn cuộc trò chuyện/i });
+      await user.click(optionsBtn);
+
+      const deleteItem = screen.getByRole('menuitem', { name: /Xóa cuộc trò chuyện/i });
+      await user.click(deleteItem);
+
+      expect(screen.getByText('Xóa cuộc trò chuyện?')).toBeInTheDocument();
+    });
+
+    it('ở trang tạo mới chưa có session active, không hiển thị nút tùy chọn menu 3 chấm', () => {
       renderWithProviders(<ChatPage />);
 
-      const shortcut = screen.getByRole('link', { name: /Dị ứng & Kiêng cữ/i });
-      await user.click(shortcut);
-
-      expect(openSignupPromptSpy).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /Tùy chọn cuộc trò chuyện/i })).not.toBeInTheDocument();
     });
   });
 

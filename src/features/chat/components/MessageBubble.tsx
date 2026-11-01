@@ -9,14 +9,14 @@ import { SurveyStars } from './SurveyStars';
 
 export const UserBubble: React.FC<{ m: ChatMessage }> = ({ m }) => {
   return (
-    <div className="flex max-w-[90%] items-start justify-end gap-3 self-end sm:max-w-[80%]">
+    <div className="chat-bubble-container flex max-w-[85%] items-start justify-end gap-3 self-end sm:max-w-[75%] print:max-w-full print:break-inside-avoid">
       <div className="flex flex-col items-end gap-1">
-        <div className="rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-on-primary shadow-xs">
+        <div className="rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-on-primary shadow-xs print:border print:border-primary/40">
           <p className="whitespace-pre-wrap break-words font-body-md text-body-md leading-relaxed">
             {m.content}
           </p>
         </div>
-        <span className="px-1 font-label-sm text-xs text-on-surface-variant">
+        <span className="px-1 font-label-sm text-xs text-on-surface-variant print:text-gray-500">
           {formatDateTime(m.createdAt)}
         </span>
       </div>
@@ -67,14 +67,14 @@ export const AssistantBubble: React.FC<{
   const lines = m.content.split('\n');
 
   return (
-    <div className="flex max-w-[96%] items-start gap-3 self-start sm:max-w-[90%]">
+    <div className="chat-bubble-container flex w-full items-start gap-3 self-start print:break-inside-avoid">
       <div className="flex w-full flex-col gap-2">
-        <div className="flex flex-col gap-4 rounded-2xl rounded-tl-none bg-surface-container-low p-5 text-on-surface shadow-sm">
+        <div className="flex flex-col gap-4 rounded-2xl rounded-tl-none bg-surface-container-low p-5 text-on-surface shadow-sm print:bg-white print:border print:border-outline-variant/30 print:shadow-none">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2.5">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">psychology</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">auto_awesome</span>
               </div>
               <span className="font-label-md text-label-md font-bold text-on-surface">
                 Cố vấn Dinh dưỡng VeggieLife
