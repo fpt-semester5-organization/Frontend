@@ -6,9 +6,10 @@ import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
 import { SyncedVideoScriptPlayer } from '@/features/videos/components/SyncedVideoScriptPlayer';
 import { useVideoTranscript } from '@/features/videos/hooks/useVideoTranscript';
-import { extractVideoDirectlyWithAi } from '@/features/videos/api/videos.api';
+import { extractAndSaveVideoRecipe } from '@/features/videos/api/videos.api';
 import { splitRawTranscriptToSegments } from '@/features/videos/lib/sampleTranscripts';
 import type { TranscriptSegment } from '@/features/videos/types/transcript.types';
+import type { ExtractedRecipe } from '@/features/videos/types/video.types';
 import type { PostRecipeAttachment, PostVideoAttachment } from '../types/community.types';
 
 /** Công thức đính kèm bài viết (FN-POST-06): khối "Liên kết công thức" dẫn tới SCR-12. */
@@ -52,23 +53,29 @@ const InlineVideoScriptPlayer: React.FC<{
   onClose: () => void;
 }> = ({ video, onClose }) => {
   const [duration, setDuration] = useState<number>(video.durationSeconds ?? 10);
-  const { data: transcriptData, isLoading } = useVideoTranscript(video.videoId ?? 0, {
-    enabled: Boolean(video.videoId),
+  const videoId = video.videoId ?? 0;
+  const { data: transcriptData, isLoading } = useVideoTranscript(videoId, {
+    enabled: Boolean(videoId),
     poll: false,
   });
   const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
+  const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
 
+  // Kích hoạt AI STT 1 lần duy nhất và lưu ngay xuống Backend
   useEffect(() => {
     if (video.videoUrl && !isLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
-      extractVideoDirectlyWithAi(video.videoUrl)
+      extractAndSaveVideoRecipe(videoId, video.videoUrl)
         .then((res) => {
           if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
+          if (res.recipe) setAiLiveRecipe(res.recipe);
         })
         .catch((err) => {
-          console.warn('AI STT direct call error:', err);
+          console.warn('AI STT direct call error in InlinePlayer:', err);
         });
     }
-  }, [video.videoUrl, isLoading, transcriptData, aiLiveTranscript]);
+  }, [video.videoUrl, isLoading, transcriptData, aiLiveTranscript, videoId]);
+
+  const activeRecipe = transcriptData?.transcript?.extractedRecipe || aiLiveRecipe;
 
   const { segments, source } = useMemo(() => {
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
@@ -79,7 +86,7 @@ const InlineVideoScriptPlayer: React.FC<{
           end: s.end,
           text: s.text,
         })),
-        source: 'CSDL VeggieLife (Đồng bộ)',
+        source: 'CSDL VeggieLife (Đã lưu)',
       };
     }
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.rawTranscript) {
@@ -91,7 +98,7 @@ const InlineVideoScriptPlayer: React.FC<{
     if (aiLiveTranscript) {
       return {
         segments: splitRawTranscriptToSegments(aiLiveTranscript, duration),
-        source: 'AI Faster-Whisper Live',
+        source: 'AI Faster-Whisper (Đã lưu CSDL)',
       };
     }
     return {
@@ -107,6 +114,8 @@ const InlineVideoScriptPlayer: React.FC<{
         posterUrl={video.thumbnailUrl}
         title={video.title}
         segments={segments}
+        recipe={activeRecipe}
+        rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
         autoPlay={true}
         onClose={onClose}
         onDurationChange={setDuration}

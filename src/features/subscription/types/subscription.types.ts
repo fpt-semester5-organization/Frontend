@@ -38,6 +38,15 @@ export interface CheckoutResult {
   expiresAt: string;
 }
 
+/**
+ * POST /subscriptions/cancel-pending (FN-SUB-02): hủy đơn PENDING mới nhất (tạo trong 5 phút) để đổi gói/cổng.
+ * `cancelled = false` là không còn đơn chờ (cổng vừa xác nhận, đơn hết hạn hoặc đã hủy ở trang cổng).
+ */
+export interface CancelPendingResult {
+  cancelled: boolean;
+  message: string;
+}
+
 /** FN-SUB-04 */
 export interface SubscriptionTransaction {
   transactionId: number;

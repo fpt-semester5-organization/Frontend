@@ -4,9 +4,22 @@ import type { DeepRequired, Schemas } from '@/api/types';
 
 type TranscriptData = DeepRequired<Schemas['GetVideoTranscriptResponse']['data']>;
 
-/** Công thức AI trích từ lời thoại (Extracted_Recipe_JSON): tên món, nguyên liệu, các bước. */
-export type ExtractedRecipe = TranscriptData['extractedRecipe'];
-export type ExtractedIngredient = ExtractedRecipe['ingredients'][number];
+export interface ExtractedIngredient {
+  name: string;
+  quantity?: number | null;
+  unit?: string | null;
+}
+
+/** Công thức AI trích từ lời thoại (Extracted_Recipe_JSON): tên món, khẩu phần, thời gian, nguyên liệu, các bước, mẹo nhỏ. */
+export interface ExtractedRecipe {
+  title: string;
+  servings?: number | null;
+  cookTimeMinutes?: number | null;
+  prepTimeMinutes?: number | null;
+  ingredients: ExtractedIngredient[];
+  steps: string[];
+  tips?: string[];
+}
 
 /** Hạn mức AI dùng thử của Khách (03 lượt/phiên, BR-GUEST-02); Thành viên không có. */
 export type AiQuota = TranscriptData['quota'];

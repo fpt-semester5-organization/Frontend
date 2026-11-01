@@ -2,21 +2,24 @@
  * SCR-31 · subscription/Checkout · `/vip/checkout/:planId`   (FN-SUB-02: POST /subscriptions/checkout, guard RequireAuth)
  * Tạo đơn khi người dùng bấm thanh toán (cổng là trường của form), đếm ngược theo `expiresAt` của server (5 phút, BR-PAY-TXN-01).
  * Kết quả thanh toán do webhook IPN quyết định: trang này chỉ theo dõi GET /users/me/subscription, không tin tham số từ cổng.
+ * "Hủy phiên thanh toán này" gọi POST /subscriptions/cancel-pending để giải phóng đơn chờ rồi về trang chọn gói (đổi gói/cổng).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { apiErrorCode, apiErrorMessage, apiErrorStatus, apiFieldErrors } from '@/api/http';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
 import { FormAlert } from '@/components/ui/forms';
 import { formatVnd } from '@/lib/format';
+import { notifyApiError } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
-import { useCheckout, useMySubscription, usePlans } from '../hooks/useSubscription';
-import { isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, type PendingOrder } from '../lib/pendingOrder';
+import { useCancelPending, useCheckout, useMySubscription, usePlans } from '../hooks/useSubscription';
+import { clearPendingOrder, isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, type PendingOrder } from '../lib/pendingOrder';
 import { checkoutSchema, parsePlanId, type CheckoutForm } from '../schemas/checkout.schemas';
 import type { Gateway } from '../types/subscription.types';
 
@@ -56,7 +59,7 @@ export function CheckoutPage() {
           </PageEmpty>
         ) : (
           <div className="grid w-full grid-cols-1 gap-gutter lg:grid-cols-5">
-            {order ? <PayPanel order={order} onExpired={() => setOrder(null)} /> : <GatewayForm planId={plan.planId} planName={plan.planName} onCreated={setOrder} />}
+            {order ? <PayPanel order={order} /> : <GatewayForm planId={plan.planId} planName={plan.planName} onCreated={setOrder} />}
             <aside className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg shadow-sm lg:col-span-2">
               <h2 className="font-headline-sm text-headline-sm text-primary">Đơn hàng</h2>
               <div className="flex items-baseline justify-between">
@@ -85,6 +88,19 @@ function GatewayForm({ planId, planName, onCreated }: { planId: number; planName
   const [pendingDialog, setPendingDialog] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const cancelPending = useCancelPending();
+
+  /** 409 đang có đơn chờ: hủy đơn cũ ngay để tạo đơn mới với gói/cổng đang chọn. */
+  const releasePending = () =>
+    cancelPending.mutate(undefined, {
+      onSuccess: (res) => {
+        clearPendingOrder();
+        setPendingDialog(null);
+        if (res.cancelled) toast.success('Đã hủy đơn đang chờ. Bạn có thể tạo đơn mới.');
+        else toast.info(res.message || 'Không còn đơn chờ thanh toán. Bạn có thể tạo đơn mới.');
+      },
+      onError: (e) => notifyApiError(e),
+    });
 
   const submit = handleSubmit((v) => {
     setFormError(null);
@@ -131,12 +147,19 @@ function GatewayForm({ planId, planName, onCreated }: { planId: number; planName
         {gateway === 'MOMO' ? 'Thanh toán bằng MoMo' : 'Tạo mã VietQR'}
       </button>
 
-      <Modal show={pendingDialog !== null} onHide={() => setPendingDialog(null)} title="Đang có đơn chờ thanh toán" size="sm">
+      <Modal show={pendingDialog !== null} onHide={() => setPendingDialog(null)} title="Đang có đơn chờ thanh toán" size="sm" locked={cancelPending.isPending}>
         <div className="flex flex-col gap-space-md p-space-lg">
           <p className="font-body-md text-body-md text-on-surface-variant">{pendingDialog}</p>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setPendingDialog(null)} className="rounded-lg bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-high">Đóng</button>
-            <button type="button" onClick={() => navigate(PATHS.SUBSCRIPTION.RESULT)} className="rounded-lg bg-primary-container px-4 py-2 font-label-md text-label-md text-on-primary hover:bg-primary">Xem trạng thái đơn</button>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Muốn đổi gói hoặc cổng thanh toán, hãy hủy đơn đang chờ. Nếu bạn đã chuyển khoản cho đơn đó, đừng hủy mà hãy xem trạng thái đơn.
+          </p>
+          <div className="flex flex-wrap justify-end gap-3">
+            <button type="button" onClick={() => setPendingDialog(null)} disabled={cancelPending.isPending} className="rounded-lg bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-high disabled:opacity-60">Đóng</button>
+            <button type="button" onClick={() => navigate(PATHS.SUBSCRIPTION.RESULT)} disabled={cancelPending.isPending} className="rounded-lg bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface hover:bg-surface-container-high disabled:opacity-60">Xem trạng thái đơn</button>
+            <button type="button" onClick={releasePending} disabled={cancelPending.isPending} className="flex items-center gap-2 rounded-lg bg-error px-4 py-2 font-label-md text-label-md text-on-error hover:opacity-90 disabled:opacity-60">
+              {cancelPending.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+              Hủy đơn đang chờ
+            </button>
           </div>
         </div>
       </Modal>
@@ -145,10 +168,14 @@ function GatewayForm({ planId, planName, onCreated }: { planId: number; planName
 }
 
 /* ---------- Bước 2: hiển thị đơn, theo dõi kết quả ---------- */
-function PayPanel({ order, onExpired }: { order: PendingOrder; onExpired: () => void }) {
+function PayPanel({ order }: { order: PendingOrder }) {
   const navigate = useNavigate();
   const left = useCountdown(order.expiresAt);
   const sub = useMySubscription({ pollMs: 3000 });
+  const cancel = useCancelPending();
+  const [confirming, setConfirming] = useState(false);
+  // Đang hủy / đã rời trang: không để lượt làm mới định kỳ (thấy CANCELLED) đẩy sang trang kết quả.
+  const leaving = useRef(false);
   const tx = useMemo(() => sub.data?.transactions.find((t) => t.transactionId === order.transactionId), [sub.data, order.transactionId]);
   const url = safePayUrl(order.payUrl);
   const qrImg = order.gateway === 'VIETQR' && isQrImageUrl(order.payUrl);
@@ -156,11 +183,33 @@ function PayPanel({ order, onExpired }: { order: PendingOrder; onExpired: () => 
 
   // Cổng đã báo (IPN) hoặc đơn hết hạn: chuyển sang trang kết quả đọc trạng thái từ server.
   useEffect(() => {
-    if (tx && tx.status !== 'PENDING') navigate(result, { replace: true });
+    if (!leaving.current && tx && tx.status !== 'PENDING') navigate(result, { replace: true });
   }, [tx, navigate, result]);
   useEffect(() => {
-    if (left === 0) navigate(result, { replace: true });
+    if (!leaving.current && left === 0) navigate(result, { replace: true });
   }, [left, navigate, result]);
+
+  const confirmCancel = () => {
+    leaving.current = true;
+    cancel.mutate(undefined, {
+      onSuccess: (res) => {
+        clearPendingOrder();
+        if (res.cancelled) {
+          toast.success('Đã hủy phiên thanh toán. Bạn có thể chọn lại gói hoặc cổng thanh toán.');
+          navigate(PATHS.SUBSCRIPTION.PRICING, { replace: true });
+        } else {
+          // Không còn đơn chờ (cổng vừa xác nhận, đơn hết hạn…): trang kết quả đọc trạng thái thật từ server.
+          toast.info(res.message || 'Đơn không còn ở trạng thái chờ thanh toán.');
+          navigate(result, { replace: true });
+        }
+      },
+      onError: (e) => {
+        leaving.current = false;
+        setConfirming(false);
+        notifyApiError(e);
+      },
+    });
+  };
 
   const copy = (v: string) => navigator.clipboard?.writeText(v).then(() => toast.success('Đã sao chép'), () => toast.error('Không sao chép được'));
 
@@ -195,8 +244,38 @@ function PayPanel({ order, onExpired }: { order: PendingOrder; onExpired: () => 
       </p>
       <div className="flex flex-col gap-space-sm sm:flex-row">
         <button type="button" onClick={() => navigate(result)} className="flex-1 rounded-lg bg-primary-container px-4 py-3 font-label-md text-label-md text-on-primary hover:bg-primary">Kiểm tra trạng thái</button>
-        <button type="button" onClick={onExpired} className="flex-1 rounded-lg bg-surface-container px-4 py-3 font-label-md text-label-md text-on-surface hover:bg-surface-container-high">Quay lại chọn cổng</button>
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={cancel.isPending}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-error/40 bg-surface-container-lowest px-4 py-3 font-label-md text-label-md text-error hover:bg-error-container disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">cancel</span>
+          Hủy phiên thanh toán này
+        </button>
       </div>
+
+      <ConfirmDialog
+        show={confirming}
+        title="Hủy phiên thanh toán này?"
+        message={
+          <div className="flex flex-col gap-2">
+            <p>
+              Đơn <span className="font-mono font-semibold">{order.orderCode}</span> sẽ bị hủy ngay; mã QR và liên kết thanh toán của đơn không dùng được nữa.
+              Bạn quay về trang chọn gói để đổi gói hoặc cổng thanh toán.
+            </p>
+            <p className="font-semibold text-on-surface">
+              Nếu bạn đã chuyển khoản, đừng hủy: hãy chờ xác nhận hoặc bấm “Kiểm tra trạng thái”. Tiền chuyển vào đơn đã hủy phải chờ Quản trị viên đối soát.
+            </p>
+          </div>
+        }
+        confirmLabel="Hủy phiên thanh toán"
+        cancelLabel="Tiếp tục thanh toán"
+        danger
+        loading={cancel.isPending}
+        onConfirm={confirmCancel}
+        onCancel={() => !cancel.isPending && setConfirming(false)}
+      />
     </section>
   );
 }

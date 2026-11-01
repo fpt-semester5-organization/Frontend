@@ -2,12 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import type { TranscriptSegment } from '../types/transcript.types';
+import type { ExtractedRecipe } from '../types/video.types';
 
 export interface SyncedVideoScriptPlayerProps {
   videoUrl?: string | null;
   posterUrl?: string | null;
   title?: string;
   segments: TranscriptSegment[];
+  recipe?: ExtractedRecipe | null;
+  rawTranscript?: string | null;
   autoPlay?: boolean;
   className?: string;
   onClose?: () => void;
@@ -21,11 +24,198 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function decodeUnicodeEscapes(str: string): string {
+  try {
+    return str.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
+      String.fromCharCode(parseInt(code, 16))
+    );
+  } catch {
+    return str;
+  }
+}
+
+function cleanStepText(step: string): string {
+  let s = decodeUnicodeEscapes(step).trim();
+  s = s.replace(/^["']|["']$/g, '').trim();
+  s = s.replace(/^(?:bước|b|step)\s*\d+[:.\-\s]*/i, '');
+  s = s.replace(/^[-•*]\s*/, '').replace(/^[0-9]+[.)]\s*/, '').trim();
+  if (s.length > 0) {
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  return s;
+}
+
+function flattenSteps(rawSteps: string[]): string[] {
+  if (!rawSteps || rawSteps.length === 0) return [];
+  const flattened: string[] = [];
+
+  for (const item of rawSteps) {
+    if (!item) continue;
+    const str = String(item).trim();
+
+    if (str.startsWith('[') && str.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) {
+          for (const sub of parsed) {
+            const cleaned = cleanStepText(String(sub));
+            if (cleaned) flattened.push(cleaned);
+          }
+          continue;
+        }
+      } catch {
+        const matches = str.match(/"([^"]+)"|'([^']+)'/g);
+        if (matches && matches.length > 0) {
+          for (const m of matches) {
+            const cleaned = cleanStepText(m.replace(/^['"]|['"]$/g, ''));
+            if (cleaned) flattened.push(cleaned);
+          }
+          continue;
+        }
+      }
+    }
+
+    const cleaned = cleanStepText(str);
+    if (cleaned) {
+      flattened.push(cleaned);
+    }
+  }
+
+  return flattened;
+}
+
+export interface ResolvedIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export function resolveIngredientAmount(ing: {
+  name: string;
+  quantity?: number | null;
+  unit?: string | null;
+}): ResolvedIngredient {
+  const cleanName = decodeUnicodeEscapes(ing.name || '').trim().replace(/\.+$/, '');
+  const lower = cleanName.toLowerCase();
+
+  let qty = ing.quantity != null && ing.quantity > 0 ? Number(ing.quantity) : null;
+  let unit = ing.unit ? ing.unit.trim() : null;
+
+  if (qty == null || !unit) {
+    if (lower.includes('bún') || lower.includes('phở') || lower.includes('mì') || lower.includes('miến') || lower.includes('hủ tiếu') || lower.includes('bánh canh')) {
+      qty = qty ?? 500;
+      unit = unit || 'g';
+    } else if (lower.includes('cơm') || lower.includes('gạo')) {
+      qty = qty ?? 300;
+      unit = unit || 'g';
+    } else if (lower.includes('đậu hũ') || lower.includes('đậu phụ') || lower.includes('tàu hũ') || lower.includes('đậu hủ')) {
+      qty = qty ?? 200;
+      unit = unit || 'g';
+    } else if (lower.includes('nấm')) {
+      qty = qty ?? 150;
+      unit = unit || 'g';
+    } else if (lower.includes('nước dùng') || lower.includes('nước lèo') || lower.includes('nước hầm') || lower.includes('nước sôi') || lower.includes('nước dừa')) {
+      qty = qty ?? 1.5;
+      unit = unit || 'lít';
+    } else if (lower.includes('rau củ') || lower.includes('cà rốt') || lower.includes('củ cải') || lower.includes('su hào') || lower.includes('bí đỏ') || lower.includes('khoai tây') || lower.includes('khoai lang')) {
+      qty = qty ?? 200;
+      unit = unit || 'g';
+    } else if (lower.includes('rau thơm') || lower.includes('hành lá') || lower.includes('ngò') || lower.includes('mùi tàu') || lower.includes('húng quế')) {
+      qty = qty ?? 50;
+      unit = unit || 'g';
+    } else if (lower.includes('rau') || lower.includes('xà lách') || lower.includes('giá đỗ') || lower.includes('bắp cải')) {
+      qty = qty ?? 150;
+      unit = unit || 'g';
+    } else if (lower.includes('gia vị') || lower.includes('hạt nêm') || lower.includes('đường') || lower.includes('muối') || lower.includes('tiêu') || lower.includes('bột ngọt')) {
+      qty = qty ?? 2;
+      unit = unit || 'thìa cà phê';
+    } else if (lower.includes('nước mắm') || lower.includes('nước tương') || lower.includes('xì dầu') || lower.includes('dầu ăn') || lower.includes('dầu hào')) {
+      qty = qty ?? 2;
+      unit = unit || 'muỗng canh';
+    } else if (lower.includes('ớt')) {
+      qty = qty ?? 2;
+      unit = unit || 'trái';
+    } else if (lower.includes('sả') || lower.includes('gừng') || lower.includes('tỏi') || lower.includes('hành tím')) {
+      qty = qty ?? 2;
+      unit = unit || 'nhánh';
+    } else {
+      qty = qty ?? 150;
+      unit = unit || 'g';
+    }
+  }
+
+  return {
+    name: cleanName,
+    quantity: qty,
+    unit: unit,
+  };
+}
+
+function formatIngredientText(ing: { name: string; quantity?: number | null; unit?: string | null }): string {
+  const resolved = resolveIngredientAmount(ing);
+  return `${resolved.quantity} ${resolved.unit} ${resolved.name}.`;
+}
+
+interface StepGroup {
+  groupTitle: string;
+  items: string[];
+}
+
+function organizeSteps(steps: string[]): StepGroup[] {
+  const normalized = flattenSteps(steps);
+  if (!normalized || normalized.length === 0) return [];
+
+  const prepSteps: string[] = [];
+  const cookSteps: string[] = [];
+
+  let currentGroup = 'prep';
+  for (const cleanStep of normalized) {
+    const lower = cleanStep.toLowerCase();
+    if (
+      lower.includes('thực hiện') ||
+      lower.includes('chế biến') ||
+      lower.includes('bước 2') ||
+      lower.includes('nấu') ||
+      lower.includes('xào') ||
+      lower.includes('phi thơm') ||
+      lower.includes('đun sôi') ||
+      lower.includes('luộc') ||
+      lower.includes('kho')
+    ) {
+      currentGroup = 'cook';
+    }
+    if (currentGroup === 'prep') {
+      prepSteps.push(cleanStep);
+    } else {
+      cookSteps.push(cleanStep);
+    }
+  }
+
+  if (prepSteps.length > 0 && cookSteps.length > 0) {
+    return [
+      { groupTitle: '1. Chuẩn bị', items: prepSteps },
+      { groupTitle: '2. Thực hiện', items: cookSteps },
+    ];
+  }
+
+  if (normalized.length >= 3) {
+    const mid = Math.ceil(normalized.length / 3);
+    return [
+      { groupTitle: '1. Chuẩn bị', items: normalized.slice(0, mid) },
+      { groupTitle: '2. Thực hiện', items: normalized.slice(mid) },
+    ];
+  }
+
+  return [{ groupTitle: '1. Hướng dẫn thực hiện', items: normalized }];
+}
+
 export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = ({
   videoUrl,
   posterUrl,
   title,
   segments,
+  recipe,
+  rawTranscript,
   autoPlay = false,
   className,
   onClose,
@@ -42,6 +232,9 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
   const [isMuted, setIsMuted] = useState(false);
   const [userAutoScroll, setUserAutoScroll] = useState(true);
   const [showScript, setShowScript] = useState(true);
+  const [activeTab, setActiveTab] = useState<'recipe' | 'transcript'>('recipe');
+
+  const stepGroups = organizeSteps(recipe?.steps ?? []);
 
   // Tìm segment đang khớp với currentTime
   const activeIndex = segments.findIndex(
@@ -250,146 +443,293 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
           </div>
         </div>
 
-        {/* ===================== CỘT PHẢI: KHUNG TÓM TẮT VIDEO (Chỉ hiện khi showScript = true) ===================== */}
+        {/* ===================== CỘT PHẢI: KHUNG TÓM TẮT VIDEO ===================== */}
         {showScript && (
           <div className="flex flex-col bg-surface-container-lowest text-on-surface border-t md:border-t-0 md:border-l border-surface-container md:col-span-5 relative overflow-hidden transition-all duration-300">
-            {/* Header tóm tắt video */}
-            <div className="flex items-center justify-between border-b border-surface-container px-3.5 py-2.5 bg-surface-container-low/50">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-container text-on-primary shadow-2xs shrink-0">
-                  <Icon name="auto_awesome" className="text-[16px]" />
-                </span>
-                <div className="min-w-0">
-                  <h4 className="truncate font-label-md text-label-md font-bold text-on-surface">
-                    Tóm tắt video
-                  </h4>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Nút bật/tắt tự cuộn */}
+            {/* Header tóm tắt video kèm 2 Tab chuyển đổi */}
+            <div className="flex items-center justify-between border-b border-surface-container px-3 py-2 bg-surface-container-low/70">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setUserAutoScroll(!userAutoScroll)}
-                  title={userAutoScroll ? 'Đang tự cuộn theo lời thoại' : 'Đã tắt tự cuộn'}
+                  onClick={() => setActiveTab('recipe')}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-label-sm text-label-sm transition-colors cursor-pointer',
-                    userAutoScroll
-                      ? 'bg-primary-fixed text-on-primary-fixed font-semibold'
-                      : 'bg-surface-container text-on-surface-variant'
+                    'flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-label-sm text-label-sm font-semibold transition-all cursor-pointer',
+                    activeTab === 'recipe'
+                      ? 'bg-primary text-on-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      userAutoScroll ? 'bg-primary animate-pulse' : 'bg-outline'
-                    )}
-                  />
-                  Đồng bộ
+                  <Icon name="menu_book" className="text-[16px]" />
+                  <span>Công thức tóm tắt</span>
                 </button>
 
-                {/* Nút thu gọn nhanh khung tóm tắt */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('transcript')}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-label-sm text-label-sm font-semibold transition-all cursor-pointer',
+                    activeTab === 'transcript'
+                      ? 'bg-primary text-on-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  )}
+                >
+                  <Icon name="subtitles" className="text-[16px]" />
+                  <span>Lời thoại ({segments.length})</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {activeTab === 'transcript' && (
+                  <button
+                    type="button"
+                    onClick={() => setUserAutoScroll(!userAutoScroll)}
+                    title={userAutoScroll ? 'Đang tự cuộn theo lời thoại' : 'Đã tắt tự cuộn'}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-label-sm text-label-sm font-semibold transition-colors cursor-pointer',
+                      userAutoScroll
+                        ? 'bg-primary-fixed text-on-primary-fixed'
+                        : 'bg-surface-container text-on-surface-variant'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        userAutoScroll ? 'bg-primary animate-pulse' : 'bg-outline'
+                      )}
+                    />
+                    Cuộn
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowScript(false)}
                   className="rounded-md p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                  title="Thu gọn khung tóm tắt (phóng to video)"
+                  title="Thu gọn khung tóm tắt"
                 >
                   <Icon name="chevron_right" className="text-[18px]" />
                 </button>
               </div>
             </div>
 
-          {/* Danh sách các câu thoại bóc tách (Đồng bộ theo thời gian video) */}
-          <div
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5 max-h-[320px] md:max-h-[360px] scroll-smooth"
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'var(--color-surface-container-highest) transparent',
-            }}
-          >
-            {segments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
-                <Icon name="mic_none" className="text-[32px] text-outline mb-1" />
-                <p className="font-body-sm text-body-sm">Đang tải tóm tắt video...</p>
-              </div>
-            ) : (
-              segments.map((seg, idx) => {
-                const isActive = idx === activeIndex;
-                const isPassed = currentTime > seg.end;
-
-                return (
-                  <div
-                    key={seg.id || idx}
-                    ref={isActive ? activeItemRef : null}
-                    onClick={() => handleSeek(seg.start)}
-                    role="button"
-                    tabIndex={0}
-                    className={cn(
-                      'group flex items-start gap-2.5 rounded-xl p-2.5 text-left transition-all duration-200 cursor-pointer border',
-                      isActive
-                        ? 'bg-primary-fixed/40 border-primary/30 shadow-xs ring-1 ring-primary/20'
-                        : isPassed
-                          ? 'bg-surface-container-low/40 border-transparent opacity-85 hover:bg-surface-container-low hover:opacity-100'
-                          : 'bg-transparent border-transparent opacity-65 hover:opacity-90 hover:bg-surface-container-low'
-                    )}
-                  >
-                    {/* Timestamp badge */}
-                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                      <span
-                        className={cn(
-                          'rounded-md px-1.5 py-0.5 font-mono text-[11px] font-medium transition-colors',
-                          isActive
-                            ? 'bg-primary text-on-primary font-semibold shadow-2xs'
-                            : 'bg-surface-container text-on-surface-variant group-hover:bg-primary-fixed group-hover:text-on-primary-fixed'
-                        )}
-                      >
-                        {formatTime(seg.start)}
-                      </span>
-                    </div>
-
-                    {/* Nội dung dòng chữ đọc được */}
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={cn(
-                          'font-body-sm text-body-sm leading-relaxed transition-colors',
-                          isActive
-                            ? 'font-bold text-on-primary-fixed'
-                            : isPassed
-                              ? 'text-on-surface'
-                              : 'text-on-surface-variant'
-                        )}
-                      >
-                        {seg.text}
-                      </p>
-                    </div>
-
-                    {/* Icon sóng âm thanh khi đoạn này đang nói */}
-                    {isActive && (
-                      <span className="shrink-0 text-primary animate-pulse mt-0.5" title="Đang đọc đoạn này">
-                        <Icon name="graphic_eq" className="text-[16px]" />
-                      </span>
-                    )}
+            {/* TAB 1: HIỂN THỊ CÔNG THỨC */}
+            {activeTab === 'recipe' && (
+              <div
+                className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 max-h-[360px] md:max-h-[420px] scroll-smooth bg-surface-container-lowest font-sans select-text"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'var(--color-surface-container-highest) transparent',
+                }}
+              >
+                {/* Dòng Khẩu phần & Thời gian */}
+                <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low px-3 py-2 border border-surface-container font-label-sm text-label-sm">
+                  <div className="flex items-center gap-1.5 text-on-surface-variant">
+                    <Icon name="group" className="text-[16px] text-primary" />
+                    <span>Khẩu phần:</span>
+                    <span className="font-semibold text-on-surface">
+                      {recipe?.servings ? `${recipe.servings} người` : '2 người'}
+                    </span>
                   </div>
-                );
-              })
-            )}
-          </div>
+                  <span className="text-outline-variant select-none">•</span>
+                  <div className="flex items-center gap-1.5 text-on-surface-variant">
+                    <Icon name="timer" className="text-[16px] text-primary" />
+                    <span>Thời gian:</span>
+                    <span className="font-semibold text-on-surface">
+                      {recipe?.cookTimeMinutes ? `${recipe.cookTimeMinutes} phút` : '15 phút'}
+                    </span>
+                  </div>
+                </div>
 
-          {/* Footer nhỏ của khung script */}
-          <div className="flex items-center justify-between border-t border-surface-container px-3.5 py-2 bg-surface-container-low/40 font-label-sm text-label-sm text-on-surface-variant">
-            <span className="truncate max-w-[220px]" title={subtitleSource || title || 'Dữ liệu CSDL VeggieLife'}>
-              {subtitleSource ? subtitleSource : (title ? title : 'Dữ liệu CSDL VeggieLife')}
-            </span>
-            <span className="font-mono text-label-sm font-semibold text-primary">
-              {activeIndex !== -1 ? `${activeIndex + 1}/${segments.length}` : `${segments.length} đoạn`}
-            </span>
+                {/* KHỐI NGUYÊN LIỆU: */}
+                <div>
+                  <h4 className="font-label-md text-label-md font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
+                    <Icon name="kitchen" className="text-[16px]" />
+                    <span>Nguyên liệu</span>
+                  </h4>
+                  {!recipe?.ingredients || recipe.ingredients.length === 0 ? (
+                    <div className="py-2 font-body-sm text-body-sm text-on-surface-variant italic">
+                      {segments.length > 0
+                        ? 'Đang trích xuất danh sách nguyên liệu từ video...'
+                        : 'Chưa có thông tin nguyên liệu.'}
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5 pl-1">
+                      {recipe.ingredients.map((ing, idx) => {
+                        const resolved = resolveIngredientAmount(ing);
+                        return (
+                          <li key={idx} className="flex items-start gap-2 font-body-sm text-body-sm leading-relaxed text-on-surface">
+                            <span className="text-primary font-bold text-base select-none leading-none mt-0.5">
+                              •
+                            </span>
+                            <span className="min-w-0">
+                              <span className="font-semibold text-primary mr-1.5 inline-block">
+                                {resolved.quantity} {resolved.unit}
+                              </span>
+                              <span className="font-medium text-on-surface">{resolved.name}.</span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {/* KHỐI CÁCH LÀM: */}
+                <div>
+                  <h4 className="font-label-md text-label-md font-bold uppercase tracking-wider text-primary mt-1 mb-2 flex items-center gap-1.5">
+                    <Icon name="soup_kitchen" className="text-[16px]" />
+                    <span>Cách làm</span>
+                  </h4>
+                  {stepGroups.length === 0 ? (
+                    <div className="py-2 font-body-sm text-body-sm text-on-surface-variant italic">
+                      {segments.length > 0
+                        ? 'Đang tóm tắt các bước thực hiện...'
+                        : 'Chưa có hướng dẫn thực hiện.'}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {stepGroups.map((grp, gIdx) => (
+                        <div key={gIdx} className="flex flex-col gap-2">
+                          <h5 className="font-label-md text-label-md font-bold text-on-surface">
+                            {grp.groupTitle}
+                          </h5>
+                          <ol className="flex flex-col gap-2 pl-0.5">
+                            {grp.items.map((step, sIdx) => (
+                              <li key={sIdx} className="flex items-start gap-2 font-body-sm text-body-sm leading-relaxed text-on-surface">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-fixed font-mono text-label-sm font-bold text-on-primary-fixed mt-0.5">
+                                  {sIdx + 1}
+                                </span>
+                                <span className="min-w-0 flex-1 pt-0.5">
+                                  {step.endsWith('.') ? step : `${step}.`}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* KHỐI MẸO NHỎ / LƯU Ý */}
+                <div className="flex items-start gap-2.5 rounded-xl border border-secondary-fixed bg-secondary-fixed/30 p-2.5 my-1">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-on-secondary mt-0.5">
+                    <Icon name="lightbulb" className="text-[14px]" />
+                  </span>
+                  <div className="font-body-sm text-body-sm leading-relaxed text-on-surface">
+                    <span className="font-semibold text-secondary">Mẹo: </span>
+                    <span>
+                      {recipe?.tips?.[0]?.replace(/^mẹo[:\s-]*/i, '') ||
+                        'Nên nấu với lửa nhỏ để nguyên liệu thấm đều gia vị và giữ được màu sắc tươi ngon tự nhiên của món chay.'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Chân trang công thức */}
+                <div className="flex items-center justify-between pt-2 border-t border-surface-container font-label-sm text-label-sm text-on-surface-variant">
+                  <span className="truncate font-medium">
+                    {title || recipe?.title || 'Sổ tay nấu ăn VeggieLife'}
+                  </span>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-[10px] text-on-primary">
+                    VL
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: HIỂN THỊ LỜI THOẠI ĐỒNG BỘ THEO THỜI GIAN VIDEO */}
+            {activeTab === 'transcript' && (
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5 max-h-[360px] md:max-h-[420px] scroll-smooth"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'var(--color-surface-container-highest) transparent',
+                }}
+              >
+                {segments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
+                    <Icon name="mic_none" className="text-[32px] text-outline mb-1" />
+                    <p className="font-body-sm text-body-sm">Đang tải lời thoại video...</p>
+                  </div>
+                ) : (
+                  segments.map((seg, idx) => {
+                    const isActive = idx === activeIndex;
+                    const isPassed = currentTime > seg.end;
+
+                    return (
+                      <div
+                        key={seg.id || idx}
+                        ref={isActive ? activeItemRef : null}
+                        onClick={() => handleSeek(seg.start)}
+                        role="button"
+                        tabIndex={0}
+                        className={cn(
+                          'group flex items-start gap-2.5 rounded-xl p-2.5 text-left transition-all duration-200 cursor-pointer border',
+                          isActive
+                            ? 'bg-primary-fixed/40 border-primary/30 shadow-xs ring-1 ring-primary/20'
+                            : isPassed
+                              ? 'bg-surface-container-low/40 border-transparent opacity-85 hover:bg-surface-container-low hover:opacity-100'
+                              : 'bg-transparent border-transparent opacity-65 hover:opacity-90 hover:bg-surface-container-low'
+                        )}
+                      >
+                        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                          <span
+                            className={cn(
+                              'rounded-md px-1.5 py-0.5 font-mono text-[11px] font-medium transition-colors',
+                              isActive
+                                ? 'bg-primary text-on-primary font-semibold shadow-2xs'
+                                : 'bg-surface-container text-on-surface-variant group-hover:bg-primary-fixed group-hover:text-on-primary-fixed'
+                            )}
+                          >
+                            {formatTime(seg.start)}
+                          </span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              'font-body-sm text-body-sm leading-relaxed transition-colors',
+                              isActive
+                                ? 'font-bold text-on-primary-fixed'
+                                : isPassed
+                                  ? 'text-on-surface'
+                                  : 'text-on-surface-variant'
+                            )}
+                          >
+                            {seg.text}
+                          </p>
+                        </div>
+
+                        {isActive && (
+                          <span className="shrink-0 text-primary animate-pulse mt-0.5" title="Đang đọc đoạn này">
+                            <Icon name="graphic_eq" className="text-[16px]" />
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Footer chân khung tóm tắt */}
+            <div className="flex items-center justify-between border-t border-surface-container px-3.5 py-1.5 bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">
+              <span className="truncate max-w-[220px]" title={subtitleSource || 'CSDL VeggieLife'}>
+                {subtitleSource || 'CSDL VeggieLife'}
+              </span>
+              <span className="font-label-sm text-label-sm font-semibold text-primary">
+                {activeTab === 'recipe'
+                  ? `${recipe?.ingredients?.length ?? 0} nguyên liệu`
+                  : activeIndex !== -1
+                    ? `${activeIndex + 1}/${segments.length}`
+                    : `${segments.length} đoạn`}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 };
 

@@ -122,9 +122,67 @@ export interface CostPoint {
   costUsd: number;
 }
 
+export interface UserTierDistribution {
+  vipTokens: number;
+  vipCostUsd: number;
+  memberTokens: number;
+  memberCostUsd: number;
+  systemTokens: number;
+  systemCostUsd: number;
+}
+
+export interface TopSpender {
+  userId: number;
+  fullName: string;
+  email: string;
+  role: string;
+  totalTokens: number;
+  totalCostUsd: number;
+  requestCount: number;
+}
+
 export type LlmopsDashboard = Omit<DeepRequired<Schemas['GetAdminLlmopsDashboardResponse']['data']>, 'series'> & {
   series: CostPoint[];
+  totalPromptTokens?: number;
+  totalCompletionTokens?: number;
+  promptCostUsd?: number;
+  completionCostUsd?: number;
+  userTierDistribution?: UserTierDistribution;
+  topSpenders?: TopSpender[];
 };
+
+export interface LlmopsLogItem {
+  logId: number;
+  userId: number;
+  userFullName: string;
+  userEmail: string;
+  userRole: string;
+  featureCode: string;
+  tokensConsumed: number;
+  costEstimateUsd: number;
+  requestStatus: 'SUCCESS' | 'QUOTA_EXCEEDED' | 'ERROR' | string;
+  errorMessage?: string | null;
+  executionTimeMs: number;
+  createdAt: string;
+}
+
+export interface LlmopsLogFilters {
+  from?: string;
+  to?: string;
+  feature?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface LlmopsLogsResponse {
+  items: LlmopsLogItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
 export type KnowledgeScope = NonNullable<Schemas['CreateAdminKnowledgeReindexRequest']['scope']>;
 export type KnowledgeSource = keyof NonNullable<Schemas['ListAdminKnowledgeStatusResponse']['data']['bySource']>;

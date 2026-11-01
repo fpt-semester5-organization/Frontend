@@ -1,7 +1,7 @@
 import http from '@/api/http';
 import type { ApiEnvelope } from '@/api/types';
 import { toApiError } from '@/lib/apiError';
-import type { ExtractVideoResult, TranscriptResult, VideoTranscriptResponse } from '../types/video.types';
+import type { ExtractedRecipe, ExtractVideoResult, TranscriptResult, VideoTranscriptResponse } from '../types/video.types';
 
 /**
  * GET /videos/{id}/transcript — FN-POST-09 Xem bản phiên âm & công thức của video.
@@ -26,27 +26,65 @@ export async function extractVideoRecipe(videoId: number) {
   return res.data;
 }
 
-/**
- * Gọi trực tiếp AI STT Microservice qua proxy /ai-stt để bóc tách video bằng Faster-Whisper & Gemini nguyên bản.
- * Xử lý trực tiếp từ Frontend mà không cần thay đổi bất kỳ dòng code nào ở Backend hay AI Service.
- */
-export async function extractVideoDirectlyWithAi(videoUrl: string): Promise<{
+export interface DirectAiRecipe {
+  title: string;
+  servings?: number | null;
+  cookTimeMinutes?: number | null;
+  prepTimeMinutes?: number | null;
+  ingredients: Array<{ name: string; quantity?: number | null; unit?: string | null }>;
+  steps: string[];
+  tips?: string[];
+}
+
+export interface DirectAiExtractResult {
   rawTranscript: string;
-  durationSeconds?: number;
-  recipe?: {
-    title: string;
-    ingredients: Array<{ name: string; quantity?: number | null; unit?: string | null }>;
-    steps: string[];
-  };
-}> {
-  const res = await http.post<{
+  durationSeconds: number;
+  recipe?: DirectAiRecipe;
+}
+
+/**
+ * Lưu kết quả bóc tách bản phiên âm và công thức từ video xuống CSDL Backend (FN-POST-09, FN-POST-10).
+ * Giúp dữ liệu lưu vĩnh viễn, lần sau mở lên hiển thị ngay mà không cần gọi lại AI.
+ */
+export async function saveVideoTranscript(
+  videoId: number,
+  data: {
     rawTranscript: string;
-    durationSeconds: number;
-    recipe: {
-      title: string;
-      ingredients: Array<{ name: string; quantity?: number | null; unit?: string | null }>;
-      steps: string[];
-    };
-  }>('/ai-stt/stt/video-to-recipe', { videoUrl }, { timeout: 60000 });
+    recipe?: ExtractedRecipe | null;
+    segments?: Array<{ start: number; end: number; text: string }>;
+    sttModelVersion?: string;
+  }
+) {
+  const res = await http.post<ApiEnvelope<VideoTranscriptResponse>>(`/videos/${videoId}/transcript`, data);
   return res.data;
+}
+
+/**
+ * Gọi AI STT Microservice qua proxy /ai-stt để bóc tách video bằng Faster-Whisper & Gemini.
+ */
+export async function extractVideoDirectlyWithAi(videoUrl: string): Promise<DirectAiExtractResult> {
+  const res = await http.post<DirectAiExtractResult>('/ai-stt/stt/video-to-recipe', { videoUrl }, { timeout: 120000 });
+  return res.data;
+}
+
+/**
+ * Quy trình chuẩn: Gọi AI STT 1 lần duy nhất, sau đó LƯU NGAY XUỐNG CSDL BACKEND.
+ * Khi lưu thành công, bất kỳ người dùng nào mở video sau này đều có sẵn công thức từ Backend.
+ */
+export async function extractAndSaveVideoRecipe(
+  videoId: number,
+  videoUrl: string
+): Promise<{ rawTranscript: string; recipe?: ExtractedRecipe; durationSeconds?: number }> {
+  const aiResult = await extractVideoDirectlyWithAi(videoUrl);
+  if (videoId > 0 && aiResult.rawTranscript) {
+    try {
+      await saveVideoTranscript(videoId, {
+        rawTranscript: aiResult.rawTranscript,
+        recipe: aiResult.recipe as ExtractedRecipe,
+      });
+    } catch (saveErr) {
+      console.warn('Lỗi lưu transcript xuống Backend:', saveErr);
+    }
+  }
+  return aiResult as { rawTranscript: string; recipe?: ExtractedRecipe; durationSeconds?: number };
 }
