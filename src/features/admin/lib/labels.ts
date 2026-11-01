@@ -128,6 +128,15 @@ export const FEATURE_LABEL: Record<string, string> = {
 export const featureLabel = (feature: string | null | undefined) =>
   !feature ? 'Tất cả tính năng' : (FEATURE_LABEL[feature] ?? 'Tính năng khác');
 
+export const LLMOPS_STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
+  SUCCESS: { label: 'Thành công', tone: 'success' },
+  QUOTA_EXCEEDED: { label: 'Hết hạn mức', tone: 'warning' },
+  ERROR: { label: 'Lỗi', tone: 'error' },
+};
+
+export const llmopsStatusLabel = (status: string | null | undefined) =>
+  (status && LLMOPS_STATUS_LABEL[status]) || { label: status || 'Không rõ', tone: 'neutral' as Tone };
+
 export const KNOWLEDGE_SCOPE_LABEL: Record<KnowledgeScope, string> = {
   ALL: 'Toàn bộ kho tri thức',
   RECIPE: 'Công thức đã duyệt',
