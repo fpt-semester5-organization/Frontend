@@ -120,7 +120,7 @@ export const TopDishSearchBar: React.FC<TopDishSearchBarProps> = ({
           onFocus={() => {
             if (keyword.trim()) setIsOpen(true);
           }}
-          placeholder="Tìm món thay thế trong database..."
+          placeholder="Tìm công thức thay thế..."
           className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/90 pl-10 pr-9 py-2 text-xs sm:text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-hidden shadow-2xs transition-all"
         />
         {keyword && (
@@ -177,6 +177,9 @@ export const TopDishSearchBar: React.FC<TopDishSearchBarProps> = ({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
+                      {recipe.foodName && (
+                        <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">{recipe.foodName}</p>
+                      )}
                       <p className="font-semibold text-xs text-gray-900 dark:text-gray-100 truncate">
                         {recipe.title}
                       </p>

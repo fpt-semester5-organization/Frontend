@@ -329,7 +329,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Nhập tên món cần thay thế (debounce 300ms)..."
+                  placeholder="Nhập tên công thức thay thế..."
                   className="w-full rounded-xl border border-surface-container bg-surface-container-low pl-10 pr-9 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-hidden transition-all"
                 />
                 {searchQuery && (
@@ -409,6 +409,9 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
+                          {recipe.foodName && (
+                            <p className="truncate text-[11px] text-on-surface-variant">{recipe.foodName}</p>
+                          )}
                           <p className="font-semibold text-xs text-on-surface truncate">
                             {recipe.title}
                           </p>
