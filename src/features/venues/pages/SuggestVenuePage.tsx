@@ -210,7 +210,15 @@ const SuggestVenuePage: React.FC = () => {
             {recipe.isPending ? (
               <div className="mt-1 h-7 w-56 animate-pulse rounded bg-surface-container" />
             ) : (
-              <h1 className="break-words font-headline-md text-headline-md text-on-surface">{recipe.data?.title ?? `Công thức #${recipeId}`}</h1>
+              <>
+                {/* Gợi ý theo món ăn (tên chung); tên công thức hiện phụ bên dưới. */}
+                <h1 className="break-words font-headline-md text-headline-md text-on-surface">
+                  {recipe.data?.foodName || recipe.data?.title || `Công thức #${recipeId}`}
+                </h1>
+                {recipe.data?.foodName && (
+                  <p className="break-words font-body-sm text-body-sm text-on-surface-variant">Từ công thức: {recipe.data.title}</p>
+                )}
+              </>
             )}
           </div>
         </div>
