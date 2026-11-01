@@ -58,6 +58,12 @@ const AdminHome = lazy(() => import('@/features/admin/pages/AdminHome'));
 const AdminUsersPage = lazy(() => import('@/features/admin/pages/AdminUsersPage'));
 const AdminUserDetailPage = lazy(() => import('@/features/admin/pages/AdminUserDetailPage'));
 const AdminAiPage = lazy(() => import('@/features/admin/pages/AdminAiPage'));
+const AdminAiLayout = lazy(() => import('@/features/admin/layouts/AdminAiLayout'));
+const AiOverviewPage = lazy(() => import('@/features/admin/pages/ai/AiOverviewPage'));
+const AiAnalyticsPage = lazy(() => import('@/features/admin/pages/ai/AiAnalyticsPage'));
+const AiLogsPage = lazy(() => import('@/features/admin/pages/ai/AiLogsPage'));
+const AiRagPage = lazy(() => import('@/features/admin/pages/ai/AiRagPage'));
+const AiQualityPage = lazy(() => import('@/features/admin/pages/ai/AiQualityPage'));
 const AdminDietarySchoolsPage = lazy(() => import('@/features/admin/pages/AdminDietarySchoolsPage'));
 const AdminENumbersPage = lazy(() => import('@/features/admin/pages/AdminENumbersPage'));
 const AdminIngredientsPage = lazy(() => import('@/features/admin/pages/AdminIngredientsPage'));
@@ -190,7 +196,17 @@ const router = createBrowserRouter([
               { path: PATHS.ADMIN.CATEGORIES, element: <AdminCategories /> },
               { path: PATHS.ADMIN.USERS, element: <AdminUsersPage /> },
               { path: PATHS.ADMIN.USER_DETAIL(':id'), element: <AdminUserDetailPage /> },
-              { path: PATHS.ADMIN.AI, element: <AdminAiPage /> },
+              {
+                path: PATHS.ADMIN.AI,
+                element: <AdminAiLayout />,
+                children: [
+                  { index: true, element: <AiOverviewPage /> },
+                  { path: 'analytics', element: <AiAnalyticsPage /> },
+                  { path: 'logs', element: <AiLogsPage /> },
+                  { path: 'rag', element: <AiRagPage /> },
+                  { path: 'quality', element: <AiQualityPage /> },
+                ],
+              },
               { path: PATHS.ADMIN.DIETARY_SCHOOLS, element: <AdminDietarySchoolsPage /> },
               { path: PATHS.ADMIN.E_NUMBERS, element: <AdminENumbersPage /> },
               { path: PATHS.ADMIN.INGREDIENTS, element: <AdminIngredientsPage /> },

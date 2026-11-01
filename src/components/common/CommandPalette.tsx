@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '@/components/ui/Modal';
 import { ADMIN_NAV } from '@/config/nav';
+import { PATHS } from '@/routes/paths';
+
+const EXTRA_ADMIN_COMMANDS = [
+  { label: 'Phân tích Chi phí AI', to: PATHS.ADMIN.AI_ANALYTICS, icon: 'analytics' },
+  { label: 'Nhật ký cuộc gọi AI (Logs)', to: PATHS.ADMIN.AI_LOGS, icon: 'receipt_long' },
+  { label: 'Kho tri thức RAG (Qdrant)', to: PATHS.ADMIN.AI_RAG, icon: 'database' },
+  { label: 'Chất lượng AI & SLA', to: PATHS.ADMIN.AI_QUALITY, icon: 'verified' },
+];
 
 /** Menu lệnh Ctrl+K: nhảy nhanh tới các màn Admin (dựng bằng react-bootstrap Modal). */
 export function CommandPalette({ show, onHide }: { show: boolean; onHide: () => void }) {
@@ -16,7 +24,8 @@ export function CommandPalette({ show, onHide }: { show: boolean; onHide: () => 
       .replace(/đ/g, 'd')
       .replace(/Đ/g, 'D')
       .toLowerCase();
-  const items = useMemo(() => ADMIN_NAV.filter((i) => norm(i.label).includes(norm(q))), [q]);
+  const allCommands = useMemo(() => [...ADMIN_NAV, ...EXTRA_ADMIN_COMMANDS], []);
+  const items = useMemo(() => allCommands.filter((i) => norm(i.label).includes(norm(q))), [allCommands, q]);
   useEffect(() => {
     if (show) {
       setQ('');
