@@ -1,11 +1,18 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAdminAiMetrics, getAdminKnowledgeStatus, getAdminLlmopsDashboard, reindexAdminKnowledge } from '../api/admin.api';
+import {
+  getAdminAiMetrics,
+  getAdminKnowledgeStatus,
+  getAdminLlmopsDashboard,
+  getAdminLlmopsLogs,
+  reindexAdminKnowledge,
+} from '../api/admin.api';
 import { retryServerErrorsOnce } from '../lib/endpoint';
-import type { AiMetricsFilters, KnowledgeScope, LlmopsFilters } from '../types/admin.types';
+import type { AiMetricsFilters, KnowledgeScope, LlmopsFilters, LlmopsLogFilters } from '../types/admin.types';
 
 export const aiKeys = {
   all: ['admin', 'ai'] as const,
   llmops: (filters: LlmopsFilters) => [...aiKeys.all, 'llmops', filters] as const,
+  llmopsLogs: (filters: LlmopsLogFilters) => [...aiKeys.all, 'llmops-logs', filters] as const,
   metrics: (filters: AiMetricsFilters) => [...aiKeys.all, 'metrics', filters] as const,
   knowledge: ['admin', 'ai', 'knowledge'] as const,
 };
@@ -17,6 +24,16 @@ export function useLlmopsDashboard(filters: LlmopsFilters) {
     queryFn: () => getAdminLlmopsDashboard(filters),
     placeholderData: keepPreviousData,
     refetchInterval: 60 * 1000,
+    retry: retryServerErrorsOnce,
+  });
+}
+
+/** Tra cứu nhật ký AIQuotaLogs phân trang và lọc theo tiêu chí. */
+export function useLlmopsLogs(filters: LlmopsLogFilters) {
+  return useQuery({
+    queryKey: aiKeys.llmopsLogs(filters),
+    queryFn: () => getAdminLlmopsLogs(filters),
+    placeholderData: keepPreviousData,
     retry: retryServerErrorsOnce,
   });
 }
