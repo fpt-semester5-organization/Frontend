@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PATHS } from '@/routes/paths';
+import { useLegalDocuments } from '../hooks/useLegalDocuments';
+import { formatDateTime } from '@/lib/format';
+import type { LegalDocType } from '../types/legal.types';
 import {
   FileText,
   ShieldCheck,
@@ -15,11 +18,17 @@ import {
   HeartHandshake,
   Mail,
   Printer,
+  Download,
+  Calendar,
+  Eye,
 } from 'lucide-react';
 
 export default function TermsPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string>('intro');
+  const [selectedScanDoc, setSelectedScanDoc] = useState<LegalDocType>('TERMS');
+
+  const { data: legalDocs } = useLegalDocuments();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -28,14 +37,49 @@ export default function TermsPage() {
 
   const sections = [
     { id: 'intro', title: '1. Giới thiệu & Phạm vi áp dụng' },
-    { id: 'account', title: '2. Tài khoản & Trách nhiệm bảo mật' },
-    { id: 'content', title: '3. Quyền sở hữu trí tuệ & Nội dung cộng đồng' },
-    { id: 'disclaimer', title: '4. Giới hạn trách nhiệm Dinh dưỡng & Y tế' },
-    { id: 'ai-features', title: '5. Tính năng AI & Quét tủ lạnh / Mã vạch' },
-    { id: 'subscription', title: '6. Gói VIP & Điều khoản thanh toán' },
-    { id: 'termination', title: '7. Tạm dừng, Khóa tài khoản & Xóa dữ liệu' },
-    { id: 'general', title: '8. Điều khoản chung & Thông tin liên hệ' },
+    { id: 'official-docs', title: '2. Văn bản số hóa chính thức (Cloudinary)' },
+    { id: 'account', title: '3. Tài khoản & Trách nhiệm bảo mật' },
+    { id: 'content', title: '4. Quyền sở hữu trí tuệ & Nội dung cộng đồng' },
+    { id: 'disclaimer', title: '5. Giới hạn trách nhiệm Dinh dưỡng & Y tế' },
+    { id: 'ai-features', title: '6. Tính năng AI & Quét tủ lạnh / Mã vạch' },
+    { id: 'subscription', title: '7. Gói VIP & Điều khoản thanh toán' },
+    { id: 'termination', title: '8. Tạm dừng, Khóa tài khoản & Xóa dữ liệu' },
+    { id: 'general', title: '9. Điều khoản chung & Thông tin liên hệ' },
   ];
+
+  const scanTabs: Array<{
+    id: LegalDocType;
+    label: string;
+    url: string | undefined;
+    pdfPath: string;
+  }> = [
+    {
+      id: 'TERMS',
+      label: 'Điều khoản dịch vụ',
+      url: legalDocs?.termsOfServiceUrl,
+      pdfPath: '/legal/Dieu_Khoan_Su_Dung_Dich_Vu_VeggieLife.pdf',
+    },
+    {
+      id: 'PRIVACY',
+      label: 'Chính sách bảo mật',
+      url: legalDocs?.privacyPolicyUrl,
+      pdfPath: '/legal/Chinh_Sach_Bao_Mat_Du_Lieu_VeggieLife.pdf',
+    },
+    {
+      id: 'USER_AGREEMENT',
+      label: 'Bản cam kết người dùng',
+      url: legalDocs?.userAgreementUrl,
+      pdfPath: '/legal/Ban_Cam_Ket_Va_Thoa_Thuan_Dang_Ky_Nguoi_Dung.pdf',
+    },
+    {
+      id: 'VEGAN_DISCLAIMER',
+      label: 'Quy chuẩn ăn chay & Miễn trừ',
+      url: legalDocs?.veganDisclaimerUrl,
+      pdfPath: '/legal/Quy_Chuan_Am_Thuc_Chay_Va_Mien_Tru_Y_Te_VeggieLife.pdf',
+    },
+  ];
+
+  const currentScan = scanTabs.find((t) => t.id === selectedScanDoc) ?? scanTabs[0];
 
   const handleScrollTo = (id: string) => {
     setActiveSection(id);
@@ -83,7 +127,9 @@ export default function TermsPage() {
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-fixed px-3 py-1 font-label-sm text-label-sm font-semibold text-on-primary-fixed">
                 <Scale className="h-3.5 w-3.5" />
                 <span>Văn bản pháp lý chính thức</span>
-                <span className="text-primary">• Hiệu lực từ 10/2026</span>
+                <span className="text-primary">
+                  • {legalDocs?.updatedAt ? `Cập nhật: ${formatDateTime(legalDocs.updatedAt)}` : 'Hiệu lực từ 10/2026'}
+                </span>
               </div>
               <h1 className="font-headline-lg text-headline-lg font-bold text-primary">
                 Điều Khoản Sử Dụng Dịch Vụ
@@ -135,7 +181,7 @@ export default function TermsPage() {
                 Tham khảo y tế & dinh dưỡng
               </h4>
               <p className="mt-1 font-body-sm text-body-sm text-amber-800/80 dark:text-amber-300/80">
-                Thực đơn và calo mang tính chất tham khảo, không thay thế chẩn đoán từ chuyên gia y tế.
+                {legalDocs?.medicalDisclaimer || 'Thực đơn và calo mang tính chất tham khảo, không thay thế chẩn đoán từ chuyên gia y tế.'}
               </p>
             </div>
 
@@ -177,7 +223,7 @@ export default function TermsPage() {
                       key={sec.id}
                       type="button"
                       onClick={() => handleScrollTo(sec.id)}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-left font-body-sm text-body-sm transition-all ${
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-left font-body-sm text-body-sm transition-all cursor-pointer ${
                         activeSection === sec.id
                           ? 'bg-primary-container font-semibold text-on-primary shadow-xs'
                           : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
@@ -232,189 +278,261 @@ export default function TermsPage() {
               </div>
             </section>
 
-            {/* Section 2 */}
+            {/* Section 2: Official Digitized Documents from Backend */}
+            <section
+              id="official-docs"
+              className="scroll-mt-24 rounded-2xl border border-primary/20 bg-surface-container-lowest p-6 shadow-xs md:p-8"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
+                    2
+                  </span>
+                  <span>Văn bản số hóa chính thức (Cloudinary)</span>
+                </h2>
+                {legalDocs?.updatedAt && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant font-medium">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span>Cập nhật: {formatDateTime(legalDocs.updatedAt)}</span>
+                  </span>
+                )}
+              </div>
+
+              <p className="font-body-md text-body-md text-on-surface-variant mb-4">
+                Dưới đây là hình ảnh số hóa nguyên bản của các văn bản pháp lý đã được ban hành và lưu trữ trên hệ thống máy chủ Cloudinary của VeggieLife:
+              </p>
+
+              {/* Document selection tabs */}
+              <div className="flex flex-wrap gap-2 mb-4 border-b border-surface-container-high pb-3">
+                {scanTabs.map((tab) => {
+                  const isSelected = selectedScanDoc === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSelectedScanDoc(tab.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs md:text-sm font-medium transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-primary text-on-primary font-semibold shadow-xs'
+                          : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                      }`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Document Preview Card */}
+              <div className="rounded-xl border border-surface-container-high bg-surface-container-low/40 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-label-md text-label-md font-semibold text-primary">
+                    {currentScan.label}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {currentScan.url && (
+                      <a
+                        href={currentScan.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-primary border border-primary/20 hover:bg-primary/10 transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Mở ảnh gốc Cloudinary</span>
+                      </a>
+                    )}
+                    <a
+                      href={currentScan.pdfPath}
+                      download
+                      className="inline-flex items-center gap-1 rounded bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-on-surface-variant border border-surface-container-high hover:bg-surface-container transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Tải file PDF</span>
+                    </a>
+                  </div>
+                </div>
+
+                {currentScan.url ? (
+                  <div className="overflow-hidden rounded-lg border border-surface-container-high bg-white shadow-xs flex justify-center">
+                    <img
+                      src={currentScan.url}
+                      alt={currentScan.label}
+                      className="w-full max-h-[550px] object-contain object-top"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-sm text-on-surface-variant">
+                    Đang kết nối API máy chủ Backend...
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Section 3 */}
             <section
               id="account"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  2
+                  3
                 </span>
                 <span>Tài khoản & Trách nhiệm bảo mật</span>
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  2.1. <strong>Độ tuổi sử dụng:</strong> Người dùng từ đủ 13 tuổi trở lên có thể tự đăng ký tài khoản. Người dùng dưới 13 tuổi cần có sự đồng ý hoặc giám sát từ cha mẹ/người giám hộ hợp pháp.
+                  3.1. <strong>Độ tuổi sử dụng:</strong> Người dùng từ đủ 13 tuổi trở lên có thể tự đăng ký tài khoản. Người dùng dưới 13 tuổi cần có sự đồng ý hoặc giám sát từ cha mẹ/người giám hộ hợp pháp.
                 </p>
                 <p>
-                  2.2. <strong>Thông tin đăng ký:</strong> Bạn cam kết cung cấp thông tin họ tên, email chính xác, thuộc quyền sở hữu của bạn. Mỗi email chỉ được liên kết với một tài khoản duy nhất trên hệ thống.
+                  3.2. <strong>Bảo mật thông tin đăng nhập:</strong> Bạn có trách nhiệm tự bảo vệ mật khẩu, mã OTP xác thực và thiết bị cá nhân của mình. Không chia sẻ mã OTP cho bất kỳ ai, kể cả nhân viên của VeggieLife.
                 </p>
                 <p>
-                  2.3. <strong>Bảo mật thông tin đăng nhập:</strong>
+                  3.3. <strong>Tính xác thực của thông tin:</strong> Bạn cam kết cung cấp địa chỉ email chính chủ và hợp lệ khi đăng ký để nhận mã kích hoạt và thông báo quan trọng từ hệ thống.
                 </p>
-                <ul className="list-disc space-y-1.5 pl-6 text-on-surface">
-                  <li>
-                    Mật khẩu phải tuân thủ chuẩn an toàn (tối thiểu 8 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt).
-                  </li>
-                  <li>
-                    Bạn chịu trách nhiệm toàn bộ đối với việc bảo mật mật khẩu và mã OTP xác minh.
-                  </li>
-                  <li>
-                    Sau 5 lần đăng nhập sai liên tiếp, hệ thống sẽ tự động tạm khóa tài khoản trong 15 phút theo Quy tắc Nghiệp vụ BR-AUTH-004 nhằm bảo vệ an toàn cho bạn.
-                  </li>
-                  <li>
-                    Nếu phát hiện có dấu hiệu truy cập trái phép, bạn cần thông báo ngay cho VeggieLife để hỗ trợ xử lý.
-                  </li>
-                </ul>
               </div>
             </section>
 
-            {/* Section 3 */}
+            {/* Section 4 */}
             <section
               id="content"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
-                  3
+                  4
                 </span>
                 <span>Quyền sở hữu trí tuệ & Nội dung cộng đồng</span>
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  3.1. <strong>Sở hữu của VeggieLife:</strong> Toàn bộ giao diện, thiết kế, logo, mã nguồn, thuật toán AI gợi ý và cơ sở dữ liệu dinh dưỡng thuộc quyền sở hữu trí tuệ độc quyền của VeggieLife. Nghiêm cấm sao chép, dịch ngược hoặc thương mại hóa khi chưa có sự cho phép bằng văn bản.
+                  4.1. <strong>Sở hữu của VeggieLife:</strong> Toàn bộ giao diện, thiết kế, logo, mã nguồn, thuật toán AI gợi ý và cơ sở dữ liệu dinh dưỡng thuộc quyền sở hữu trí tuệ độc quyền của VeggieLife. Nghiêm cấm sao chép, dịch ngược hoặc thương mại hóa khi chưa có sự cho phép bằng văn bản.
                 </p>
                 <p>
-                  3.2. <strong>Nội dung do người dùng đăng tải (UGC):</strong> Khi bạn chia sẻ công thức món chay, hình ảnh món ăn, bình luận hoặc bài viết cộng đồng:
-                </p>
-                <ul className="list-disc space-y-1.5 pl-6 text-on-surface">
-                  <li>
-                    Bạn khẳng định sở hữu bản quyền hoặc có đủ quyền sử dụng hình ảnh/nội dung đó.
-                  </li>
-                  <li>
-                    Bạn cấp cho VeggieLife quyền miễn phí bản quyền để lưu trữ, hiển thị và giới thiệu công thức đến cộng đồng ăn chay.
-                  </li>
-                  <li>
-                    Nghiêm cấm đăng tải nội dung chứa thành phần thịt động vật, công thức phản khoa học, nội dung xuyên tạc, thù địch hoặc trái với văn hóa ẩm thực chay.
-                  </li>
-                </ul>
-              </div>
-            </section>
-
-            {/* Section 4 */}
-            <section
-              id="disclaimer"
-              className="scroll-mt-24 rounded-2xl border border-amber-200 bg-amber-50/40 p-6 shadow-xs dark:border-amber-900/60 dark:bg-amber-950/20 md:p-8"
-            >
-              <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-amber-900 dark:text-amber-200">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-200 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
-                  4
-                </span>
-                <span>Giới hạn trách nhiệm Dinh dưỡng & Y tế (Quan trọng)</span>
-              </h2>
-              <div className="space-y-3 font-body-md text-body-md text-amber-950/90 dark:text-amber-200/90 leading-relaxed">
-                <div className="rounded-xl border border-amber-300 bg-amber-100/60 p-4 dark:border-amber-800 dark:bg-amber-900/40 font-medium">
-                  ⚠️ <strong>Cảnh báo y tế:</strong> Nền tảng VeggieLife được xây dựng với mục đích hỗ trợ định hướng lối sống xanh, tham khảo dinh dưỡng và chia sẻ công thức ẩm thực. Hệ thống <strong>không phải là một cơ sở y tế</strong> và không cung cấp dịch vụ điều trị bệnh.
-                </div>
-                <p>
-                  4.1. <strong>Tính năng phân tích dị ứng:</strong> Hệ thống cung cấp cảnh báo thành phần dị ứng và phụ gia E-number dựa trên cơ sở dữ liệu tham khảo tiêu chuẩn quốc tế và trường phái ăn chay mà bạn khai báo (Thuần chay Vegan, Ăn chay có trứng sữa Lacto-Ovo, Ăn chay Phật giáo...). Tuy nhiên, quy trình chế biến thực tế tại nhà hoặc nhà hàng có thể tiềm ẩn nguy cơ nhiễm chéo.
+                  4.2. <strong>Nội dung do người dùng đăng tải (UGC):</strong> Khi bạn đăng bài viết, công thức món chay hoặc bình luận, bạn cấp cho VeggieLife quyền sử dụng phi độc quyền, miễn phí bản quyền trên toàn cầu để hiển thị, lưu trữ và phân phối nội dung đó trong phạm vi nền tảng.
                 </p>
                 <p>
-                  4.2. <strong>Trách nhiệm cá nhân:</strong> Người dùng có tiền sử dị ứng nghiêm trọng, phụ nữ mang thai, người mắc bệnh lý mạn tính (tiểu đường, tim mạch, suy thận...) cần tham khảo ý kiến bác sĩ chuyên khoa hoặc chuyên gia dinh dưỡng được cấp phép trước khi áp dụng bất kỳ thực đơn nào. VeggieLife miễn trừ trách nhiệm đối với các rủi ro phát sinh từ việc người dùng tự ý áp dụng chế độ ăn uống không phù hợp với thể trạng.
+                  4.3. <strong>Quy tắc cấm kỵ (Tiêu chuẩn cộng đồng):</strong> Nghiêm cấm đăng tải nội dung chứa thịt động vật hoặc cố ý gắn nhãn sai lệch trường phái ăn chay; nội dung kích động bạo lực, xúc phạm danh dự người khác; hoặc quảng cáo gian dối. Bài viết vi phạm sẽ bị hệ thống tự động gỡ bỏ hoặc kiểm duyệt xử lý theo quy định D109.
                 </p>
               </div>
             </section>
 
             {/* Section 5 */}
             <section
-              id="ai-features"
-              className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
+              id="disclaimer"
+              className="scroll-mt-24 rounded-2xl border border-amber-200/80 bg-amber-50/40 p-6 shadow-xs md:p-8 dark:border-amber-900/50 dark:bg-amber-950/20"
             >
-              <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
+              <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-amber-900 dark:text-amber-200">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-200 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
                   5
                 </span>
-                <span>Tính năng AI & Quét tủ lạnh / Mã vạch</span>
+                <span>Giới hạn trách nhiệm Dinh dưỡng & Y tế (Quan trọng)</span>
               </h2>
-              <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
+              <div className="space-y-3 font-body-md text-body-md text-amber-950/90 dark:text-amber-200/90 leading-relaxed">
+                <div className="rounded-xl border border-amber-300 bg-amber-100/60 p-4 dark:border-amber-800 dark:bg-amber-900/40 font-medium">
+                  ⚠️ <strong>Cảnh báo y tế chính thức:</strong>{' '}
+                  {legalDocs?.medicalDisclaimer ||
+                    'Nền tảng VeggieLife được xây dựng với mục đích hỗ trợ định hướng lối sống xanh, tham khảo dinh dưỡng và chia sẻ công thức ẩm thực. Hệ thống không phải là một cơ sở y tế và không cung cấp dịch vụ điều trị bệnh.'}
+                </div>
                 <p>
-                  5.1. <strong>Công nghệ AI Vision:</strong> Tính năng quét tủ lạnh và quét mã vạch sử dụng mô hình thị giác máy tính và học máy để nhận diện nguyên liệu chay từ ảnh chụp thực tế.
+                  5.1. <strong>Tính năng phân tích dị ứng:</strong> Hệ thống cung cấp cảnh báo thành phần dị ứng và phụ gia E-number dựa trên cơ sở dữ liệu tham khảo tiêu chuẩn quốc tế và trường phái ăn chay mà bạn khai báo (Thuần chay Vegan, Ăn chay có trứng sữa Lacto-Ovo, Ăn chay Phật giáo...). Tuy nhiên, quy trình chế biến thực tế tại nhà hoặc nhà hàng có thể tiềm ẩn nguy cơ nhiễm chéo.
                 </p>
                 <p>
-                  5.2. <strong>Độ chính xác tương đối:</strong> Kết quả nhận diện phụ thuộc vào góc chụp, ánh sáng và bao bì thực phẩm. Người dùng cần luôn kiểm tra lại bảng danh sách nguyên liệu và điều chỉnh trước khi bấm lưu vào tủ lạnh hoặc gợi ý thực đơn.
-                </p>
-                <p>
-                  5.3. <strong>Hạn mức truy vấn (Quota):</strong> Nhằm đảm bảo tài nguyên hệ thống, mỗi tài khoản Khách / Thành viên / VIP sẽ áp dụng hạn mức quét theo quy định trong từng thời kỳ (BR-SCAN-QUOTA).
+                  5.2. <strong>Trách nhiệm cá nhân:</strong> Người dùng có tiền sử dị ứng nghiêm trọng, phụ nữ mang thai, người mắc bệnh lý mạn tính (tiểu đường, tim mạch, suy thận...) cần tham khảo ý kiến bác sĩ chuyên khoa hoặc chuyên gia dinh dưỡng được cấp phép trước khi áp dụng bất kỳ thực đơn nào. VeggieLife miễn trừ trách nhiệm đối với các rủi ro phát sinh từ việc người dùng tự ý áp dụng chế độ ăn uống không phù hợp với thể trạng.
                 </p>
               </div>
             </section>
 
             {/* Section 6 */}
             <section
-              id="subscription"
+              id="ai-features"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
                   6
                 </span>
-                <span>Gói VIP & Điều khoản thanh toán</span>
+                <span>Tính năng AI & Quét tủ lạnh / Mã vạch</span>
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  6.1. <strong>Gói hội viên VIP:</strong> VeggieLife cung cấp các gói nâng cấp VIP với quyền lợi mở rộng hạn mức AI, tạo thực đơn tuần không giới hạn và công thức độc quyền.
+                  6.1. <strong>Công nghệ AI Vision:</strong> Tính năng quét tủ lạnh và quét mã vạch sử dụng mô hình thị giác máy tính và học máy để nhận diện nguyên liệu chay từ ảnh chụp thực tế.
                 </p>
                 <p>
-                  6.2. <strong>Phương thức thanh toán:</strong> Mọi giao dịch được thanh toán bằng tiền đồng Việt Nam (VNĐ) qua các cổng thanh toán uy tín (MoMo, VietQR / chuyển khoản ngân hàng).
+                  6.2. <strong>Độ chính xác tương đối:</strong> Kết quả nhận diện phụ thuộc vào góc chụp, ánh sáng và bao bì thực phẩm. Người dùng cần luôn kiểm tra lại bảng danh sách nguyên liệu và điều chỉnh trước khi bấm lưu vào tủ lạnh hoặc gợi ý thực đơn.
                 </p>
                 <p>
-                  6.3. <strong>Chính sách hoàn tiền:</strong> Nếu có sự cố lỗi hệ thống khiến gói VIP không được kích hoạt sau khi đã thanh toán thành công, vui lòng liên hệ bộ phận hỗ trợ trong vòng 48 giờ để được kiểm tra và kích hoạt bù hoặc hoàn tiền.
+                  6.3. <strong>Hạn mức truy vấn (Quota):</strong> Nhằm đảm bảo tài nguyên hệ thống, mỗi tài khoản Khách / Thành viên / VIP sẽ áp dụng hạn mức quét theo quy định trong từng thời kỳ (BR-SCAN-QUOTA).
                 </p>
               </div>
             </section>
 
             {/* Section 7 */}
             <section
-              id="termination"
+              id="subscription"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
                   7
                 </span>
-                <span>Tạm dừng, Khóa tài khoản & Xóa dữ liệu</span>
+                <span>Gói VIP & Điều khoản thanh toán</span>
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  7.1. <strong>Xử lý vi phạm:</strong> VeggieLife có quyền cảnh cáo, tạm dừng hoặc khóa vĩnh viễn tài khoản nếu người dùng có hành vi gian lận, tấn công hệ thống mạng, quấy rối thành viên khác, hoặc phát tán nội dung vi phạm tiêu chuẩn cộng đồng chay.
+                  7.1. <strong>Gói hội viên VIP:</strong> VeggieLife cung cấp các gói nâng cấp VIP với quyền lợi mở rộng hạn mức AI, tạo thực đơn tuần không giới hạn và công thức độc quyền.
                 </p>
                 <p>
-                  7.2. <strong>Yêu cầu xóa tài khoản:</strong> Bạn có quyền yêu cầu xóa tài khoản tại trang Cài đặt hồ sơ cá nhân. Hệ thống áp dụng <strong>thời gian ân hạn 30 ngày</strong>: trong thời gian này, bạn có thể đăng nhập lại để khôi phục tài khoản nếu đổi ý. Hết 30 ngày, toàn bộ thông tin cá nhân sẽ bị xóa vĩnh viễn theo quy định.
+                  7.2. <strong>Phương thức thanh toán:</strong> Mọi giao dịch được thanh toán bằng tiền đồng Việt Nam (VNĐ) qua các cổng thanh toán uy tín (MoMo, VietQR / chuyển khoản ngân hàng).
+                </p>
+                <p>
+                  7.3. <strong>Chính sách hoàn tiền:</strong> Nếu có sự cố lỗi hệ thống khiến gói VIP không được kích hoạt sau khi đã thanh toán thành công, vui lòng liên hệ bộ phận hỗ trợ trong vòng 48 giờ để được kiểm tra và kích hoạt bù hoặc hoàn tiền.
                 </p>
               </div>
             </section>
 
             {/* Section 8 */}
             <section
-              id="general"
+              id="termination"
               className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
             >
               <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
                   8
                 </span>
+                <span>Tạm dừng, Khóa tài khoản & Xóa dữ liệu</span>
+              </h2>
+              <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                <p>
+                  8.1. <strong>Xử lý vi phạm:</strong> VeggieLife có quyền cảnh cáo, tạm dừng hoặc khóa vĩnh viễn tài khoản nếu người dùng có hành vi gian lận, tấn công hệ thống mạng, quấy rối thành viên khác, hoặc phát tán nội dung vi phạm tiêu chuẩn cộng đồng chay.
+                </p>
+                <p>
+                  8.2. <strong>Yêu cầu xóa tài khoản:</strong> Bạn có quyền yêu cầu xóa tài khoản tại trang Cài đặt hồ sơ cá nhân. Hệ thống áp dụng <strong>thời gian ân hạn 30 ngày</strong>: trong thời gian này, bạn có thể đăng nhập lại để khôi phục tài khoản nếu đổi ý. Hết 30 ngày, toàn bộ thông tin cá nhân sẽ bị xóa vĩnh viễn theo quy định.
+                </p>
+              </div>
+            </section>
+
+            {/* Section 9 */}
+            <section
+              id="general"
+              className="scroll-mt-24 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs md:p-8"
+            >
+              <h2 className="mb-4 flex items-center gap-2.5 font-headline-sm text-headline-sm font-bold text-primary">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-on-primary-fixed">
+                  9
+                </span>
                 <span>Điều khoản chung & Thông tin liên hệ</span>
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  8.1. <strong>Sửa đổi điều khoản:</strong> VeggieLife có thể cập nhật bản Điều khoản này khi có sự thay đổi về pháp lý hoặc tính năng sản phẩm. Mọi sửa đổi quan trọng sẽ được thông báo đến người dùng qua email hoặc biểu ngữ trên website.
+                  9.1. <strong>Sửa đổi điều khoản:</strong> VeggieLife có thể cập nhật bản Điều khoản này khi có sự thay đổi về pháp lý hoặc tính năng sản phẩm. Mọi sửa đổi quan trọng sẽ được thông báo đến người dùng qua email hoặc biểu ngữ trên website.
                 </p>
                 <p>
-                  8.2. <strong>Luật điều chỉnh:</strong> Điều khoản này được điều chỉnh và giải thích theo quy định của pháp luật nước Cộng hòa Xã hội Chủ nghĩa Việt Nam.
+                  9.2. <strong>Luật điều chỉnh:</strong> Điều khoản này được điều chỉnh và giải thích theo quy định của pháp luật nước Cộng hòa Xã hội Chủ nghĩa Việt Nam.
                 </p>
                 <p>
-                  8.3. <strong>Liên hệ:</strong>
+                  9.3. <strong>Liên hệ:</strong>
                 </p>
                 <div className="rounded-xl bg-surface-container-low p-4 text-on-surface">
                   <p className="font-semibold text-primary">Dự án VeggieLife — Ẩm thực & Dinh dưỡng Chay</p>
@@ -425,22 +543,21 @@ export default function TermsPage() {
             </section>
 
             {/* Footer actions inside content */}
-            <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-surface-container-high bg-surface-container-low p-6 sm:flex-row">
-              <div className="space-y-1 text-center sm:text-left">
-                <h4 className="font-headline-sm text-headline-sm text-primary">
-                  Tìm hiểu thêm về quyền riêng tư?
-                </h4>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-6 shadow-xs">
+              <div className="space-y-1">
+                <h4 className="font-label-lg text-label-lg font-bold text-on-surface">Bạn đã sẵn sàng cùng VeggieLife?</h4>
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Xem chi tiết cách chúng tôi bảo vệ thông tin sức khỏe và dữ liệu của bạn.
+                  Tạo tài khoản ngay hôm nay để khám phá hàng ngàn công thức nấu món chay hấp dẫn.
                 </p>
               </div>
-              <Link
-                to={PATHS.PRIVACY}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-container px-5 py-2.5 font-label-md text-label-md font-semibold text-on-primary shadow-xs transition hover:bg-primary"
-              >
-                <span>Xem Chính sách bảo mật</span>
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  to={PATHS.AUTH.REGISTER}
+                  className="rounded-xl bg-primary px-5 py-2.5 font-label-md text-label-md font-semibold text-on-primary shadow-xs transition hover:bg-primary-container hover:text-on-primary-container"
+                >
+                  Đăng ký tài khoản
+                </Link>
+              </div>
             </div>
           </div>
         </div>
