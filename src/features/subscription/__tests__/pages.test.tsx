@@ -1,9 +1,10 @@
 import { AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/stores/auth.store';
+import { useUiStore } from '@/stores/ui.store';
 import { renderWithProviders } from '@/test/test-utils';
 import * as api from '../api/subscription.api';
 import { CheckoutPage } from '../pages/CheckoutPage';
@@ -34,6 +35,8 @@ beforeEach(() => {
   sessionStorage.clear();
   useAuthStore.setState({ user, accessToken: 't', guestToken: null });
   vi.mocked(api.listPlans).mockResolvedValue(plans);
+  vi.mocked(api.cancelPendingOrder).mockClear();
+  useUiStore.setState({ toasts: [] });
 });
 
 describe('PricingPage (SCR-30)', () => {
@@ -64,7 +67,24 @@ describe('PricingPage (SCR-30)', () => {
 
 describe('CheckoutPage (SCR-31)', () => {
   const renderCheckout = (id = '1') =>
-    renderWithProviders(<Routes><Route path="/vip/checkout/:planId" element={<CheckoutPage />} /><Route path="/vip/result" element={<div>RESULT</div>} /></Routes>, `/vip/checkout/${id}`);
+    renderWithProviders(
+      <Routes>
+        <Route path="/vip/checkout/:planId" element={<CheckoutPage />} />
+        <Route path="/vip/result" element={<div>RESULT</div>} />
+        <Route path="/vip" element={<div>PRICING</div>} />
+      </Routes>,
+      `/vip/checkout/${id}`
+    );
+
+  const pending = { isVip: false, transactions: [{ transactionId: 3001, gateway: 'VIETQR', amountVnd: 49000, status: 'PENDING', createdAt: new Date().toISOString() }] };
+  /** Đang ở bước quét mã: đơn 3001 còn 5 phút, server báo PENDING. */
+  const openPayPanel = async () => {
+    vi.mocked(api.checkout).mockResolvedValue({ transactionId: 3001, orderCode: 'VL_1', amountVnd: 49000, payUrl: 'https://pay.example/qr.png', expiresAt: new Date(Date.now() + 300_000).toISOString() });
+    vi.mocked(api.getMySubscription).mockResolvedValue(pending);
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: 'Tạo mã VietQR' }));
+    expect(await screen.findByText('VL_1')).toBeInTheDocument();
+  };
 
   it('gói không tồn tại -> trạng thái không tìm thấy', async () => {
     renderCheckout('99');
@@ -80,6 +100,66 @@ describe('CheckoutPage (SCR-31)', () => {
     expect(await screen.findByText('VL_1')).toBeInTheDocument();
     expect(JSON.parse(sessionStorage.getItem('vl_pending_order') ?? '{}').transactionId).toBe(3001);
     expect(screen.getByAltText('Mã QR VietQR')).toBeInTheDocument();
+  });
+
+  it('hủy phiên: hỏi xác nhận kèm hậu quả, chỉ gọi cancel-pending sau khi xác nhận, rồi về trang chọn gói', async () => {
+    vi.mocked(api.cancelPendingOrder).mockResolvedValue({ cancelled: true, message: 'Đã hủy đơn chờ thanh toán thành công.' });
+    await openPayPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy phiên thanh toán này' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/mã QR và liên kết thanh toán của đơn không dùng được nữa/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Nếu bạn đã chuyển khoản, đừng hủy/)).toBeInTheDocument();
+    expect(api.cancelPendingOrder).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hủy phiên thanh toán' }));
+    expect(await screen.findByText('PRICING')).toBeInTheDocument();
+    expect(api.cancelPendingOrder).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem('vl_pending_order')).toBeNull();
+    expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Đã hủy phiên thanh toán. Bạn có thể chọn lại gói hoặc cổng thanh toán.');
+  });
+
+  it('bấm "Tiếp tục thanh toán" thì đóng hộp thoại, không hủy đơn', async () => {
+    await openPayPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy phiên thanh toán này' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Tiếp tục thanh toán' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.cancelPendingOrder).not.toHaveBeenCalled();
+    expect(screen.getByText('VL_1')).toBeInTheDocument();
+  });
+
+  it('không còn đơn chờ để hủy (vừa thanh toán xong, đơn hết hạn) thì sang trang kết quả đọc trạng thái thật', async () => {
+    vi.mocked(api.cancelPendingOrder).mockResolvedValue({ cancelled: false, message: 'Không có đơn chờ thanh toán nào cần hủy.' });
+    await openPayPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy phiên thanh toán này' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Hủy phiên thanh toán' }));
+    expect(await screen.findByText('RESULT')).toBeInTheDocument();
+    expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Không có đơn chờ thanh toán nào cần hủy.');
+  });
+
+  it('hủy lỗi thì ở lại trang thanh toán, báo lỗi', async () => {
+    vi.mocked(api.cancelPendingOrder).mockRejectedValue(apiError(400, 'ERR_VALIDATION', 'Không hủy được đơn.'));
+    await openPayPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy phiên thanh toán này' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Hủy phiên thanh toán' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByText('VL_1')).toBeInTheDocument();
+    expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Không hủy được đơn.');
+  });
+
+  it('409 đang có đơn chờ: "Hủy đơn đang chờ" giải phóng đơn cũ rồi tạo được đơn mới ngay', async () => {
+    vi.mocked(api.checkout).mockRejectedValueOnce(apiError(409, 'ERR_PAYMENT_PENDING_EXISTS', 'Đang có đơn chờ thanh toán chưa hết hạn.'));
+    vi.mocked(api.cancelPendingOrder).mockResolvedValue({ cancelled: true, message: 'Đã hủy.' });
+    vi.mocked(api.getMySubscription).mockResolvedValue(pending);
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: 'Tạo mã VietQR' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Hủy đơn đang chờ' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(api.cancelPendingOrder).toHaveBeenCalledTimes(1);
+    expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Đã hủy đơn đang chờ. Bạn có thể tạo đơn mới.');
+
+    vi.mocked(api.checkout).mockResolvedValue({ transactionId: 3002, orderCode: 'VL_2', amountVnd: 49000, payUrl: 'https://pay.example/qr2.png', expiresAt: new Date(Date.now() + 300_000).toISOString() });
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo mã VietQR' }));
+    expect(await screen.findByText('VL_2')).toBeInTheDocument();
   });
 
   it('409 ERR_PAYMENT_PENDING_EXISTS -> hộp thoại với message của server', async () => {
