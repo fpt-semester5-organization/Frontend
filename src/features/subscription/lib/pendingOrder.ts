@@ -1,8 +1,11 @@
-import type { CheckoutResult, Gateway } from '../types/subscription.types';
+import { parseServerDate } from '@/lib/serverDate';
+import { storage } from '@/lib/storage';
+import type { CheckoutResult, Gateway, SubscriptionTransaction } from '../types/subscription.types';
 
 /**
- * Đơn thanh toán đang chờ, lưu ở sessionStorage ngay sau khi tạo (trước khi chuyển sang cổng) để trang kết quả
- * biết `transactionId` cần theo dõi. Chỉ là tiện ích hiển thị — trạng thái thật luôn lấy từ GET /users/me/subscription.
+ * Đơn thanh toán đang chờ, lưu ở localStorage ngay sau khi tạo (trước khi chuyển sang cổng) để trang kết quả
+ * biết `transactionId` cần theo dõi. Không dùng sessionStorage vì trang cổng mở ở tab mới và quay về ngay trong tab đó.
+ * Chỉ là tiện ích hiển thị — trạng thái thật luôn lấy từ GET /users/me/subscription.
  */
 export interface PendingOrder extends CheckoutResult {
   planId: number;
@@ -13,17 +16,35 @@ export interface PendingOrder extends CheckoutResult {
 
 const KEY = 'vl_pending_order';
 
+/** Đơn chờ có hiệu lực 5 phút kể từ lúc tạo (BR-PAY-TXN-01). */
+const ORDER_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Trạng thái hiển thị của giao dịch. Server chuyển PENDING sang EXPIRED chậm (job quét mỗi phút, GET /users/me/subscription
+ * còn cache cả danh sách 5 phút) nên quá 5 phút mà server vẫn báo PENDING thì hiển thị Hết hạn.
+ * Chỉ áp dụng cho PENDING: mọi trạng thái khác, nhất là SUCCESS, luôn theo server.
+ */
+export function displayStatus(tx: Pick<SubscriptionTransaction, 'status' | 'createdAt'>, now: number): string {
+  if (tx.status !== 'PENDING') return tx.status;
+  const createdAt = parseServerDate(tx.createdAt)?.getTime();
+  return createdAt !== undefined && now >= createdAt + ORDER_TTL_MS ? 'EXPIRED' : 'PENDING';
+}
+
+/** Số giây còn lại của đơn theo `expiresAt` của server; 0 là đã hết hạn. */
+export function secondsLeft(expiresAt: string, now: number): number {
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
+}
+
+export const formatCountdown = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+/** Storage bị chặn thì không lưu được: trang kết quả sẽ rơi về giao dịch mới nhất. */
 export function savePendingOrder(order: PendingOrder) {
-  try {
-    sessionStorage.setItem(KEY, JSON.stringify(order));
-  } catch {
-    /* sessionStorage bị chặn: trang kết quả sẽ rơi về giao dịch mới nhất */
-  }
+  storage.set(KEY, JSON.stringify(order));
 }
 
 export function readPendingOrder(userId?: number): PendingOrder | null {
   try {
-    const raw = sessionStorage.getItem(KEY);
+    const raw = storage.get(KEY);
     if (!raw) return null;
     const o = JSON.parse(raw) as PendingOrder;
     if (typeof o.transactionId !== 'number' || (userId !== undefined && o.userId !== userId)) return null;
@@ -34,11 +55,13 @@ export function readPendingOrder(userId?: number): PendingOrder | null {
 }
 
 export function clearPendingOrder() {
-  try {
-    sessionStorage.removeItem(KEY);
-  } catch {
-    /* bỏ qua */
-  }
+  storage.remove(KEY);
+}
+
+/** Mã đơn cổng gắn trên URL có phải đơn này không: PayOS trả phần số của orderCode (VL_1793516377203 → 1793516377203). */
+export function isSameOrder(order: PendingOrder, gatewayOrder: string | null | undefined): boolean {
+  if (!gatewayOrder) return false;
+  return gatewayOrder === order.orderCode || gatewayOrder === order.orderCode.replace(/\D/g, '');
 }
 
 /** Chỉ cho phép chuyển hướng tới http(s) — không tin chuỗi lạ (javascript:, data:…) từ phản hồi cổng. */

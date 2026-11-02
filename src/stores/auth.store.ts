@@ -18,8 +18,8 @@ export type UserRole = AuthUser['role'];
 
 export type SessionStatus = 'restoring' | 'ready';
 
-const TOKEN_KEY = 'vl_access_token';
-const USER_KEY = 'vl_user';
+export const TOKEN_KEY = 'vl_access_token';
+export const USER_KEY = 'vl_user';
 const GUEST_KEY = 'vl_guest_token';
 
 const readUser = (): AuthUser | null => {

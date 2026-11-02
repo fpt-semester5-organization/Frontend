@@ -1,6 +1,9 @@
 import { QUOTA } from '@/constants/quota';
 import type { TierBenefits } from '../types/subscription.types';
 
+/** Tính năng chỉ VIP mới có (BR-PAY-SUB-03), ngoài các hạn mức trong `benefitRows`. */
+export const VIP_EXCLUSIVE_FEATURES = ['Xem calo chi tiết của thực đơn tuần', 'Xuất PDF thực đơn và danh sách đi chợ'];
+
 /** Dòng quyền lợi để hiển thị. `chatPerDay` của VIP có thể null: hiển thị "tối đa N" theo BR (QUOTA.chatPerDay.vip). */
 export function benefitRows(benefits: { free?: TierBenefits; vip?: TierBenefits } | undefined) {
   const chatVip = benefits?.vip?.chatPerDay;

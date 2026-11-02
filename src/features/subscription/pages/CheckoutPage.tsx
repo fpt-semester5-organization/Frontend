@@ -18,22 +18,10 @@ import { PATHS } from '@/routes/paths';
 import { selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
-import { useCancelPending, useCheckout, useMySubscription, usePlans } from '../hooks/useSubscription';
-import { clearPendingOrder, isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, type PendingOrder } from '../lib/pendingOrder';
+import { useCancelPending, useCheckout, useMySubscription, useNow, usePlans } from '../hooks/useSubscription';
+import { clearPendingOrder, formatCountdown, isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { checkoutSchema, parsePlanId, type CheckoutForm } from '../schemas/checkout.schemas';
 import type { Gateway } from '../types/subscription.types';
-
-const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-
-function useCountdown(expiresAt: string | undefined) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!expiresAt) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [expiresAt]);
-  return expiresAt ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000)) : null;
-}
 
 export function CheckoutPage() {
   const planId = parsePlanId(useParams().planId);
@@ -170,7 +158,7 @@ function GatewayForm({ planId, planName, onCreated }: { planId: number; planName
 /* ---------- Bước 2: hiển thị đơn, theo dõi kết quả ---------- */
 function PayPanel({ order }: { order: PendingOrder }) {
   const navigate = useNavigate();
-  const left = useCountdown(order.expiresAt);
+  const left = secondsLeft(order.expiresAt, useNow(true));
   const sub = useMySubscription({ pollMs: 3000 });
   const cancel = useCancelPending();
   const [confirming, setConfirming] = useState(false);
@@ -214,12 +202,10 @@ function PayPanel({ order }: { order: PendingOrder }) {
   const copy = (v: string) => navigator.clipboard?.writeText(v).then(() => toast.success('Đã sao chép'), () => toast.error('Không sao chép được'));
 
   return (
-    <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg shadow-sm lg:col-span-3" aria-live="polite">
+    <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg shadow-sm lg:col-span-3">
       <div className="flex items-center justify-between">
         <h1 className="font-headline-md text-headline-md text-primary">{order.gateway === 'MOMO' ? 'Thanh toán MoMo' : 'Thanh toán VietQR'}</h1>
-        {left !== null && (
-          <span className={`rounded-full px-3 py-1 font-label-md text-label-md ${left < 60 ? 'bg-error-container text-on-error-container' : 'bg-secondary-fixed text-on-secondary-fixed'}`}>Hết hạn sau {mmss(left)}</span>
-        )}
+        <span role="timer" className={`rounded-full px-3 py-1 font-label-md text-label-md ${left < 60 ? 'bg-error-container text-on-error-container' : 'bg-secondary-fixed text-on-secondary-fixed'}`}>Hết hạn sau {formatCountdown(left)}</span>
       </div>
       <dl className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-space-md font-body-sm text-body-sm">
         <div><dt className="text-on-surface-variant">Số tiền</dt><dd className="font-headline-sm text-headline-sm text-primary">{formatVnd(order.amountVnd)}</dd></div>
@@ -232,15 +218,20 @@ function PayPanel({ order }: { order: PendingOrder }) {
         </div>
       </dl>
       {qrImg && <img src={order.payUrl} alt="Mã QR VietQR" className="mx-auto h-56 w-56 rounded-lg bg-white object-contain p-2" />}
-      {url ? (
+      {qrImg ? (
+        // Backend chỉ trả ảnh QR khi không tạo được đơn trên cổng (chưa cấu hình hoặc cổng lỗi): sẽ không có webhook xác nhận.
+        <FormAlert tone="warning" title="Mã QR này không có xác nhận tự động">
+          Cổng thanh toán đang không khả dụng nên đây là mã chuyển khoản thông thường. Hệ thống sẽ không tự kích hoạt VIP sau khi bạn chuyển tiền. Bạn nên hủy phiên này và thử lại sau.
+        </FormAlert>
+      ) : url ? (
         <a href={url} target={order.gateway === 'MOMO' ? '_self' : '_blank'} rel="noopener noreferrer" className="rounded-lg bg-secondary px-4 py-3 text-center font-label-md text-label-md text-on-secondary hover:opacity-90">
           {order.gateway === 'MOMO' ? 'Mở lại cổng MoMo' : 'Mở trang thanh toán VietQR'}
         </a>
       ) : (
         <FormAlert>Máy chủ không trả liên kết thanh toán hợp lệ. Hãy tạo lại đơn sau khi đơn hiện tại hết hạn.</FormAlert>
       )}
-      <p className="font-label-sm text-label-sm text-on-surface-variant">
-        {sub.isError ? 'Chưa kiểm tra được trạng thái đơn, đang thử lại…' : 'Đang chờ xác nhận từ cổng thanh toán (thường dưới 30 giây). Trang sẽ tự chuyển khi có kết quả.'}
+      <p aria-live="polite" className="font-label-sm text-label-sm text-on-surface-variant">
+        {sub.isError ? 'Chưa kiểm tra được trạng thái đơn, đang thử lại…' : qrImg ? 'Trang sẽ tự chuyển khi đơn hết hạn hoặc có kết quả.' : 'Đang chờ xác nhận từ cổng thanh toán (thường dưới 30 giây). Trang sẽ tự chuyển khi có kết quả.'}
       </p>
       <div className="flex flex-col gap-space-sm sm:flex-row">
         <button type="button" onClick={() => navigate(result)} className="flex-1 rounded-lg bg-primary-container px-4 py-3 font-label-md text-label-md text-on-primary hover:bg-primary">Kiểm tra trạng thái</button>
@@ -261,7 +252,7 @@ function PayPanel({ order }: { order: PendingOrder }) {
         message={
           <div className="flex flex-col gap-2">
             <p>
-              Đơn <span className="font-mono font-semibold">{order.orderCode}</span> sẽ bị hủy ngay; mã QR và liên kết thanh toán của đơn không dùng được nữa.
+              Đơn <span className="font-mono font-semibold">{order.orderCode}</span> sẽ bị hủy ngay. Đừng thanh toán bằng mã QR hoặc liên kết của đơn này nữa.
               Bạn quay về trang chọn gói để đổi gói hoặc cổng thanh toán.
             </p>
             <p className="font-semibold text-on-surface">

@@ -1,29 +1,8 @@
 import { refreshAccessToken } from '@/api/session';
+import { decodeJwtClaims } from '@/lib/jwtClaims';
 import { useAuthStore } from '@/stores/auth.store';
 
-interface Claims {
-  role?: string;
-  isVip?: boolean;
-}
-
-const ROLE_CLAIM_LONG = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
-
-/** Đọc payload JWT (không xác thực chữ ký — chỉ để đồng bộ giao diện; server vẫn kiểm tra mọi request). */
-export function decodeJwtClaims(token: string): Claims {
-  try {
-    const part = token.split('.')[1];
-    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
-    const p = JSON.parse(decodeURIComponent(escape(json))) as Record<string, unknown>;
-    const role = (p.role ?? p[ROLE_CLAIM_LONG]) as string | string[] | undefined;
-    const isVipRaw = p.isVip ?? p.is_vip;
-    return {
-      role: Array.isArray(role) ? role[0] : role,
-      isVip: typeof isVipRaw === 'string' ? isVipRaw.toLowerCase() === 'true' : typeof isVipRaw === 'boolean' ? isVipRaw : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
+export { decodeJwtClaims };
 
 /**
  * Sau khi VIP kích hoạt (IPN thành công), JWT cũ vẫn mang role MEMBER/isVip=false (D104) nên RequireVip và hạn mức sai.
