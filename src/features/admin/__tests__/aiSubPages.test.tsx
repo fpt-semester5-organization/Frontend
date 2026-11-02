@@ -116,24 +116,20 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     const nav = screen.getByRole('navigation', { name: 'Điều hướng phân hệ AI' });
     expect(within(nav).getByText('Tổng quan')).toBeInTheDocument();
     expect(within(nav).getByText('Phân tích Chi phí')).toBeInTheDocument();
-    expect(within(nav).getByText('Nhật ký cuộc gọi (Logs)')).toBeInTheDocument();
-    expect(within(nav).getByText('Kho tri thức RAG (Qdrant)')).toBeInTheDocument();
-    expect(within(nav).getByText('Chất lượng AI & SLA')).toBeInTheDocument();
+    expect(within(nav).getByText('Nhật ký cuộc gọi')).toBeInTheDocument();
+    expect(within(nav).getByText('Kho tri thức RAG')).toBeInTheDocument();
+    expect(within(nav).getByText('Chất lượng & SLA')).toBeInTheDocument();
   });
 
-  it('2. AiOverviewPage hiển thị các thẻ KPI và 4 thẻ Bento navigation', async () => {
+  it('2. AiOverviewPage hiển thị các thẻ KPI tổng quan và khối Tiêu thụ theo Người dùng', async () => {
     mockApi(handler());
     renderWithProviders(<AiOverviewPage />, '/admin/ai');
 
     expect(await screen.findByText('Chi phí hôm nay')).toBeInTheDocument();
     expect(screen.getByText('Chi phí 30 ngày qua')).toBeInTheDocument();
-    expect(screen.getByText('Phân hệ Quản lý Chi tiết')).toBeInTheDocument();
-
-    // 4 thẻ Bento Card
-    expect(screen.getByText('Phân tích Chi phí & Token')).toBeInTheDocument();
-    expect(screen.getByText('Nhật ký cuộc gọi (Logs)')).toBeInTheDocument();
-    expect(screen.getByText('Kho tri thức RAG (Qdrant)')).toBeInTheDocument();
-    expect(screen.getByText('Chất lượng AI & SLA')).toBeInTheDocument();
+    expect(screen.getByText('Tiêu thụ theo Người dùng')).toBeInTheDocument();
+    expect(screen.getByText('Phân bổ theo Hạng Hội viên')).toBeInTheDocument();
+    expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
   });
 
   it('3. AiAnalyticsPage hiển thị bộ lọc, biểu đồ, nút xem bảng số liệu và top spenders', async () => {
@@ -144,6 +140,29 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     expect(screen.getByRole('group', { name: 'Cách xem' })).toBeInTheDocument();
     expect(screen.getByText('Phân bổ theo Hạng Hội viên')).toBeInTheDocument();
     expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
+
+    // Kiểm tra chuyển đổi các loại biểu đồ
+    const switcher = screen.getByRole('group', { name: 'Cách xem' });
+
+    // 1. Chuyển sang Vùng xu hướng (Stacked Area)
+    await userEvent.click(within(switcher).getByRole('button', { name: /Vùng xu hướng/ }));
+    expect(screen.getByLabelText('Biểu đồ vùng chi phí AI theo ngày')).toBeInTheDocument();
+
+    // 2. Chuyển sang Biểu đồ tròn % (Pie Chart)
+    await userEvent.click(within(switcher).getByRole('button', { name: /Biểu đồ tròn %/ }));
+    expect(screen.getByLabelText('Biểu đồ tròn tỷ trọng chi phí')).toBeInTheDocument();
+
+    // 3. Chuyển sang Phân rã Token (Input vs Output)
+    await userEvent.click(within(switcher).getByRole('button', { name: /Phân rã Token/ }));
+    expect(screen.getByLabelText('Biểu đồ phân rã Token Input và Output')).toBeInTheDocument();
+
+    // 4. Chuyển sang Theo tính năng (Feature Bars)
+    await userEvent.click(within(switcher).getByRole('button', { name: /Theo tính năng/ }));
+    expect(screen.getByLabelText('Chi phí AI theo tính năng')).toBeInTheDocument();
+
+    // 5. Quay về Cột chồng (Daily Stacked Bar)
+    await userEvent.click(within(switcher).getByRole('button', { name: /Cột chồng/ }));
+    expect(screen.getByLabelText('Biểu đồ chi phí AI theo ngày')).toBeInTheDocument();
   });
 
   it('4. AiLogsPage hiển thị bảng tra cứu cuộc gọi toàn màn hình', async () => {
