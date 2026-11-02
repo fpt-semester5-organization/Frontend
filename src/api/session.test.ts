@@ -1,7 +1,47 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/stores/auth.store';
-import { _resetBanHandlingForTests, getBannedReason, handleAccountBanned } from './session';
+import { mockApi } from '@/test/mockApi';
+import { _resetBanHandlingForTests, getBannedReason, handleAccountBanned, refreshAccessToken, syncRoleClaims } from './session';
+
+const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+const jwt = (claims: object) => `h.${b64(claims)}.s`;
+
+describe('session - đồng bộ role/isVip theo JWT mới (D104)', () => {
+  const member = { userId: 101, fullName: 'An', email: 'an@x.vn', role: 'MEMBER' as const, isVip: false };
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    useAuthStore.setState({ user: member, accessToken: 'old', token: 'old', isAuthenticated: true });
+  });
+
+  it('webhook đã nâng VIP: lần làm mới token kế tiếp chuyển Thành viên sang VIP, không cần đăng nhập lại', async () => {
+    const token = jwt({ role: 'VIP', isVip: 'true' });
+    mockApi((req) => (req.url === '/auth/refresh-token' ? { data: { accessToken: token } } : undefined));
+    await expect(refreshAccessToken()).resolves.toBe(token);
+    expect(useAuthStore.getState().user).toMatchObject({ role: 'VIP', isVip: true });
+    expect(useAuthStore.getState().accessToken).toBe(token);
+    expect(JSON.parse(window.localStorage.getItem('vl_user') ?? '{}')).toMatchObject({ role: 'VIP', isVip: true });
+  });
+
+  it('VIP hết hạn: token mới hạ về Thành viên', () => {
+    useAuthStore.setState({ user: { ...member, role: 'VIP', isVip: true } });
+    expect(syncRoleClaims(jwt({ role: 'MEMBER', isVip: 'false' }))).toBe(true);
+    expect(useAuthStore.getState().user).toMatchObject({ role: 'MEMBER', isVip: false });
+  });
+
+  it('không đổi gì khi claim giống hiện tại hoặc token không đọc được', () => {
+    expect(syncRoleClaims(jwt({ role: 'MEMBER', isVip: 'false' }))).toBe(false);
+    expect(syncRoleClaims('khong-phai-jwt')).toBe(false);
+    expect(useAuthStore.getState().user).toMatchObject({ role: 'MEMBER', isVip: false });
+  });
+
+  it('chưa đăng nhập thì không tạo user từ token', () => {
+    useAuthStore.setState({ user: null });
+    expect(syncRoleClaims(jwt({ role: 'VIP', isVip: 'true' }))).toBe(false);
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+});
 
 describe('session - Ban Handling', () => {
   beforeEach(() => {

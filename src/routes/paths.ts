@@ -80,6 +80,12 @@ export const PATHS = {
     CHECKOUT: (planId: string | number) => `/vip/checkout/${planId}`,
     RESULT: '/vip/result',
   },
+  /** Cổng thanh toán chuyển về (đường dẫn do Backend quy định, chưa có trong docs/11); trang đích rồi chuyển tiếp sang SUBSCRIPTION.RESULT. */
+  PAYMENT: {
+    SUCCESS: '/payment/success',
+    CANCEL: '/payment/cancel',
+    CALLBACK: '/payment/callback',
+  },
   ADMIN: {
     ROOT: '/admin',
     DASHBOARD: '/admin',

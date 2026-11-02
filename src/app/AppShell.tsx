@@ -8,6 +8,7 @@ import { SignupPromptModal } from '@/components/common/SignupPromptModal';
 import { useSessionBanMonitor } from '@/features/auth/hooks/useSessionBanMonitor';
 import { useSessionRestore } from '@/features/auth/hooks/useSessionRestore';
 import { TranscriptWatcher } from '@/features/videos/components/TranscriptWatcher';
+import { useCrossTabSession } from '@/hooks/useCrossTabSession';
 import { useRealtimeAccountStatus } from '@/hooks/useRealtimeAccountStatus';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -19,6 +20,7 @@ export const AppShell: React.FC = () => {
   useSessionRestore();
   useSessionBanMonitor();
   useRealtimeAccountStatus();
+  useCrossTabSession();
 
   const navigate = useNavigate();
 

@@ -42,6 +42,7 @@ const FridgePage = lazy(() => import('@/features/fridge/pages/FridgePage'));
 const PricingPage = lazy(() => import('@/features/subscription/pages/PricingPage'));
 const CheckoutPage = lazy(() => import('@/features/subscription/pages/CheckoutPage'));
 const PaymentResultPage = lazy(() => import('@/features/subscription/pages/PaymentResultPage'));
+const PaymentReturnPage = lazy(() => import('@/features/subscription/pages/PaymentReturnPage'));
 const MySubscriptionPage = lazy(() => import('@/features/subscription/pages/MySubscriptionPage'));
 const SuggestVenuePage = lazy(() => import('@/features/venues/pages/SuggestVenuePage'));
 const TermsPage = lazy(() => import('@/features/legal/pages/TermsPage'));
@@ -152,6 +153,10 @@ const router = createBrowserRouter([
             children: [
               { path: PATHS.SUBSCRIPTION.CHECKOUT(':planId'), element: <CheckoutPage /> },
               { path: PATHS.SUBSCRIPTION.RESULT, element: <PaymentResultPage /> },
+              // Cổng thanh toán chuyển về: chuyển tiếp sang trang kết quả (hết phiên thì đăng nhập rồi quay lại đúng đây).
+              { path: PATHS.PAYMENT.SUCCESS, element: <PaymentReturnPage outcome="return" /> },
+              { path: PATHS.PAYMENT.CALLBACK, element: <PaymentReturnPage outcome="return" /> },
+              { path: PATHS.PAYMENT.CANCEL, element: <PaymentReturnPage outcome="cancel" /> },
               { path: PATHS.ME.SUBSCRIPTION, element: <MySubscriptionPage /> },
             ],
           },

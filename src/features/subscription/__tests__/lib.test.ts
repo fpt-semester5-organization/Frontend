@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { benefitRows, perThirtyDays } from '../lib/benefits';
-import { clearPendingOrder, isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, type PendingOrder } from '../lib/pendingOrder';
+import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { decodeJwtClaims } from '../lib/sessionClaims';
 import { checkoutSchema, parsePlanId } from '../schemas/checkout.schemas';
 
@@ -23,13 +23,40 @@ describe('checkout schema', () => {
 });
 
 describe('pendingOrder', () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => localStorage.clear());
   it('lưu/đọc theo người dùng', () => {
     savePendingOrder(order);
     expect(readPendingOrder(7)?.transactionId).toBe(3001);
     expect(readPendingOrder(8)).toBeNull();
     clearPendingOrder();
     expect(readPendingOrder(7)).toBeNull();
+  });
+  it('đơn PENDING quá 5 phút hiển thị Hết hạn dù server chưa cập nhật; trạng thái khác luôn theo server', () => {
+    const createdAt = '2026-11-02T10:00:00Z';
+    const at = (time: string) => new Date(time).getTime();
+    expect(displayStatus({ status: 'PENDING', createdAt }, at('2026-11-02T10:04:59Z'))).toBe('PENDING');
+    expect(displayStatus({ status: 'PENDING', createdAt }, at('2026-11-02T10:05:00Z'))).toBe('EXPIRED');
+    expect(displayStatus({ status: 'SUCCESS', createdAt }, at('2026-11-02T10:30:00Z'))).toBe('SUCCESS');
+    expect(displayStatus({ status: 'CANCELLED', createdAt }, at('2026-11-02T10:30:00Z'))).toBe('CANCELLED');
+  });
+  it('createdAt không có múi giờ được coi là UTC; không đọc được thì giữ PENDING', () => {
+    const at = (time: string) => new Date(time).getTime();
+    expect(displayStatus({ status: 'PENDING', createdAt: '2026-11-02T10:00:00.1234567' }, at('2026-11-02T10:04:00Z'))).toBe('PENDING');
+    expect(displayStatus({ status: 'PENDING', createdAt: '2026-11-02T10:00:00.1234567' }, at('2026-11-02T10:06:00Z'))).toBe('EXPIRED');
+    expect(displayStatus({ status: 'PENDING', createdAt: 'khong-phai-ngay' }, at('2026-11-02T10:06:00Z'))).toBe('PENDING');
+  });
+  it('đếm ngược theo expiresAt, không âm', () => {
+    const now = new Date('2026-11-02T10:00:00Z').getTime();
+    expect(secondsLeft('2026-11-02T10:01:05Z', now)).toBe(65);
+    expect(secondsLeft('2026-11-02T09:59:00Z', now)).toBe(0);
+    expect(formatCountdown(65)).toBe('01:05');
+  });
+  it('khớp mã đơn của cổng: PayOS trả phần số của orderCode', () => {
+    expect(isSameOrder({ ...order, orderCode: 'VL_1793516377203' }, '1793516377203')).toBe(true);
+    expect(isSameOrder({ ...order, orderCode: 'VL_1793516377203' }, 'VL_1793516377203')).toBe(true);
+    expect(isSameOrder({ ...order, orderCode: 'VL_1793516377203' }, '999')).toBe(false);
+    expect(isSameOrder(order, null)).toBe(false);
+    expect(isSameOrder(order, '')).toBe(false);
   });
   it('chỉ chấp nhận http(s) cho payUrl', () => {
     expect(safePayUrl('https://test-payment.momo.vn/pay?x=1')).toBe('https://test-payment.momo.vn/pay?x=1');

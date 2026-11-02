@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/lib/env';
+import { decodeJwtClaims } from '@/lib/jwtClaims';
 import { queryClient } from '@/lib/queryClient';
 import { storage } from '@/lib/storage';
 import { PATHS } from '@/routes/paths';
@@ -16,6 +17,22 @@ export const rawHttp = axios.create({ baseURL: API_BASE_URL, withCredentials: tr
 
 let refreshing: Promise<string> | null = null;
 
+/**
+ * JWT mới mang role/isVip hiện hành (D104). Nâng VIP hoặc hết hạn VIP xảy ra ở server (webhook, VipExpiryJob) nên giao diện chỉ biết
+ * khi có token mới: đồng bộ vào `user` và tải lại dữ liệu phụ thuộc quyền (calo chi tiết, hạn mức chat…). Trả về true nếu có thay đổi.
+ */
+export function syncRoleClaims(token: string): boolean {
+  const { user, updateUser } = useAuthStore.getState();
+  if (!user) return false;
+  const claims = decodeJwtClaims(token);
+  const role = claims.role === 'MEMBER' || claims.role === 'VIP' || claims.role === 'ADMIN' ? claims.role : user.role;
+  const isVip = claims.isVip ?? user.isVip;
+  if (role === user.role && isVip === user.isVip) return false;
+  updateUser({ role, isVip });
+  void queryClient.invalidateQueries();
+  return true;
+}
+
 /** FN-AUTH-09 — làm mới Access Token. Nhiều request 401 cùng lúc dùng chung 1 lần gọi (single-flight). */
 export function refreshAccessToken(): Promise<string> {
   refreshing ??= rawHttp
@@ -23,6 +40,7 @@ export function refreshAccessToken(): Promise<string> {
     .then((r) => {
       const token = r.data.data.accessToken;
       useAuthStore.getState().setAccessToken(token);
+      syncRoleClaims(token);
       return token;
     })
     .finally(() => {
