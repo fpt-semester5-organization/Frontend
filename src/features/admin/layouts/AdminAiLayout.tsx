@@ -28,19 +28,19 @@ export const AI_SUB_NAV: AiSubNavItem[] = [
     description: 'Biểu đồ chi phí token theo ngày, tính năng, phân rã Input/Output và Top Spenders.',
   },
   {
-    label: 'Nhật ký cuộc gọi (Logs)',
+    label: 'Nhật ký cuộc gọi',
     to: PATHS.ADMIN.AI_LOGS,
     icon: 'receipt_long',
     description: 'Tra cứu toàn bộ lịch sử gọi AI, kiểm tra prompt, response, latency và mã lỗi.',
   },
   {
-    label: 'Kho tri thức RAG (Qdrant)',
+    label: 'Kho tri thức RAG',
     to: PATHS.ADMIN.AI_RAG,
     icon: 'database',
     description: 'Trạng thái Vector Database, số điểm tri thức theo nguồn và kích hoạt đồng bộ lại.',
   },
   {
-    label: 'Chất lượng AI & SLA',
+    label: 'Chất lượng & SLA',
     to: PATHS.ADMIN.AI_QUALITY,
     icon: 'verified',
     description: 'Trạng thái ngắt mạch (Circuit Breaker), cảnh báo suy giảm độ chính xác và ma trận lỗi.',
@@ -58,7 +58,6 @@ export const AdminAiLayout: React.FC = () => {
     <div className="flex flex-col gap-space-lg">
       <AdminPageHeader
         title="Quản lý & Giám sát AI"
-        description="Theo dõi chi phí token, chất lượng phản hồi và quản trị kho tri thức vector của Chatbot RAG."
       />
 
       {/* Thanh Sub-navigation Tabs */}

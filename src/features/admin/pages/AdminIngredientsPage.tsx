@@ -12,6 +12,7 @@ import { formatNumber } from '@/lib/format';
 import { notifyInfo, notifySuccess } from '@/lib/notify';
 import { AdminPageHeader, AdminQueryError, CARD, CONTROL, ServerMessageDialog, StatusBadge, TD, TH, TableShell, TableSkeleton } from '../components/AdminUi';
 import { CheckRow, FormDialog, FormRow } from '../components/FormDialog';
+import { MasterDataTabs } from '../components/MasterDataTabs';
 import { SearchBox } from '../components/SearchBox';
 import {
   useAdminIngredients,
@@ -78,6 +79,7 @@ const AdminIngredientsPage: React.FC = () => {
           </>
         }
       />
+      <MasterDataTabs />
 
       <div className={cn(CARD, 'grid gap-space-sm p-space-md sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
         <SearchBox value={get('keyword')} onSearch={(keyword) => set({ keyword })} label="Tìm nguyên liệu" placeholder="Tên nguyên liệu" maxLength={100} />

@@ -57,7 +57,7 @@ const AdminENumbersPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-space-lg">
       <AdminPageHeader
-        title="Dữ liệu gốc"
+        title="Từ điển E-number"
         description="Từ điển phụ gia (E-number) dùng để kết luận sản phẩm khi quét mã vạch."
         actions={
           <Button onClick={() => setCreating(true)}>

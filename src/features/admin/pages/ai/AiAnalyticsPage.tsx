@@ -5,7 +5,15 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { AdminQueryError, CARD, CONTROL } from '../../components/AdminUi';
-import { CostLegend, CostTable, DailyCostChart, FeatureCostBars } from '../../components/CostChart';
+import {
+  CostLegend,
+  CostTable,
+  DailyCostChart,
+  DonutCostChart,
+  FeatureCostBars,
+  StackedAreaCostChart,
+  TokenBreakdownChart,
+} from '../../components/CostChart';
 import { TopSpendersCard } from '../../components/TopSpendersCard';
 import { useLlmopsDashboard } from '../../hooks/useAdminAi';
 import { useUrlFilters } from '../../hooks/useUrlFilters';
@@ -17,6 +25,16 @@ const PRESETS = [7, 30, 90];
 const DEFAULT_DAYS = 30;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+export type ChartViewMode = 'day' | 'area' | 'donut' | 'token-split' | 'feature';
+
+const CHART_VIEWS: { id: ChartViewMode; label: string; icon: string }[] = [
+  { id: 'day', label: 'Cột chồng', icon: 'bar_chart' },
+  { id: 'area', label: 'Vùng xu hướng', icon: 'area_chart' },
+  { id: 'donut', label: 'Biểu đồ tròn %', icon: 'pie_chart' },
+  { id: 'token-split', label: 'Phân rã Token', icon: 'compare_arrows' },
+  { id: 'feature', label: 'Theo tính năng', icon: 'reorder' },
+];
+
 export const AiAnalyticsPage: React.FC = () => {
   const { get, set } = useUrlFilters();
   const today = vnDate();
@@ -27,7 +45,7 @@ export const AiAnalyticsPage: React.FC = () => {
   const preset = PRESETS.find((days) => from === vnDate(days - 1) && to === today);
 
   const dashboard = useLlmopsDashboard({ from, to });
-  const [view, setView] = useState<'day' | 'feature'>('day');
+  const [view, setView] = useState<ChartViewMode>('day');
   const [showTable, setShowTable] = useState(false);
   const matrix = useMemo(() => buildCostMatrix(dashboard.data?.series ?? []), [dashboard.data]);
 
@@ -173,21 +191,33 @@ export const AiAnalyticsPage: React.FC = () => {
             <div className={cn(CARD, 'flex flex-col gap-space-md p-space-md sm:p-space-lg')}>
               <div className="flex flex-wrap items-center justify-between gap-space-sm">
                 <h3 className="font-label-lg text-label-lg text-on-surface">
-                  {view === 'day' ? 'Chi phí theo ngày (USD)' : 'Chi phí theo tính năng (USD, cả kỳ)'}
+                  {view === 'day'
+                    ? 'Chi phí theo ngày (Cột chồng, USD)'
+                    : view === 'area'
+                    ? 'Xu hướng chi phí theo ngày (Vùng miền, USD)'
+                    : view === 'donut'
+                    ? 'Cơ cấu tỷ trọng chi phí theo tính năng (%)'
+                    : view === 'token-split'
+                    ? 'Phân rã Token theo ngày (Input vs Output)'
+                    : 'Chi phí theo tính năng (Thanh ngang, cả kỳ)'}
                 </h3>
-                <div role="group" aria-label="Cách xem" className="flex rounded-lg bg-surface-container p-0.5">
-                  {(['day', 'feature'] as const).map((option) => (
+                {/* Bộ nút chuyển đổi loại biểu đồ */}
+                <div role="group" aria-label="Cách xem" className="flex flex-wrap rounded-lg bg-surface-container p-1 gap-1">
+                  {CHART_VIEWS.map((option) => (
                     <button
-                      key={option}
+                      key={option.id}
                       type="button"
-                      aria-pressed={view === option}
-                      onClick={() => setView(option)}
+                      aria-pressed={view === option.id}
+                      onClick={() => setView(option.id)}
                       className={cn(
-                        'rounded-md px-3 py-1.5 font-label-md text-label-md transition-colors',
-                        view === option ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-label-sm text-label-sm transition-all',
+                        view === option.id
+                          ? 'bg-surface-container-lowest text-on-surface shadow-xs font-semibold'
+                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
                       )}
                     >
-                      {option === 'day' ? 'Theo ngày' : 'Theo tính năng'}
+                      <Icon name={option.icon} className="text-[16px]" />
+                      <span>{option.label}</span>
                     </button>
                   ))}
                 </div>
@@ -204,6 +234,15 @@ export const AiAnalyticsPage: React.FC = () => {
                   <CostLegend features={matrix.features} />
                   <DailyCostChart matrix={matrix} dailyBudgetUsd={data.dailyBudgetUsd} />
                 </>
+              ) : view === 'area' ? (
+                <>
+                  <CostLegend features={matrix.features} />
+                  <StackedAreaCostChart matrix={matrix} dailyBudgetUsd={data.dailyBudgetUsd} />
+                </>
+              ) : view === 'donut' ? (
+                <DonutCostChart matrix={matrix} />
+              ) : view === 'token-split' ? (
+                <TokenBreakdownChart matrix={matrix} />
               ) : (
                 <FeatureCostBars matrix={matrix} />
               )}

@@ -39,9 +39,6 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
             <h3 className="font-headline-sm text-headline-sm text-on-surface">
               Phân bổ theo Hạng Hội viên
             </h3>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Tỷ trọng tiêu thụ Token và chi phí ước tính giữa các nhóm tài khoản.
-            </p>
           </div>
 
           {/* Thanh phân bổ nhiều phân đoạn (Multi-segment bar) */}
@@ -181,9 +178,6 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
             <h3 className="font-headline-sm text-headline-sm text-on-surface">
               Top 5 tài khoản tiêu thụ
             </h3>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Người dùng tiêu tốn nhiều token và chi phí nhất trong kỳ lọc.
-            </p>
           </div>
 
           {topSpenders.length === 0 ? (
@@ -204,10 +198,23 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
                 return (
                   <div key={user.userId || idx} className="flex items-center justify-between gap-3 p-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      {/* Avatar */}
+                      {/* Avatar: hiển thị ảnh thật nếu có avatarUrl, ngược lại hiển thị chữ cái đầu tiên */}
+                      {user.avatarUrl ? (
+                        <img
+                          src={user.avatarUrl}
+                          alt={user.fullName || 'Avatar'}
+                          className="h-10 w-10 shrink-0 rounded-full object-cover border border-outline-variant/40"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
                       <div
+                        style={{ display: user.avatarUrl ? 'none' : 'flex' }}
                         className={cn(
-                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-headline-sm text-headline-sm font-semibold',
+                          'h-10 w-10 shrink-0 items-center justify-center rounded-full font-headline-sm text-headline-sm font-semibold',
                           isVip
                             ? 'bg-secondary-fixed text-on-secondary-fixed'
                             : 'bg-primary-fixed text-on-primary-fixed'

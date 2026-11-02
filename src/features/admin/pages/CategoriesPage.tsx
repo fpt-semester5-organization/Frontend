@@ -11,6 +11,7 @@ import { Field } from '@/components/ui/forms';
 import { RowMenu, RowMenuItem } from '@/components/common/RowMenu';
 import { toast } from '@/stores/ui.store';
 import { AdminPage, Panel } from '../components/AdminPage';
+import { MasterDataTabs } from '../components/MasterDataTabs';
 import { SelectField, TextArea } from '../components/fields';
 import { PRIMARY_BTN } from '../components/Filters';
 import { ConfirmDialog, FormActions, FormModal, ServerError } from '../components/FormModal';
@@ -68,6 +69,7 @@ export function CategoriesPage() {
         </button>
       }
     >
+      <MasterDataTabs />
       <Panel>
         <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} refetch={q.refetch} isEmpty={cats.length === 0} emptyTitle="Chưa có danh mục" emptyHint="Thêm danh mục đầu tiên để phân loại công thức.">
           <div className="overflow-x-auto">

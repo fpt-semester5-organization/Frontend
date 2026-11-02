@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
+import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { formatServerDateTime } from '@/lib/serverDate';
 import { PATHS } from '@/routes/paths';
 import { AdminQueryError, CARD, CONTROL, StatusBadge, TD, TH, TableShell } from './AdminUi';
+import { LlmopsLogDetailSheet } from './LlmopsLogDetailSheet';
 import { useLlmopsLogs } from '../hooks/useAdminAi';
 import { FEATURE_LABEL, featureLabel, llmopsStatusLabel } from '../lib/labels';
 import { formatTokens, formatUsd } from '../lib/llmops';
@@ -228,7 +229,11 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
                 return (
                   <tr
                     key={item.logId}
-                    className="transition-colors hover:bg-surface-container-lowest"
+                    onClick={() => setSelectedLog(item)}
+                    className={cn(
+                      'cursor-pointer transition-colors hover:bg-surface-container-low/60',
+                      selectedLog?.logId === item.logId && 'bg-primary/5 hover:bg-primary/10'
+                    )}
                   >
                     {/* Thời gian */}
                     <td className={`${TD} whitespace-nowrap font-mono text-body-xs`}>
@@ -237,30 +242,39 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
 
                     {/* Người thực hiện */}
                     <td className={TD}>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5">
-                          {item.userId > 0 ? (
-                            <Link
-                              to={PATHS.ADMIN.USER_DETAIL(item.userId)}
-                              className="font-label-md text-label-md font-semibold text-primary hover:underline"
+                      <div className="flex items-center gap-2.5">
+                        <Avatar
+                          name={item.userFullName || `User #${item.userId}`}
+                          src={item.userAvatarUrl}
+                          size="sm"
+                          className="shrink-0 ring-1 ring-surface-container"
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {item.userId > 0 ? (
+                              <Link
+                                to={PATHS.ADMIN.USER_DETAIL(item.userId)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="font-label-md text-label-md font-semibold text-primary hover:underline truncate"
+                              >
+                                {item.userFullName || `User #${item.userId}`}
+                              </Link>
+                            ) : (
+                              <span className="font-label-md text-label-md font-semibold text-on-surface">
+                                {item.userFullName || 'Hệ thống'}
+                              </span>
+                            )}
+                            <StatusBadge
+                              tone={isVip ? 'wait' : isAdmin ? 'info' : 'neutral'}
+                              className="text-[10px]"
                             >
-                              {item.userFullName || `User #${item.userId}`}
-                            </Link>
-                          ) : (
-                            <span className="font-label-md text-label-md font-semibold text-on-surface">
-                              {item.userFullName || 'Hệ thống'}
-                            </span>
-                          )}
-                          <StatusBadge
-                            tone={isVip ? 'wait' : isAdmin ? 'info' : 'neutral'}
-                            className="text-[10px]"
-                          >
-                            {item.userRole || 'MEMBER'}
-                          </StatusBadge>
+                              {item.userRole || 'MEMBER'}
+                            </StatusBadge>
+                          </div>
+                          <span className="font-body-xs text-body-xs text-on-surface-variant truncate">
+                            {item.userEmail || '—'}
+                          </span>
                         </div>
-                        <span className="font-body-xs text-body-xs text-on-surface-variant">
-                          {item.userEmail || '—'}
-                        </span>
                       </div>
                     </td>
 
@@ -298,7 +312,10 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setSelectedLog(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLog(item);
+                        }}
                         className="h-8 px-2 text-primary hover:bg-primary/10"
                         aria-label={`Xem chi tiết lượt gọi ${item.logId}`}
                       >
@@ -331,102 +348,11 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
         </>
       )}
 
-      {/* Modal Chi tiết bản ghi gọi AI */}
-      <Modal
-        show={Boolean(selectedLog)}
-        onHide={() => setSelectedLog(null)}
-        title={
-          <div className="flex items-center gap-2">
-            <Icon name="info" className="text-primary text-[22px]" />
-            <span>Chi tiết lượt gọi AI #{selectedLog?.logId}</span>
-          </div>
-        }
-        size="lg"
-      >
-        {selectedLog && (
-          <div className="flex flex-col gap-space-md">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Thời gian thực thi</span>
-                <span className="font-body-sm font-semibold text-on-surface">
-                  {formatServerDateTime(selectedLog.createdAt)}
-                </span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Trạng thái</span>
-                <div className="mt-1">
-                  <StatusBadge tone={llmopsStatusLabel(selectedLog.requestStatus).tone}>
-                    {llmopsStatusLabel(selectedLog.requestStatus).label}
-                  </StatusBadge>
-                </div>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Người thực hiện</span>
-                <span className="font-body-sm font-semibold text-on-surface">
-                  {selectedLog.userFullName || `User #${selectedLog.userId}`}
-                </span>
-                <span className="font-body-xs text-on-surface-variant">{selectedLog.userEmail} ({selectedLog.userRole})</span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Tính năng AI</span>
-                <span className="font-body-sm font-semibold text-on-surface">
-                  {featureLabel(selectedLog.featureCode)} ({selectedLog.featureCode})
-                </span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Token tiêu thụ</span>
-                <span className="font-body-sm font-semibold text-on-surface">
-                  {formatNumber(selectedLog.tokensConsumed)} token (~ {formatTokens(selectedLog.tokensConsumed)})
-                </span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Chi phí ước tính</span>
-                <span className="font-body-sm font-semibold text-secondary">
-                  {formatUsd(selectedLog.costEstimateUsd)}
-                </span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Thời gian xử lý</span>
-                <span className="font-body-sm font-semibold text-on-surface">
-                  {selectedLog.executionTimeMs} ms
-                </span>
-              </div>
-
-              <div className="flex flex-col rounded-lg bg-surface-container-low p-3">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Mã bản ghi (Log ID)</span>
-                <span className="font-mono text-body-sm text-on-surface">
-                  {selectedLog.logId}
-                </span>
-              </div>
-            </div>
-
-            {/* Chi tiết lỗi nếu có */}
-            {selectedLog.errorMessage && (
-              <div className="flex flex-col gap-1.5 rounded-xl border border-error/30 bg-error-container/40 p-3">
-                <span className="flex items-center gap-1.5 font-label-md text-label-md font-semibold text-on-error-container">
-                  <Icon name="error" className="text-[18px] text-error" />
-                  Thông báo lỗi hệ thống
-                </span>
-                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container-lowest p-2.5 font-mono text-body-xs text-on-error-container border border-error/20">
-                  {selectedLog.errorMessage}
-                </pre>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-2">
-              <Button type="button" variant="secondary" onClick={() => setSelectedLog(null)}>
-                Đóng
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* Modal Dialog Chi tiết lượt gọi AI căn giữa màn hình */}
+      <LlmopsLogDetailSheet
+        log={selectedLog}
+        onClose={() => setSelectedLog(null)}
+      />
     </div>
   );
 };

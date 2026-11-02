@@ -135,6 +135,7 @@ export interface TopSpender {
   userId: number;
   fullName: string;
   email: string;
+  avatarUrl?: string | null;
   role: string;
   totalTokens: number;
   totalCostUsd: number;
@@ -157,6 +158,7 @@ export interface LlmopsLogItem {
   userFullName: string;
   userEmail: string;
   userRole: string;
+  userAvatarUrl?: string | null;
   featureCode: string;
   tokensConsumed: number;
   costEstimateUsd: number;
