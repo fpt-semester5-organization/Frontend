@@ -35,26 +35,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: 'Danh mục',
     to: PATHS.ADMIN.CATEGORIES,
     icon: 'category',
-    description: 'Quản lý cây danh mục ẩm thực, gán món và chuyển nhóm.',
+    also: [PATHS.ADMIN.DIETARY_SCHOOLS, PATHS.ADMIN.E_NUMBERS, PATHS.ADMIN.INGREDIENTS],
+    description: 'Cây danh mục món, trường phái ăn chay, từ điển E-number và nguyên liệu.',
   },
   {
     label: 'Người dùng',
     to: PATHS.ADMIN.USERS,
     icon: 'group',
     description: 'Tra cứu tài khoản, xem vi phạm và xử lý kỷ luật.',
-  },
-  {
-    label: 'Dữ liệu gốc',
-    to: PATHS.ADMIN.DIETARY_SCHOOLS,
-    icon: 'eco',
-    also: [PATHS.ADMIN.E_NUMBERS],
-    description: '07 trường phái ăn chay và từ điển E-number.',
-  },
-  {
-    label: 'Nguyên liệu & dị ứng',
-    to: PATHS.ADMIN.INGREDIENTS,
-    icon: 'nutrition',
-    description: 'Nguyên liệu, nhóm thực phẩm và nhóm dị ứng.',
   },
   {
     label: 'Quán chay',

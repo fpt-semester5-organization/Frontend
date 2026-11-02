@@ -35,7 +35,7 @@ const AdminDietarySchoolsPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-space-lg">
       <AdminPageHeader
-        title="Dữ liệu gốc"
+        title="Trường phái ăn chay"
         description="07 trường phái ăn chay cố định của hệ thống. Quy tắc thực phẩm cấm dùng để lọc công thức, gợi ý thực đơn và cảnh báo khi quét mã vạch."
       />
       <MasterDataTabs />
@@ -64,7 +64,7 @@ const AdminDietarySchoolsPage: React.FC = () => {
                     <p className="font-label-sm text-label-sm text-on-surface-variant">{dietarySchoolLabel(school.schoolCode)}</p>
                     <h2 className="break-words font-headline-sm text-headline-sm text-on-surface">{school.schoolName}</h2>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(school)} aria-label={`Sửa ${school.schoolName}`}>
+                  <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setEditing(school)} aria-label={`Sửa ${school.schoolName}`}>
                     <Icon name="edit" className="text-[18px]" />
                     Sửa
                   </Button>

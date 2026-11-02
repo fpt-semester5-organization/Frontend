@@ -3,18 +3,16 @@ import type { ReactNode } from 'react';
 /** Khung trang quản trị chung: tiêu đề + thao tác + nội dung, khớp bố cục Stitch (pt-16, max 1360). */
 export function AdminPage({ title, subtitle, actions, children, wide }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; wide?: boolean }) {
   return (
-    <main className="relative min-h-screen bg-background pt-16">
-      <div className={`mx-auto flex w-full flex-col gap-space-lg px-space-lg py-space-lg ${wide ? 'max-w-[1440px]' : 'max-w-[1360px]'}`}>
-        <header className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
-          <div className="flex flex-col gap-space-xs">
-            <h1 className="font-headline-lg text-headline-lg tracking-tight text-on-surface">{title}</h1>
-            {subtitle && <p className="max-w-2xl font-body-sm text-body-sm text-on-surface-variant">{subtitle}</p>}
-          </div>
-          {actions && <div className="flex flex-wrap items-center gap-space-sm">{actions}</div>}
-        </header>
-        {children}
-      </div>
-    </main>
+    <div className={`mx-auto flex w-full flex-col gap-space-lg ${wide ? 'max-w-[1440px]' : 'max-w-[1360px]'}`}>
+      <header className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
+        <div className="flex flex-col gap-space-xs">
+          <h1 className="font-headline-lg text-headline-lg tracking-tight text-on-surface">{title}</h1>
+          {subtitle && <p className="max-w-2xl font-body-sm text-body-sm text-on-surface-variant">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-space-sm">{actions}</div>}
+      </header>
+      {children}
+    </div>
   );
 }
 

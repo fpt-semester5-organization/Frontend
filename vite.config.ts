@@ -16,21 +16,21 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api/v1/ai-stt': {
-        target: 'http://127.0.0.1:8080',
+        target: 'http://127.0.0.1:8081',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/v1\/ai-stt/, ''),
         headers: {
-          'X-Internal-Api-Key': 'veggielife-internal-secret-key-2026',
+          'X-Internal-Api-Key': 'veggielife-secret-internal-key-2026',
         },
       },
       '/ai-stt': {
-        target: 'http://127.0.0.1:8080',
+        target: 'http://127.0.0.1:8081',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/ai-stt/, ''),
         headers: {
-          'X-Internal-Api-Key': 'veggielife-internal-secret-key-2026',
+          'X-Internal-Api-Key': 'veggielife-secret-internal-key-2026',
         },
       },
       '/api': {

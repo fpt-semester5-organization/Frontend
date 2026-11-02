@@ -153,11 +153,7 @@ export function AdminLayout() {
       </Offcanvas>
 
       <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-60'}`}>
-        <header
-          className={`fixed inset-x-0 top-0 z-40 h-16 bg-surface-bright/90 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md transition-[left] duration-200 ${
-            collapsed ? 'lg:left-16' : 'lg:left-60'
-          }`}
-        >
+        <header className="sticky top-0 z-40 h-16 bg-surface-bright/90 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md">
           <div className="flex h-16 w-full items-center justify-between gap-space-md px-gutter">
             <div className="flex flex-1 items-center gap-space-sm md:max-w-md">
               <button
