@@ -59,7 +59,7 @@ export const AiOverviewPage: React.FC = () => {
             <div key={key} className={cn(CARD, 'h-32 animate-pulse')} />
           ))}
         </div>
-      ) : dashboard.isError && !dashboard.data ? (
+      ) : !data ? (
         <AdminQueryError error={dashboard.error} onRetry={() => void dashboard.refetch()} retrying={dashboard.isRefetching} />
       ) : (
         <div className="grid gap-space-md sm:grid-cols-2 lg:grid-cols-4">

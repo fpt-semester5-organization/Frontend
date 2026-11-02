@@ -34,6 +34,7 @@ export const STATUS_LABEL: Record<PlanStatus, string> = {
   ACTIVE: 'Đang áp dụng',
   ARCHIVED: 'Đã lưu trữ',
   TEMPLATE: 'Thực đơn mẫu',
+  CANCELLED: 'Đã hủy',
 };
 
 export const STATUS_CLASS: Record<PlanStatus, string> = {
@@ -41,6 +42,7 @@ export const STATUS_CLASS: Record<PlanStatus, string> = {
   ACTIVE: 'bg-primary-fixed text-on-primary-fixed',
   ARCHIVED: 'bg-surface-container text-on-surface-variant',
   TEMPLATE: 'bg-surface-container text-on-surface-variant',
+  CANCELLED: 'bg-error-container text-error border border-error/20 font-medium',
 };
 
 /** Mức ngân sách (D72). */

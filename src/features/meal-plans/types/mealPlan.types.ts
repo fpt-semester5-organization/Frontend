@@ -2,8 +2,22 @@ import type { DeepRequired, Schemas } from '@/api/types';
 
 // Mọi type lấy từ src/api/generated (sinh từ docs/08. OpenAPI); chỉ bổ sung chỗ OpenAPI bỏ trống.
 
+export type PlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'TEMPLATE' | 'CANCELLED';
+
+export type MealPlanStatusFilter = 'ALL' | 'ACTIVE' | 'DRAFT' | 'CANCELLED' | 'ARCHIVED';
+
+export type MealPlanSortOption = 'newest' | 'oldest' | 'startDateDesc' | 'startDateAsc';
+
+export interface MealPlanFilterState {
+  status: MealPlanStatusFilter;
+  keyword: string;
+  sort: MealPlanSortOption;
+}
+
 /** GET /meal-plans/{id} (FN-MEAL-02): 21 bữa, hạn mức chỉnh sửa trước/sau khi kích hoạt. */
-export type MealPlanDetail = DeepRequired<Schemas['GetMealPlanResponse']['data']>;
+export type MealPlanDetail = Omit<DeepRequired<Schemas['GetMealPlanResponse']['data']>, 'planStatus'> & {
+  planStatus: PlanStatus;
+};
 type RawMealSlot = MealPlanDetail['slots'][number];
 export type MealSlot = RawMealSlot & {
   swapCount?: number;
@@ -17,13 +31,14 @@ export type MealSlot = RawMealSlot & {
   notes?: string | null;
 };
 export type MealPlanEdits = MealPlanDetail['edits'];
-export type PlanStatus = MealPlanDetail['planStatus'];
 export type BudgetTier = MealPlanDetail['budgetTier'];
 export type DayOfWeek = MealSlot['dayOfWeek'];
 export type MealType = MealSlot['mealType'];
 
 /** GET /meal-plans (FN-MEAL-02). */
-export type MealPlanListItem = DeepRequired<Schemas['ListMealPlansResponse']['data'][number]>;
+export type MealPlanListItem = Omit<DeepRequired<Schemas['ListMealPlansResponse']['data'][number]>, 'planStatus'> & {
+  planStatus: PlanStatus;
+};
 
 /** POST /meal-plans (FN-MEAL-01). */
 export type CreateMealPlanBody = Schemas['CreateMealPlanRequest'] & {
