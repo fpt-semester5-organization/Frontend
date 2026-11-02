@@ -43,6 +43,7 @@ import {
 import { useExportPdf } from '../hooks/useExportPdf';
 import {
   useActivateMealPlan,
+  useCancelMealPlan,
   useCompleteMealSlot,
   useMealPlan,
   useMealPlanNutrition,
@@ -383,6 +384,7 @@ export const MealPlanDetail: React.FC = () => {
   const [nutritionLevel, setNutritionLevel] = useState<NutritionLevel>(isVip ? 'DETAILED' : 'BASIC');
   const nutrition = useMealPlanNutrition(planId, nutritionLevel, !!plan.data);
   const activate = useActivateMealPlan(planId);
+  const cancel = useCancelMealPlan(planId);
   const swap = useSwapMealSlot(planId);
   const swapByNote = useSwapMealSlotByNote(planId);
   const complete = useCompleteMealSlot(planId);
@@ -409,9 +411,28 @@ export const MealPlanDetail: React.FC = () => {
 
   // Dialogs
   const [confirmActivate, setConfirmActivate] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
   const [upsell, setUpsell] = useState<{ title: string; message: string } | null>(null);
   const [shoppingOpen, setShoppingOpen] = useState(false);
+
+  const handleConfirmCancel = () => {
+    cancel.mutate(undefined, {
+      onSuccess: () => {
+        setShowCancelModal(false);
+        notifySuccess('Đã hủy thực đơn thành công. Trạng thái thực đơn đã chuyển sang Đã hủy.');
+      },
+      onError: (err) => {
+        const apiError = toApiError(err);
+        setShowCancelModal(false);
+        if (apiError.status === 409) {
+          setNotice({ title: 'Không thể hủy thực đơn', message: 'Thực đơn này đã ở trạng thái đã hủy trước đó.' });
+        } else {
+          notifyApiError(apiError);
+        }
+      },
+    });
+  };
 
   // Lưu ý riêng cho từng món ăn (theo slotId)
   const [slotNotes, setSlotNotes] = useState<Record<number, string>>(() => {
@@ -551,7 +572,8 @@ export const MealPlanDetail: React.FC = () => {
   const status = data.planStatus;
   const isDraft = status === 'DRAFT';
   const isActive = status === 'ACTIVE';
-  const editable = isDraft || isActive;
+  const isCancelled = status === 'CANCELLED';
+  const editable = (isDraft || isActive) && !isCancelled;
   const edits = editsOfPhase(data);
   const editsLeft = Math.max(0, edits.limit - edits.used);
   const prog = progress(data);
@@ -890,6 +912,20 @@ export const MealPlanDetail: React.FC = () => {
               <span className="hidden sm:inline">{exportPdf.isPending ? 'Đang tạo…' : isVip ? 'Xuất PDF' : 'Xuất PDF (VIP)'}</span>
             </button>
 
+            {/* Nút Hủy thực đơn này: hiển thị khi thực đơn chưa bị hủy (TASK-T1 / SWP391-232) */}
+            {!isCancelled && (
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                disabled={cancel.isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-error/30 bg-surface-container-lowest px-3.5 py-2 font-label-md text-label-md font-semibold text-error hover:bg-error-container/30 transition-all shadow-2xs disabled:opacity-60"
+                title="Hủy thực đơn này (chuyển sang trạng thái Đã hủy)"
+              >
+                <Icon name="cancel" className="text-[18px]" />
+                <span className="hidden sm:inline">Hủy thực đơn</span>
+              </button>
+            )}
+
             <Link
               to={PATHS.MEAL_PLANS.NEW}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-container px-3.5 py-2 font-label-md text-label-md text-on-primary font-semibold shadow-xs hover:bg-primary transition-all"
@@ -899,6 +935,24 @@ export const MealPlanDetail: React.FC = () => {
             </Link>
           </div>
         </section>
+
+        {/* Khối Thông báo Đã Hủy (SWP391-232) */}
+        {isCancelled && (
+          <FormAlert
+            tone="error"
+            title="Thực đơn này đã bị hủy"
+          >
+            <p>
+              Thực đơn đã chuyển sang trạng thái <strong>Đã hủy</strong> và không còn hiệu lực theo dõi bữa ăn hay đổi món.
+              Lưu ý: Lượt tạo thực đơn tuần này đã được sử dụng cho việc sinh AI trước đó.
+              Nếu bạn muốn tạo thực đơn khác ngay trong tuần này, vui lòng{' '}
+              <Link to={PATHS.SUBSCRIPTION.PRICING} className="font-semibold underline text-primary hover:text-primary-dim">
+                Nâng cấp VIP
+              </Link>{' '}
+              để nhận thêm 3 lượt tạo thực đơn mỗi tuần hoặc chờ sang tuần tiếp theo.
+            </p>
+          </FormAlert>
+        )}
 
         {/* Khối Thông báo Nháp */}
         {isDraft && (
@@ -920,32 +974,54 @@ export const MealPlanDetail: React.FC = () => {
           </FormAlert>
         )}
 
-        {/* LƯU Ý BAN ĐẦU KHI SINH THỰC ĐƠN (GỌN GÀNG, CHỈ XEM) */}
-        {(data.customInstructions || aiChips.length > 0) && (
-          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-surface-container bg-surface-container-lowest px-4 py-2.5 text-xs shadow-2xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-on-surface">
-                <Icon name="auto_awesome" className="text-[16px] text-primary" />
-                Lưu ý ban đầu khi tạo:
-              </span>
-              {aiChips.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {aiChips.map((chip) => (
-                    <span
-                      key={chip.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-surface-container-lowest border border-surface-container px-2.5 py-0.5 text-xs font-semibold text-primary shadow-2xs"
-                    >
-                      <Icon name={chip.icon as any} className="text-[13px] text-primary" />
-                      {chip.label}
-                    </span>
-                  ))}
+        {/* BANNER NỔI BẬT ĐỐI CHIẾU GHI CHÚ DINH DƯỠNG AI (SCR-22 / SWP391-232) - CHỈ HIỂN THỊ KHI CÓ GHI CHÚ */}
+        {Boolean(data.customInstructions && data.customInstructions.trim()) && (
+          <section
+            aria-label="Đối chiếu ghi chú dinh dưỡng AI"
+            className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-r from-primary-container/15 via-surface-container-lowest to-surface-container-lowest p-4 sm:p-5 shadow-xs"
+          >
+            <div className="flex flex-col gap-3">
+              {/* Header của Banner */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-semibold text-on-surface text-sm sm:text-base">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-on-primary shadow-2xs">
+                    <Icon name="auto_awesome" className="text-[16px]" />
+                  </div>
+                  <span>Ghi chú dinh dưỡng cá nhân đã gửi AI</span>
                 </div>
-              ) : (
-                <span className="italic text-on-surface font-medium">"{data.customInstructions}"</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed text-on-primary-fixed px-3 py-1 text-xs font-semibold shadow-2xs">
+                  <Icon name="check_circle" className="text-[14px]" />
+                  AI đã áp dụng ghi chú này
+                </span>
+              </div>
+
+              {/* Nội dung nguyên văn ghi chú đối chiếu */}
+              <div className="rounded-xl border-l-4 border-primary bg-surface-container-low/70 px-4 py-3">
+                <p className="text-xs text-on-surface-variant font-medium mb-1">Nguyên văn yêu cầu của bạn trước khi sinh thực đơn:</p>
+                <p className="text-sm font-semibold italic text-on-surface tracking-wide">
+                  "{data.customInstructions}"
+                </p>
+              </div>
+
+              {/* Các thẻ tiêu chí AI nhận diện được (Context Chips) nếu có */}
+              {aiChips.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-surface-container/60">
+                  <span className="text-xs text-on-surface-variant font-medium">Tiêu chí bóc tách:</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {aiChips.map((chip) => (
+                      <span
+                        key={chip.id}
+                        className="inline-flex items-center gap-1 rounded-full bg-surface-container-lowest border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary shadow-2xs"
+                      >
+                        <Icon name={chip.icon as any} className="text-[13px] text-primary" />
+                        {chip.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            <span className="text-[11px] font-medium text-outline">Ngữ cảnh AI đã áp dụng</span>
-          </div>
+          </section>
         )}
 
         {/* 4 Thẻ KPI Chỉ số thực đơn */}
@@ -1168,6 +1244,32 @@ export const MealPlanDetail: React.FC = () => {
         loading={activate.isPending}
         onConfirm={runActivate}
         onCancel={() => setConfirmActivate(false)}
+      />
+
+      {/* Confirm Cancel Meal Plan Dialog (TASK-T1 / SWP391-232) */}
+      <ConfirmDialog
+        show={showCancelModal}
+        title="Hủy thực đơn này?"
+        danger
+        loading={cancel.isPending}
+        confirmLabel={cancel.isPending ? 'Đang hủy…' : 'Xác nhận hủy thực đơn'}
+        cancelLabel="Giữ lại thực đơn"
+        message={
+          <div className="flex flex-col gap-3">
+            <p>
+              Thực đơn này sẽ chuyển sang trạng thái <strong>Đã hủy (CANCELLED)</strong> và không còn hiệu lực theo dõi bữa ăn hay đổi món.
+            </p>
+            <div className="rounded-xl border border-error/30 bg-error-container/30 p-3 text-xs text-error font-medium leading-relaxed">
+              <div className="flex items-center gap-1.5 font-semibold mb-1 text-sm">
+                <Icon name="warning" className="text-[16px]" />
+                Lưu ý quan trọng về hạn mức:
+              </div>
+              Lượt tạo thực đơn tuần này sẽ <strong>KHÔNG được hoàn lại</strong> sau khi hủy (Đã sử dụng hạn mức sinh AI của tuần). Bạn sẽ không thể tạo lại thực đơn mới cho tuần này trừ khi nâng cấp tài khoản VIP.
+            </div>
+          </div>
+        }
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setShowCancelModal(false)}
       />
 
       {/* Notice Info Modal */}

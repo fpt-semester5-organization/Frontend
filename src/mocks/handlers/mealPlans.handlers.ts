@@ -9,7 +9,7 @@ import { api, currentUser, fail, latency, ok, unauthorized, validationError } fr
 
 type Aisle = 'PRODUCE' | 'PLANT_PROTEIN' | 'DRY_GOODS' | 'CONDIMENTS';
 type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER';
-type PlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'TEMPLATE';
+type PlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'TEMPLATE' | 'CANCELLED';
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 const MEALS: MealType[] = ['BREAKFAST', 'LUNCH', 'DINNER'];
@@ -511,6 +511,20 @@ export const mealPlansHandlers = [
       .forEach((other) => (other.planStatus = 'ARCHIVED'));
     plan.planStatus = 'ACTIVE';
     return ok({ planId: plan.planId, planStatus: plan.planStatus }, 'Đã kích hoạt thực đơn.');
+  }),
+
+  // PUT /meal-plans/{id}/cancel — FN-MEAL-02, TASK-T1 / SWP391-232
+  http.put(api('/meal-plans/:id/cancel'), async ({ request, params }) => {
+    await latency();
+    const me = currentUser(request);
+    if (!me) return unauthorized();
+    const plan = findOwnPlan(params.id, me.userId);
+    if (!plan) return planNotFound();
+    if (plan.planStatus === 'CANCELLED') {
+      return fail(409, 'ERR_VALIDATION', 'Thực đơn này đã ở trạng thái đã hủy (CANCELLED).');
+    }
+    plan.planStatus = 'CANCELLED';
+    return ok(planDto(plan), 'Đã hủy thực đơn thành công.');
   }),
 
   // PUT /meal-plans/{id}/slots/{slotId} — FN-MEAL-03 Đổi món

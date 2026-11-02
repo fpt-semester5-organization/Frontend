@@ -47,6 +47,12 @@ export async function activateMealPlan(planId: number) {
   return res.data;
 }
 
+/** PUT /meal-plans/{id}/cancel — Hủy thực đơn (FN-MEAL-02, TASK-T1 / SWP391-232). */
+export async function cancelMealPlan(planId: number) {
+  const res = await http.put<ApiEnvelope<MealPlanDetail>>(`/meal-plans/${planId}/cancel`);
+  return res.data;
+}
+
 /** PUT /meal-plans/{id}/slots/{slotId} — FN-MEAL-03 Đổi món. */
 export async function swapMealSlot(planId: number, slotId: number, body: SwapSlotBody) {
   const res = await http.put<ApiEnvelope<SwapSlotResult>>(`/meal-plans/${planId}/slots/${slotId}`, body);

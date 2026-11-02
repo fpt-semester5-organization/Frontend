@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toApiError } from '@/lib/apiError';
 import {
   activateMealPlan,
+  cancelMealPlan,
   createMealPlan,
   getMealPlan,
   getMealPlanNutrition,
@@ -86,6 +87,20 @@ export function useActivateMealPlan(planId: number) {
         plan ? { ...plan, planStatus: res.data.planStatus } : plan
       );
       // Thực đơn ACTIVE khác cùng tuần chuyển ARCHIVED: làm mới danh sách.
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.lists() });
+    },
+  });
+}
+
+/** Hủy thực đơn: chuyển trạng thái sang CANCELLED, không hoàn lại quota tuần (TASK-T1 / SWP391-232). */
+export function useCancelMealPlan(planId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cancelMealPlan(planId),
+    onSuccess: (res) => {
+      queryClient.setQueryData<MealPlanDetail>(mealPlanKeys.detail(planId), (plan) =>
+        plan ? { ...plan, planStatus: res.data.planStatus ?? 'CANCELLED' } : plan
+      );
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.lists() });
     },
   });
