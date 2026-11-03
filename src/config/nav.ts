@@ -15,7 +15,7 @@ export interface NavItem {
 
 /** Điều hướng chính của Khách / Thành viên / VIP (route theo UI Screen Specification). */
 export const MAIN_NAV: NavItem[] = [
-  { label: 'Trang chủ', to: PATHS.HOME, end: true, mobileOnly: true },
+  { label: 'Trang chủ', to: PATHS.HOME, end: true },
   { label: 'Công thức', to: PATHS.RECIPES.ROOT },
   { label: 'Tủ lạnh AI', to: PATHS.FRIDGE },
   { label: 'Thực đơn', to: PATHS.MEAL_PLANS.ROOT, also: ['/shopping-lists'] },

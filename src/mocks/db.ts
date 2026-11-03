@@ -88,10 +88,10 @@ export interface MockReport {
 export const MOCK_PASSWORD = 'Veggie@2026';
 
 export const users: MockUser[] = [
-  { userId: 1, fullName: 'Quản trị viên', email: 'admin@veggielife.vn', role: 'ADMIN', isVip: true, avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80', createdAt: '2026-06-01T00:00:00Z' },
-  { userId: 1024, fullName: 'Nguyễn An', email: 'an.nguyen@gmail.com', role: 'MEMBER', isVip: false, avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80', createdAt: '2026-09-01T02:00:00Z' },
-  { userId: 2048, fullName: 'Trần Bình', email: 'binh.tran@gmail.com', role: 'VIP', isVip: true, avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=160&q=80', createdAt: '2026-08-15T02:00:00Z' },
-  { userId: 3072, fullName: 'Lê Minh Chi', email: 'chi.le@gmail.com', role: 'MEMBER', isVip: false, avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80', createdAt: '2026-07-20T02:00:00Z' },
+  { userId: 1, fullName: 'Quản trị viên', email: 'admin@veggielife.vn', role: 'ADMIN', isVip: true, avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=95', createdAt: '2026-06-01T00:00:00Z' },
+  { userId: 1024, fullName: 'Nguyễn An', email: 'an.nguyen@gmail.com', role: 'MEMBER', isVip: false, avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=600&q=95', createdAt: '2026-09-01T02:00:00Z' },
+  { userId: 2048, fullName: 'Trần Bình', email: 'binh.tran@gmail.com', role: 'VIP', isVip: true, avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=95', createdAt: '2026-08-15T02:00:00Z' },
+  { userId: 3072, fullName: 'Lê Minh Chi', email: 'chi.le@gmail.com', role: 'MEMBER', isVip: false, avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=95', createdAt: '2026-07-20T02:00:00Z' },
 ];
 
 const cover = (background: string, accent: string) =>

@@ -32,7 +32,7 @@ export const HomeHero: React.FC<HomeHeroProps> = () => {
           </p>
 
           <a
-            href="#recipes-section"
+            href="#foods-section"
             className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-label-lg text-label-lg text-on-primary shadow-sm transition-all hover:bg-primary-container hover:shadow-md"
           >
             Khám phá công thức

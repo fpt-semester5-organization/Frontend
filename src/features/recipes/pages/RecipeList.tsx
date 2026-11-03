@@ -2,6 +2,7 @@
  * SCR-11 · recipes/RecipeList · `/recipes`
  * FN: FN-POST-01, FN-PROF-08 · Huỳnh Việt Phát · Sprint 5
  * Kho công thức & video công khai có bộ lọc và phân trang; Khách lướt tới mục thứ N thì mời đăng ký (BR-GUEST-01).
+ * Hỗ trợ xem toàn bộ công thức theo món ăn (foodId) với giao diện đầy đủ, thoáng đãng.
  */
 import React, { useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -16,7 +17,7 @@ import { PATHS } from '@/routes/paths';
 import { RecipeCard, RecipeCardSkeleton } from '../components/RecipeCard';
 import { RecipeFilterPanel } from '../components/RecipeFilterPanel';
 import { useBrowsePrompt } from '../hooks/useBrowsePrompt';
-import { useCategories, useDietarySchools, useRecipeList } from '../hooks/useRecipes';
+import { useCategories, useDietarySchools, useFood, useRecipeList } from '../hooks/useRecipes';
 import {
   DEFAULT_RECIPE_FILTERS,
   hasActiveRecipeFilters,
@@ -37,6 +38,9 @@ const RecipeList: React.FC = () => {
   const list = useRecipeList(params);
   const schools = useDietarySchools();
   const categories = useCategories();
+  const food = useFood(filters.foodId);
+  const foodName = filters.foodId ? food.data?.foodName : undefined;
+
   const resultsRef = useRef<HTMLElement>(null);
   const { promptIndex, promptRef } = useBrowsePrompt(list.data?.meta.signUpPromptAtItem);
 
@@ -129,12 +133,16 @@ const RecipeList: React.FC = () => {
       <header className="flex flex-col gap-space-md md:flex-row md:items-end md:justify-between">
         <div className="max-w-[680px]">
           <p className="flex items-center gap-1.5 font-label-sm text-label-sm tracking-wide text-secondary uppercase">
-            <Icon name="menu_book" className="text-[16px]" />
-            Thư viện công thức chay
+            <Icon name={foodName ? 'restaurant_menu' : 'menu_book'} className="text-[16px]" />
+            {foodName ? `Món ăn: ${foodName}` : 'Thư viện công thức chay'}
           </p>
-          <h1 className="mt-1 font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">Kho công thức chay</h1>
+          <h1 className="mt-1 font-headline-lg text-headline-lg-mobile text-primary sm:text-headline-lg">
+            {foodName ? `Công thức món “${foodName}”` : 'Kho công thức chay'}
+          </h1>
           <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
-            Công thức đã qua kiểm duyệt, có định lượng rõ ràng, lọc theo trường phái, nguyên liệu và thời gian nấu.
+            {foodName
+              ? `Khám phá các biến thể công thức khác nhau của món ${foodName}: công thức giàu calo cho người gầy tăng cân, công thức thanh dịu không ăn cay, chuẩn vị truyền thống và kiêng ngũ vị tân.`
+              : 'Công thức đã qua kiểm duyệt, có định lượng rõ ràng, lọc theo trường phái, nguyên liệu và thời gian nấu.'}
           </p>
         </div>
         <Link to={PATHS.RECIPES.NEW} className={cn(PRIMARY_LINK, 'w-fit shrink-0')}>
@@ -151,10 +159,84 @@ const RecipeList: React.FC = () => {
         onReset={resetFilters}
       />
 
+      {/* Dải lọc biến thể công thức nhanh khi đang xem theo món ăn (Giao diện to, đồng bộ Web) */}
+      {foodName && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-3 shadow-xs">
+          <span className="font-label-sm text-label-sm font-semibold text-on-surface-variant mr-1 flex items-center gap-1">
+            <Icon name="filter_list" className="text-[16px]" />
+            Nhu cầu đặc biệt:
+          </span>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: '', dietarySchoolId: null })}
+            className={cn(
+              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer',
+              !filters.keyword && !filters.dietarySchoolId
+                ? 'bg-primary text-on-primary font-semibold shadow-xs'
+                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+            )}
+          >
+            Tất cả công thức
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: 'gầy' })}
+            className={cn(
+              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              filters.keyword === 'gầy'
+                ? 'bg-emerald-700 text-white font-semibold shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+            )}
+          >
+            <Icon name="fitness_center" className="text-[14px]" />
+            Dành cho người gầy (Giàu calo)
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: 'không cay' })}
+            className={cn(
+              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              filters.keyword === 'không cay'
+                ? 'bg-blue-700 text-white font-semibold shadow-xs'
+                : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
+            )}
+          >
+            <Icon name="sentiment_satisfied_alt" className="text-[14px]" />
+            Không ăn cay (Thanh dịu)
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: 'truyền thống' })}
+            className={cn(
+              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              filters.keyword === 'truyền thống'
+                ? 'bg-amber-700 text-white font-semibold shadow-xs'
+                : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+            )}
+          >
+            <Icon name="history_edu" className="text-[14px]" />
+            Chuẩn vị truyền thống
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ dietarySchoolId: 2 })}
+            className={cn(
+              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              filters.dietarySchoolId === 2
+                ? 'bg-purple-700 text-white font-semibold shadow-xs'
+                : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+            )}
+          >
+            <Icon name="spa" className="text-[14px]" />
+            Kiêng ngũ vị tân
+          </button>
+        </div>
+      )}
+
       <section ref={resultsRef} aria-labelledby="recipe-results-title" className="scroll-mt-24">
         <div className="mb-space-md flex items-center justify-between gap-space-sm">
           <h2 id="recipe-results-title" className="font-headline-sm text-headline-sm text-on-surface">
-            {filters.keyword ? `Kết quả cho “${filters.keyword}”` : 'Tất cả công thức'}
+            {foodName ? `Kết quả cho món “${foodName}”` : filters.keyword ? `Kết quả cho “${filters.keyword}”` : 'Tất cả công thức'}
           </h2>
           <p aria-live="polite" className="font-label-md text-label-md text-on-surface-variant">
             {total !== undefined && !list.isError ? `${formatNumber(total)} công thức` : ''}

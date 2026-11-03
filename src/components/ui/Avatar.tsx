@@ -1,6 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 
+/**
+ * Tối ưu URL ảnh đại diện sang độ phân giải cao và sắc nét, tránh mờ do nén thấp trên màn hình Retina/High-DPI.
+ */
+const getHighResSrc = (url: string | null | undefined): string | undefined => {
+  if (!url) return undefined;
+  // Nếu là ảnh unsplash bị giới hạn w=160 hoặc q=80 thì nâng cấp lên chuẩn HD sắc nét
+  if (url.includes('images.unsplash.com')) {
+    return url.replace(/w=\d+/, 'w=600').replace(/q=\d+/, 'q=95');
+  }
+  // Nếu là cloudinary có thumbnail nhỏ
+  if (url.includes('cloudinary.com') && url.includes('w_')) {
+    return url.replace(/w_\d+/, 'w_400');
+  }
+  return url;
+};
+
 /** "Nguyễn Văn An" → "VA" (hai chữ cái đầu của hai từ cuối). */
 const initialsOf = (name = '') =>
   name
@@ -44,6 +60,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   }, [src]);
 
   if (src && !imageError) {
+    const optimizedSrc = getHighResSrc(src);
     return (
       <span
         className={cn(
@@ -53,10 +70,13 @@ export const Avatar: React.FC<AvatarProps> = ({
         )}
       >
         <img
-          src={src}
+          src={optimizedSrc}
           alt={alt || `Ảnh đại diện của ${name}`}
           onError={() => setImageError(true)}
+          loading="eager"
+          decoding="sync"
           className="h-full w-full object-cover"
+          style={{ imageRendering: '-webkit-optimize-contrast' }}
         />
       </span>
     );
