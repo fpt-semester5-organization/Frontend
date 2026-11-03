@@ -86,6 +86,7 @@ export function useActivateMealPlan(planId: number) {
       queryClient.setQueryData<MealPlanDetail>(mealPlanKeys.detail(planId), (plan) =>
         plan ? { ...plan, planStatus: res.data.planStatus } : plan
       );
+      void queryClient.invalidateQueries({ queryKey: mealPlanKeys.detail(planId) });
       // Thực đơn ACTIVE khác cùng tuần chuyển ARCHIVED: làm mới danh sách.
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.lists() });
     },

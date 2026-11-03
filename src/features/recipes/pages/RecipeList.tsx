@@ -170,35 +170,48 @@ const RecipeList: React.FC = () => {
             type="button"
             onClick={() => applyFilters({ keyword: '', dietarySchoolId: null })}
             className={cn(
-              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer',
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer border',
               !filters.keyword && !filters.dietarySchoolId
-                ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
             )}
           >
             Tất cả công thức
           </button>
           <button
             type="button"
-            onClick={() => applyFilters({ keyword: 'gầy' })}
+            onClick={() => applyFilters({ keyword: 'giảm cân', dietarySchoolId: null })}
             className={cn(
-              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
-              filters.keyword === 'gầy'
-                ? 'bg-emerald-700 text-white font-semibold shadow-xs'
-                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
+              filters.keyword === 'giảm cân'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
             )}
           >
-            <Icon name="fitness_center" className="text-[14px]" />
-            Dành cho người gầy (Giàu calo)
+            <Icon name="local_fire_department" className="text-[14px]" />
+            Giảm cân (Eat Clean)
           </button>
           <button
             type="button"
-            onClick={() => applyFilters({ keyword: 'không cay' })}
+            onClick={() => applyFilters({ keyword: 'sa tế', dietarySchoolId: null })}
             className={cn(
-              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
+              filters.keyword === 'sa tế'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
+            )}
+          >
+            <Icon name="whatshot" className="text-[14px]" />
+            Vị sa tế cay nồng (ăn được ớt)
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: 'không cay', dietarySchoolId: null })}
+            className={cn(
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
               filters.keyword === 'không cay'
-                ? 'bg-blue-700 text-white font-semibold shadow-xs'
-                : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
             )}
           >
             <Icon name="sentiment_satisfied_alt" className="text-[14px]" />
@@ -206,12 +219,25 @@ const RecipeList: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => applyFilters({ keyword: 'truyền thống' })}
+            onClick={() => applyFilters({ keyword: 'giàu đạm', dietarySchoolId: null })}
             className={cn(
-              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
+              filters.keyword === 'giàu đạm'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
+            )}
+          >
+            <Icon name="fitness_center" className="text-[14px]" />
+            Giàu đạm thực vật
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFilters({ keyword: 'truyền thống', dietarySchoolId: null })}
+            className={cn(
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
               filters.keyword === 'truyền thống'
-                ? 'bg-amber-700 text-white font-semibold shadow-xs'
-                : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
             )}
           >
             <Icon name="history_edu" className="text-[14px]" />
@@ -219,12 +245,12 @@ const RecipeList: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => applyFilters({ dietarySchoolId: 2 })}
+            onClick={() => applyFilters({ keyword: '', dietarySchoolId: 2 })}
             className={cn(
-              'rounded-full px-3 py-1 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1',
+              'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border',
               filters.dietarySchoolId === 2
-                ? 'bg-purple-700 text-white font-semibold shadow-xs'
-                : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+                ? 'border-primary bg-primary text-on-primary font-semibold shadow-xs'
+                : 'border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-primary hover:text-primary'
             )}
           >
             <Icon name="spa" className="text-[14px]" />

@@ -100,13 +100,29 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
 
   const text = rawNote.trim();
   const chips: AiParsedChip[] = [];
+  const addedConcepts = new Set<string>();
   const addedLower = new Set<string>();
+
+  const getConceptGroup = (label: string): string => {
+    const l = label.toLowerCase().trim();
+    if (l.includes('dầu mỡ') || l.includes('thanh đạm')) return 'GROUP_LOW_OIL_THANH_DAM';
+    if (l.includes('ngũ vị tân')) return 'GROUP_ALLIUM';
+    if (l.includes('không ăn cay') || l.includes('ít cay') || l.includes('hạn chế cay')) return 'GROUP_SPICY';
+    if (l.includes('chiên') || l.includes('rán')) return 'GROUP_FRIED';
+    if (l.includes('canh')) return 'GROUP_SOUP';
+    if (l.includes('nấm')) return 'GROUP_MUSHROOM';
+    if (l.includes('rau củ luộc')) return 'GROUP_BOILED_VEG';
+    if (l.includes('đạm') || l.includes('protein')) return 'GROUP_PROTEIN';
+    return l;
+  };
 
   const addChip = (label: string, category: ContextCategory) => {
     const cleanLabel = label.trim();
-    const key = cleanLabel.toLowerCase();
-    if (!key || addedLower.has(key)) return;
-    addedLower.add(key);
+    if (!cleanLabel) return;
+    const groupKey = getConceptGroup(cleanLabel);
+    if (addedConcepts.has(groupKey)) return;
+    addedConcepts.add(groupKey);
+    addedLower.add(cleanLabel.toLowerCase());
     chips.push({
       id: `chip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       category,
@@ -166,7 +182,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
     { regex: /ít\s*(?:dầu\s*)?mỡ/i, label: 'Ít dầu mỡ, thanh đạm' },
     { regex: /thích\s*(?:món\s*)?canh|thèm\s*canh/i, label: 'Thích món canh ấm nóng' },
     { regex: /món\s*nước/i, label: 'Ưu tiên món nước (bún, phở, cháo)' },
-    { regex: /thanh\s*đạm/i, label: 'Khẩu vị thanh đạm' },
+    { regex: /(?<!dầu\s*mỡ[,\s]*)thanh\s*đạm/i, label: 'Ít dầu mỡ, thanh đạm' },
     { regex: /đậm\s*đà/i, label: 'Khẩu vị đậm đà' },
     { regex: /ít\s*ngọt/i, label: 'Ít ngọt' },
     { regex: /ít\s*muối|ít\s*mặn/i, label: 'Ít mặn' },
@@ -202,7 +218,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
   const dietPatterns: Array<{ regex: RegExp; label: string }> = [
     { regex: /thuần\s*chay|vegan/i, label: 'Thuần chay (Vegan)' },
     { regex: /chay\s*kỳ/i, label: 'Ăn chay kỳ' },
-    { regex: /không\s*ngũ\s*vị\s*tân/i, label: 'Kiêng ngũ vị tân (hành, tỏi, hẹ)' },
+    { regex: /(?:không|kiêng)\s*(?:ăn\s*)?ngũ\s*vị\s*tân/i, label: 'Không ngũ vị tân' },
     { regex: /chay\s*có\s*trứng|ovo/i, label: 'Ăn chay có trứng' },
     { regex: /chay\s*có\s*sữa|lacto/i, label: 'Ăn chay có sữa' },
   ];

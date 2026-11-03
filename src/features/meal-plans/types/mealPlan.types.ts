@@ -29,6 +29,11 @@ export type MealSlot = RawMealSlot & {
     imageUrl?: string | null;
   } | null;
   notes?: string | null;
+  recipe?: (NonNullable<RawMealSlot['recipe']> & {
+    foodId?: number | null;
+    foodName?: string | null;
+    foodImageUrl?: string | null;
+  }) | null;
 };
 export type MealPlanEdits = MealPlanDetail['edits'];
 export type BudgetTier = MealPlanDetail['budgetTier'];

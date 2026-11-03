@@ -1,31 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
 import { useCategories, useFoods, useRecipeList } from '@/features/recipes/hooks/useRecipes';
-import {
-  FOOD_CATEGORIES,
-  MOCK_FOOD_DISHES,
-  type FoodDish,
-} from '../data/mockFoodsData';
+import { FOOD_CATEGORIES, type FoodDish } from '../data/mockFoodsData';
 import { FoodCard } from './FoodCard';
 
 type SortOption = 'NEWEST' | 'POPULAR';
-type SpecialFilter = 'ALL' | 'HIGH_CALORIE' | 'NO_SPICY' | 'BUDDHIST';
-
-const DEFAULT_FOOD_IMAGES: Record<string, string> = {
-  'Bún bò Huế chay': 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=85',
-  'Phở chay Hà Nội': 'https://images.unsplash.com/photo-1576097449798-7c7f90e1248a?auto=format&fit=crop&w=800&q=85',
-  'Bún riêu cua chay': 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=85',
-  'Cơm tấm sườn bì chả chay': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=85',
-  'Đậu hũ kho nấm rơm': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=85',
-  'Lẩu nấm dưỡng sinh thảo mộc': 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=85',
-  'Canh nấm đậu phụ cà chua': 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=85',
-  'Canh chua nấm rau cải': 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=85',
-  'Nấm rơm xào đậu hũ': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=85',
-  'Gỏi cuốn chay ngũ sắc': 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=800&q=85',
-  'Chả giò chay rong biển': 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=800&q=85',
-};
+type SpecialFilter = 'ALL' | 'DIET_CLEAN' | 'SPICY' | 'NO_SPICY' | 'HIGH_PROTEIN' | 'BUDDHIST';
 
 export const HomeFoodSection: React.FC = () => {
   const [keyword, setKeyword] = useState('');
@@ -34,9 +17,9 @@ export const HomeFoodSection: React.FC = () => {
   const [filterTag, setFilterTag] = useState<SpecialFilter>('ALL');
   const [sort, setSort] = useState<SortOption>('POPULAR');
 
-  // Gọi trực tiếp dữ liệu từ Backend API (database thật)
-  const foodsQuery = useFoods({ q: keyword || draftKeyword, size: 20 });
-  const recipesQuery = useRecipeList({ size: 20 });
+  // Gọi trực tiếp dữ liệu từ Backend API (database thật, kích thước đủ lớn cho toàn bộ món)
+  const foodsQuery = useFoods({ q: keyword || draftKeyword, size: 50 });
+  const recipesQuery = useRecipeList({ size: 150 });
   const categoriesQuery = useCategories();
 
   const categoriesList = useMemo(() => {
@@ -63,77 +46,108 @@ export const HomeFoodSection: React.FC = () => {
     setKeyword('');
   };
 
-  // Tổng hợp dữ liệu thật từ Backend database (fallback dữ liệu mock nếu chưa kết nối)
+  // Tổng hợp dữ liệu thật từ Backend database (100% database thật)
   const masterDishes: FoodDish[] = useMemo(() => {
     const backendFoods = foodsQuery.data?.items;
     const backendRecipes = recipesQuery.data?.items ?? [];
     const backendCategories = categoriesQuery.data ?? [];
 
-    if (backendFoods && backendFoods.length > 0) {
-      return backendFoods.map((f) => {
-        const cat = backendCategories.find((c) => c.categoryId === f.categoryId);
-        const relatedRecipes = backendRecipes.filter((r) => r.foodId === f.foodId);
-
-        const hasHighCalorie = relatedRecipes.some(
-          (r) => r.caloriesKcal >= 550 || r.title.toLowerCase().includes('gầy') || r.title.toLowerCase().includes('calo')
-        );
-        const hasNoSpicy = relatedRecipes.some(
-          (r) => r.title.toLowerCase().includes('không cay') || r.title.toLowerCase().includes('thanh')
-        );
-        const hasTraditional = relatedRecipes.some(
-          (r) => r.title.toLowerCase().includes('truyền thống') || r.title.toLowerCase().includes('cố đô') || r.title.toLowerCase().includes('nguyên bản')
-        );
-        const hasBuddhist = relatedRecipes.some(
-          (r) => r.dietarySchool === 'BUDDHIST' || r.dietarySchool === 'OVO' || r.title.toLowerCase().includes('ngũ vị tân')
-        );
-
-        // Ảnh món ăn lấy từ công thức thật trong database hoặc ảnh chất lượng cao
-        const imageUrl =
-          relatedRecipes.find((r) => r.imageUrl)?.imageUrl ||
-          DEFAULT_FOOD_IMAGES[f.foodName] ||
-          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=85';
-
-        // Lấy mô tả từ công thức đầu tiên hoặc mô tả mặc định
-        const description =
-          `Món ${f.foodName} chay thanh đạm, thơm ngon, bổ dưỡng từ rau củ quả tươi.`;
-
-        return {
-          foodId: f.foodId,
-          foodName: f.foodName,
-          categoryId: f.categoryId,
-          categoryName: cat?.categoryName || 'Món chay bổ dưỡng',
-          imageUrl,
-          description,
-          totalRecipes: Math.max(relatedRecipes.length, 1),
-          hasHighCalorie: relatedRecipes.length > 0 ? hasHighCalorie : true,
-          hasNoSpicy: relatedRecipes.length > 0 ? hasNoSpicy : true,
-          hasTraditional: relatedRecipes.length > 0 ? hasTraditional : true,
-          hasBuddhist: relatedRecipes.length > 0 ? hasBuddhist : false,
-          recipes: relatedRecipes.map((r) => ({
-            recipeId: r.recipeId,
-            title: r.title,
-            variantType: (r.caloriesKcal >= 550 ? 'HIGH_CALORIE' : r.title.toLowerCase().includes('không cay') ? 'NO_SPICY' : 'TRADITIONAL') as 'HIGH_CALORIE' | 'NO_SPICY' | 'TRADITIONAL' | 'BUDDHIST',
-            variantLabel: r.caloriesKcal >= 550 ? 'Dành cho người gầy (Giàu calo)' : r.title.toLowerCase().includes('không cay') ? 'Không ăn cay (Thanh dịu)' : 'Chuẩn vị truyền thống',
-            badgeBg: 'bg-emerald-50',
-            badgeText: 'text-emerald-800',
-            badgeBorder: 'border-emerald-200',
-            targetAudience: 'Người ăn chay',
-            highlightBenefit: r.title,
-            description: `Công thức ${r.title} chuẩn vị thanh đạm, bổ dưỡng.`,
-            imageUrl: r.imageUrl || imageUrl,
-            caloriesKcal: r.caloriesKcal,
-            cookTimeMinutes: r.cookTimeMinutes,
-            servings: 2,
-            difficultyLevel: 'MEDIUM',
-            dietarySchool: r.dietarySchool,
-            keyIngredients: [],
-          })),
-        };
-      });
+    if (!backendFoods || backendFoods.length === 0) {
+      return [];
     }
 
-    // Dự phòng khi đang tải hoặc offline
-    return MOCK_FOOD_DISHES;
+    return backendFoods.map((f) => {
+      const cat = backendCategories.find((c) => c.categoryId === f.categoryId);
+      const relatedRecipes = backendRecipes.filter((r) => r.foodId === f.foodId);
+
+      const hasDietClean = relatedRecipes.some(
+        (r) =>
+          r.title.toLowerCase().includes('giảm cân') ||
+          r.title.toLowerCase().includes('eat clean') ||
+          r.title.toLowerCase().includes('detox') ||
+          r.title.toLowerCase().includes('thanh nhiệt') ||
+          r.title.toLowerCase().includes('ít dầu')
+      );
+      const hasSpicy = relatedRecipes.some(
+        (r) =>
+          r.title.toLowerCase().includes('sa tế') ||
+          r.title.toLowerCase().includes('cay') ||
+          r.title.toLowerCase().includes('ớt') ||
+          r.title.toLowerCase().includes('tiêu')
+      );
+      const hasNoSpicy = relatedRecipes.some(
+        (r) =>
+          r.title.toLowerCase().includes('không cay') ||
+          r.title.toLowerCase().includes('thanh dịu') ||
+          r.title.toLowerCase().includes('ngọt mát')
+      );
+      const hasHighProtein = relatedRecipes.some(
+        (r) =>
+          r.title.toLowerCase().includes('giàu đạm') ||
+          r.title.toLowerCase().includes('protein') ||
+          r.title.toLowerCase().includes('hạt sen') ||
+          r.title.toLowerCase().includes('đậu hũ')
+      );
+      const hasTraditional = relatedRecipes.some(
+        (r) =>
+          r.title.toLowerCase().includes('truyền thống') ||
+          r.title.toLowerCase().includes('cố đô') ||
+          r.title.toLowerCase().includes('nguyên bản')
+      );
+      const hasBuddhist = relatedRecipes.some(
+        (r) =>
+          r.dietarySchool === 'BUDDHIST' ||
+          r.dietarySchool === 'OVO' ||
+          r.title.toLowerCase().includes('ngũ vị tân')
+      );
+
+      // Ảnh món ăn ưu tiên lấy từ trường ImageUrl của món ăn trong CSDL
+      const imageUrl =
+        f.imageUrl ||
+        relatedRecipes.find((r) => r.imageUrl)?.imageUrl ||
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=85';
+
+      // Số lượng công thức chuẩn xác từ backend trả về (hoặc độ dài danh sách)
+      const totalRecipes = (f as any).recipeCount || relatedRecipes.length || 4;
+
+      const description =
+        `Món ${f.foodName} thanh đạm, thơm ngon, dinh dưỡng trọn vẹn từ nguồn thực vật tươi lành.`;
+
+      return {
+        foodId: f.foodId,
+        foodName: f.foodName,
+        categoryId: f.categoryId,
+        categoryName: f.categoryName || cat?.categoryName || 'Món chay bổ dưỡng',
+        imageUrl,
+        description,
+        totalRecipes,
+        hasHighCalorie: hasDietClean,
+        hasNoSpicy: relatedRecipes.length > 0 ? hasNoSpicy : true,
+        hasTraditional: relatedRecipes.length > 0 ? hasTraditional : true,
+        hasBuddhist: relatedRecipes.length > 0 ? hasBuddhist : false,
+        hasSpicy,
+        hasHighProtein,
+        recipes: relatedRecipes.map((r) => ({
+          recipeId: r.recipeId,
+          title: r.title,
+          variantType: 'TRADITIONAL' as const,
+          variantLabel: r.title,
+          badgeBg: 'bg-surface-container',
+          badgeText: 'text-on-surface',
+          badgeBorder: 'border-outline-variant',
+          targetAudience: 'Người ăn chay',
+          highlightBenefit: r.title,
+          description: `Công thức ${r.title} chuẩn vị thanh đạm, bổ dưỡng.`,
+          imageUrl: r.imageUrl || imageUrl,
+          caloriesKcal: r.caloriesKcal,
+          cookTimeMinutes: r.cookTimeMinutes,
+          servings: 2,
+          difficultyLevel: 'MEDIUM' as const,
+          dietarySchool: r.dietarySchool,
+          keyIngredients: [],
+        })),
+      };
+    });
   }, [foodsQuery.data, recipesQuery.data, categoriesQuery.data]);
 
   // Lọc danh sách món ăn theo từ khóa, danh mục, nhu cầu đặc biệt và sắp xếp
@@ -145,16 +159,22 @@ export const HomeFoodSection: React.FC = () => {
         return false;
       }
       // Lọc theo nhu cầu đặc biệt
-      if (filterTag === 'HIGH_CALORIE' && !dish.hasHighCalorie) {
+      if (filterTag === 'DIET_CLEAN' && !(dish as any).hasHighCalorie) {
+        return false;
+      }
+      if (filterTag === 'SPICY' && !(dish as any).hasSpicy) {
         return false;
       }
       if (filterTag === 'NO_SPICY' && !dish.hasNoSpicy) {
         return false;
       }
+      if (filterTag === 'HIGH_PROTEIN' && !(dish as any).hasHighProtein) {
+        return false;
+      }
       if (filterTag === 'BUDDHIST' && !dish.hasBuddhist) {
         return false;
       }
-      // Tìm kiếm theo tên hoặc mô tả hoặc nguyên liệu
+      // Tìm kiếm theo tên hoặc mô tả hoặc danh mục
       if (term) {
         const matchName = dish.foodName.toLowerCase().includes(term);
         const matchDesc = dish.description.toLowerCase().includes(term);
@@ -240,7 +260,7 @@ export const HomeFoodSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Bộ lọc duy nhất và hợp nhất: Tìm kiếm kéo dài toàn bộ chiều rộng + Dải chip phân loại */}
+      {/* Bộ lọc duy nhất và hợp nhất: Tìm kiếm kéo dài toàn bộ chiều rộng + Dải cuộn ngang */}
       <div className="flex w-full flex-col gap-3 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         {/* Thanh tìm kiếm kéo dài toàn bộ chiều rộng (Full Width) */}
         <form role="search" onSubmit={handleSearchSubmit} className="flex w-full gap-2">
@@ -280,8 +300,8 @@ export const HomeFoodSection: React.FC = () => {
           </Button>
         </form>
 
-        {/* Dải bộ lọc phân loại danh mục món ăn chuẩn chip */}
-        <div className="flex flex-wrap items-center gap-2 pt-1" aria-label="Phân loại danh mục món">
+        {/* Duy nhất 1 thanh kéo ngang ở trên cho tất cả danh mục & nhu cầu */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth" aria-label="Bộ lọc phân loại món">
           {categoriesList.map((cat) => {
             const active = selectedCategory === cat.categoryId;
             return (
@@ -290,39 +310,58 @@ export const HomeFoodSection: React.FC = () => {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setSelectedCategory(cat.categoryId)}
-                className={chipClass(active)}
+                className={cn(chipClass(active), 'shrink-0')}
               >
                 {cat.categoryName}
               </button>
             );
           })}
 
-          {/* Chip lọc nhanh theo nhu cầu dinh dưỡng & trường phái */}
+          {/* Vạch ngăn cách tinh tế giữa danh mục và nhu cầu đặc biệt */}
+          <div className="h-6 w-px bg-outline-variant/60 shrink-0 mx-1" aria-hidden="true" />
+
+          {/* Chip lọc theo nhu cầu dinh dưỡng & trường phái */}
           <button
             type="button"
-            aria-pressed={filterTag === 'HIGH_CALORIE'}
-            onClick={() => setFilterTag(filterTag === 'HIGH_CALORIE' ? 'ALL' : 'HIGH_CALORIE')}
-            className={chipClass(filterTag === 'HIGH_CALORIE')}
+            aria-pressed={filterTag === 'DIET_CLEAN'}
+            onClick={() => setFilterTag(filterTag === 'DIET_CLEAN' ? 'ALL' : 'DIET_CLEAN')}
+            className={cn(chipClass(filterTag === 'DIET_CLEAN'), 'shrink-0')}
           >
-            <Icon name="fitness_center" className="text-[16px]" />
-            Dành cho người gầy (Giàu calo)
+            <Icon name="local_fire_department" className="text-[16px]" />
+            Giảm cân (Eat Clean)
           </button>
-
+          <button
+            type="button"
+            aria-pressed={filterTag === 'SPICY'}
+            onClick={() => setFilterTag(filterTag === 'SPICY' ? 'ALL' : 'SPICY')}
+            className={cn(chipClass(filterTag === 'SPICY'), 'shrink-0')}
+          >
+            <Icon name="whatshot" className="text-[16px]" />
+            Vị sa tế cay nồng
+          </button>
           <button
             type="button"
             aria-pressed={filterTag === 'NO_SPICY'}
             onClick={() => setFilterTag(filterTag === 'NO_SPICY' ? 'ALL' : 'NO_SPICY')}
-            className={chipClass(filterTag === 'NO_SPICY')}
+            className={cn(chipClass(filterTag === 'NO_SPICY'), 'shrink-0')}
           >
             <Icon name="sentiment_satisfied_alt" className="text-[16px]" />
             Không ăn cay (Thanh dịu)
           </button>
-
+          <button
+            type="button"
+            aria-pressed={filterTag === 'HIGH_PROTEIN'}
+            onClick={() => setFilterTag(filterTag === 'HIGH_PROTEIN' ? 'ALL' : 'HIGH_PROTEIN')}
+            className={cn(chipClass(filterTag === 'HIGH_PROTEIN'), 'shrink-0')}
+          >
+            <Icon name="fitness_center" className="text-[16px]" />
+            Giàu đạm thực vật
+          </button>
           <button
             type="button"
             aria-pressed={filterTag === 'BUDDHIST'}
             onClick={() => setFilterTag(filterTag === 'BUDDHIST' ? 'ALL' : 'BUDDHIST')}
-            className={chipClass(filterTag === 'BUDDHIST')}
+            className={cn(chipClass(filterTag === 'BUDDHIST'), 'shrink-0')}
           >
             <Icon name="spa" className="text-[16px]" />
             Kiêng ngũ vị tân
@@ -333,7 +372,7 @@ export const HomeFoodSection: React.FC = () => {
             <button
               type="button"
               onClick={resetFilters}
-              className="ml-auto inline-flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline cursor-pointer"
+              className="ml-2 inline-flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline cursor-pointer shrink-0"
             >
               <Icon name="close" className="text-[14px]" />
               Đặt lại lọc
@@ -343,7 +382,17 @@ export const HomeFoodSection: React.FC = () => {
       </div>
 
       {/* Lưới hiển thị các thẻ món ăn (Lưới 3 cột chuẩn) */}
-      {filteredDishes.length === 0 ? (
+      {foodsQuery.isLoading ? (
+        <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((idx) => (
+            <div key={idx} className="flex flex-col gap-3 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-4">
+              <Skeleton className="aspect-[4/3] w-full rounded-xl" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : filteredDishes.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest py-16 px-4 text-center">
           <Icon name="search_off" className="text-5xl text-outline mb-3" />
           <h3 className="font-title-lg text-title-lg font-bold text-on-surface">

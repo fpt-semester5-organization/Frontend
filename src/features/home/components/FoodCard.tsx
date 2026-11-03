@@ -13,6 +13,7 @@ export interface FoodCardProps {
 /** Thẻ món ăn đồng bộ với chuẩn thiết kế VeggieLife, dẫn thẳng sang giao diện đầy đủ /recipes?food= */
 export const FoodCard: React.FC<FoodCardProps> = ({ dish, className, onSelect }) => {
   const navigate = useNavigate();
+  const [imgError, setImgError] = React.useState(false);
 
   const handleCardClick = () => {
     if (onSelect) {
@@ -31,14 +32,23 @@ export const FoodCard: React.FC<FoodCardProps> = ({ dish, className, onSelect })
     >
       {/* Ảnh món ăn chất lượng cao tỉ lệ 4:3 */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container">
-        <img
-          src={dish.imageUrl}
-          alt={dish.foodName}
-          width={480}
-          height={360}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          loading="lazy"
-        />
+        {!imgError && dish.imageUrl ? (
+          <img
+            src={dish.imageUrl}
+            alt={dish.foodName}
+            width={480}
+            height={360}
+            onError={() => setImgError(true)}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60 p-4">
+            <div className="flex flex-col items-center gap-1.5 text-primary">
+              <Icon name="restaurant" className="text-[40px]" />
+            </div>
+          </div>
+        )}
 
         {/* Badge danh mục góc trái */}
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">

@@ -53,15 +53,15 @@ export const CreateShoppingListDialog: React.FC<{
     setConflict(null);
     createList.mutate(
       {
-        servingsMultiplier: values.servingsMultiplier,
-        daysCount: selectedDays,
+        servingsMultiplier: 1, // Định lượng chuẩn 1 phần trong CSDL để nhân động theo khẩu phần
+        daysCount: defaultDays, // Toàn bộ thực đơn
         ...(values.targetShoppingDate ? { targetShoppingDate: values.targetShoppingDate } : {}),
       },
       {
         onSuccess: (res) => {
           notifySuccess(res.message || 'Đã tạo danh sách đi chợ.');
           onHide();
-          navigate(PATHS.SHOPPING_LISTS.DETAIL(res.data.listId));
+          navigate(`${PATHS.SHOPPING_LISTS.DETAIL(res.data.listId)}?servings=${values.servingsMultiplier || 1}`);
         },
         onError: (error) => {
           const apiError = toApiError(error);
@@ -94,62 +94,12 @@ export const CreateShoppingListDialog: React.FC<{
     <Modal show={show} onHide={onHide} title="Tạo danh sách đi chợ" locked={createList.isPending}>
       <form onSubmit={handleSubmit(submit)} noValidate className="flex flex-col gap-space-md p-space-lg">
         <p className="font-body-md text-body-md text-on-surface-variant">
-          Hệ thống cộng dồn nguyên liệu theo {selectedDays} ngày ({selectedDays * 3} bữa ăn) của thực đơn và chia theo quầy hàng để bạn đi chợ dễ dàng.
+          Hệ thống tổng hợp đầy đủ nguyên liệu của thực đơn và chia theo 4 quầy hàng tiện lợi để bạn đi chợ dễ dàng.
         </p>
-
-        {/* Lựa chọn số ngày đi chợ */}
-        <div className="flex flex-col gap-space-xs rounded-xl border border-surface-container bg-surface-container-low p-3">
-          <div className="flex items-center justify-between">
-            <label htmlFor="shopping-days" className="font-label-md text-label-md font-semibold text-on-surface">
-              Đi chợ theo số ngày:
-            </label>
-            <div className="flex items-center gap-1.5">
-              <input
-                id="shopping-days"
-                type="number"
-                min={1}
-                max={defaultDays}
-                value={selectedDays}
-                onChange={(e) => {
-                  const val = Math.max(1, Math.min(defaultDays, Number(e.target.value) || 1));
-                  setSelectedDays(val);
-                  setValue('daysCount', val);
-                }}
-                className="w-16 rounded-lg bg-surface-container-lowest px-2 py-1 text-center font-bold text-sm text-on-surface border border-surface-container focus:ring-1 focus:ring-primary/30 outline-hidden"
-              />
-              <span className="text-xs font-medium text-on-surface-variant">/ {defaultDays} ngày</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-xs text-on-surface-variant">Chọn nhanh:</span>
-            {quickDays.map((d) => {
-              const active = selectedDays === d;
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDays(d);
-                    setValue('daysCount', d);
-                  }}
-                  className={cn(
-                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-all',
-                    active
-                      ? 'bg-primary-container text-on-primary shadow-2xs font-bold'
-                      : 'bg-surface-container-lowest text-on-surface border border-surface-container hover:bg-surface-container'
-                  )}
-                >
-                  {d === defaultDays ? `Toàn bộ (${d} ngày)` : `${d} ngày đầu`}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="flex flex-col gap-space-xs">
           <label htmlFor="servings-multiplier" className={LABEL_CLASS}>
-            Hệ số khẩu phần
+            Khẩu phần ăn
           </label>
           <input
             id="servings-multiplier"

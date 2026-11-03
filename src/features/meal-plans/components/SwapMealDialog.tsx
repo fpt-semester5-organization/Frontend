@@ -79,7 +79,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     listRecipes({
       keyword: debouncedQuery.trim() || undefined,
       page: 1,
-      size: 16,
+      size: 50,
       sort: 'POPULAR',
     })
       .then((paged) => {
@@ -123,14 +123,37 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     }
   };
 
-  // Bộ lọc nhanh danh mục
+  // Bộ lọc nhanh danh mục chuẩn xác theo Category_ID & tên món
   const filteredSearchResults = searchResults.filter((recipe) => {
     if (selectedCategory === 'ALL') return true;
-    if (selectedCategory === 'CANH' && /canh|súp|soup/i.test(recipe.title)) return true;
-    if (selectedCategory === 'KHO' && /kho|sốt/i.test(recipe.title)) return true;
-    if (selectedCategory === 'XAO' && /xào|chiên/i.test(recipe.title)) return true;
-    if (selectedCategory === 'NUOC' && /bún|phở|miến|cháo/i.test(recipe.title)) return true;
-    return true;
+    const nameToCheck = `${recipe.foodName || ''} ${recipe.title || ''}`.toLowerCase();
+    const catId = (recipe as any).categoryId;
+    
+    if (selectedCategory === 'XAO') {
+      return catId === 14 || (!catId && /xào|áp chảo/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'NUOC') {
+      return catId === 11 || catId === 10 || catId === 3 || (!catId && /bún|phở|miến|hủ tiếu|mì|cháo|bánh canh|canh|súp|lẩu/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'DOKHO') {
+      return catId === 5 || catId === 9 || catId === 6 || catId === 4 || (!catId && /cơm|xôi|kho|rim|om|cuốn|chả giò|chiên|rán/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'DOUONG') {
+      return catId === 2 || (!catId && /nước ép|sinh tố|trà|sữa hạt|smoothie|juice/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'CANH') {
+      return catId === 3 || (!catId && /canh|súp|soup/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'KHO') {
+      return catId === 9 || (!catId && /kho|rim|om/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'COM') {
+      return catId === 5 || (!catId && /cơm|xôi/i.test(nameToCheck));
+    }
+    if (selectedCategory === 'GOI') {
+      return catId === 6 || catId === 7 || (!catId && /gỏi|cuốn|salad|nộm/i.test(nameToCheck));
+    }
+    return false;
   });
 
   return (
@@ -139,10 +162,10 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
         <div className="flex flex-col gap-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {/* Thông tin món hiện tại */}
           <div className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3.5 border border-surface-container shadow-2xs">
-            {slot.recipe?.imageUrl || detail?.imageUrl ? (
+            {slot.recipe?.foodImageUrl || (detail as any)?.foodImageUrl || slot.recipe?.imageUrl || detail?.imageUrl ? (
               <img
-                src={detail?.imageUrl || slot.recipe?.imageUrl || ''}
-                alt={detail?.title || slot.recipe?.title || 'Món ăn'}
+                src={slot.recipe?.foodImageUrl || (detail as any)?.foodImageUrl || detail?.imageUrl || slot.recipe?.imageUrl || ''}
+                alt={slot.recipe?.foodName || (detail as any)?.foodName || detail?.title || slot.recipe?.title || 'Món ăn'}
                 className="h-16 w-16 shrink-0 rounded-xl object-cover"
               />
             ) : (
@@ -163,8 +186,13 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                 )}
               </div>
               <p className="truncate font-bold text-sm sm:text-base text-on-surface mt-0.5">
-                {detail?.title || slot.recipe?.title || 'Chưa có món'}
+                {slot.recipe?.foodName || (detail as any)?.foodName || detail?.title || slot.recipe?.title || 'Chưa có món'}
               </p>
+              {(slot.recipe?.foodName || (detail as any)?.foodName) && (slot.recipe?.title || detail?.title) && (
+                <p className="truncate text-xs text-on-surface-variant italic">
+                  Công thức: {slot.recipe?.title || detail?.title}
+                </p>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-on-surface-variant">
                 <span className="flex items-center gap-1 font-semibold text-secondary">
                   <Icon name="local_fire_department" className="text-[15px] text-secondary" />
@@ -347,10 +375,12 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
               <div className="flex flex-wrap gap-1">
                 {[
                   { id: 'ALL', label: 'Tất cả' },
-                  { id: 'CANH', label: 'Món canh' },
-                  { id: 'NUOC', label: 'Món nước' },
-                  { id: 'KHO', label: 'Món kho' },
                   { id: 'XAO', label: 'Món xào' },
+                  { id: 'NUOC', label: 'Món nước' },
+                  { id: 'DOKHO', label: 'Đồ khô' },
+                  { id: 'DOUONG', label: 'Đồ uống' },
+                  { id: 'CANH', label: 'Món canh' },
+                  { id: 'GOI', label: 'Gỏi & Cuốn' },
                 ].map((cat) => (
                   <button
                     key={cat.id}
@@ -396,10 +426,10 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                         )}
                       >
                         <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-surface-container relative">
-                          {recipe.imageUrl ? (
+                          {((recipe as any).foodImageUrl || recipe.imageUrl) ? (
                             <img
-                              src={recipe.imageUrl}
-                              alt={recipe.title}
+                              src={(recipe as any).foodImageUrl || recipe.imageUrl}
+                              alt={recipe.foodName || recipe.title}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -409,12 +439,14 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          {recipe.foodName && (
-                            <p className="truncate text-[11px] text-on-surface-variant">{recipe.foodName}</p>
-                          )}
                           <p className="font-semibold text-xs text-on-surface truncate">
-                            {recipe.title}
+                            {recipe.foodName || recipe.title}
                           </p>
+                          {recipe.foodName && recipe.foodName !== recipe.title && (
+                            <p className="truncate text-[11px] text-on-surface-variant italic">
+                              Công thức: {recipe.title}
+                            </p>
+                          )}
                           <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5">
                             <span className="font-semibold text-secondary">
                               {Math.round(recipe.caloriesKcal)} kcal

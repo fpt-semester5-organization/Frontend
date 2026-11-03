@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { RelatedRecipes } from '../components/RelatedRecipes';
 import { RECIPE_STATUS_META, canEditRecipe } from '../lib/recipeStatus';
 import { useRecipe } from '../hooks/useRecipes';
+import { normalizeInstructions } from '../api/recipes.api';
 import type { MyRecipeStatus, RecipeDetail as RecipeDetailData } from '../types/recipe.types';
 
 const PAGE = 'mx-auto flex w-full max-w-[1100px] flex-col gap-space-xl px-margin-mobile py-space-lg sm:px-margin';
@@ -70,6 +71,7 @@ const RecipeDetail: React.FC = () => {
   const recipe = useRecipe(recipeId);
   const target = useMemo<ContentRef>(() => ({ resource: 'recipes', id: recipeId }), [recipeId]);
   const [reportOpen, setReportOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   if (!validId) return <NotFound />;
 
@@ -107,15 +109,19 @@ const RecipeDetail: React.FC = () => {
   const canReport = isPublic && !isOwner && (!isMember || data.memberActions.canReport);
 
   const handleBack = () => {
+    const state = location.state as { fromPlanId?: number; fromDay?: string; returnUrl?: string } | null;
+    if (state?.returnUrl) {
+      navigate(state.returnUrl);
+      return;
+    }
+    if (state?.fromPlanId) {
+      navigate(`${PATHS.MEAL_PLANS.DETAIL(state.fromPlanId)}${state.fromDay ? `?day=${state.fromDay}` : ''}`);
+      return;
+    }
     if (window.history.state && window.history.state.idx > 0) {
       navigate(-1);
     } else {
-      const state = location.state as { fromPlanId?: number; fromDay?: string } | null;
-      if (state?.fromPlanId && state?.fromDay) {
-        navigate(`${PATHS.MEAL_PLANS.DETAIL(state.fromPlanId)}?day=${state.fromDay}`);
-      } else {
-        navigate(PATHS.RECIPES.ROOT);
-      }
+      navigate(PATHS.RECIPES.ROOT);
     }
   };
 
@@ -170,7 +176,7 @@ const RecipeDetail: React.FC = () => {
                 playsInline
                 className="aspect-[4/3] h-auto w-full object-cover"
               />
-            ) : data.imageUrl ? (
+            ) : data.imageUrl && !imgError ? (
               <img
                 src={data.imageUrl}
                 alt={`Ảnh công thức ${data.title}`}
@@ -178,6 +184,7 @@ const RecipeDetail: React.FC = () => {
                 height={720}
                 // Ảnh món là phần tử lớn nhất màn đầu (LCP) nên tải ngay.
                 {...{ fetchpriority: 'high' }}
+                onError={() => setImgError(true)}
                 className="aspect-[4/3] h-auto w-full object-cover"
               />
             ) : (
@@ -295,30 +302,49 @@ const RecipeDetail: React.FC = () => {
           </section>
 
           <section aria-labelledby="steps-title" className={`${CARD} lg:col-span-7`}>
-            <h2 id="steps-title" className="flex items-center justify-between gap-2 font-headline-sm text-headline-sm text-on-surface">
-              Cách làm
-              <span className="font-label-md text-label-md text-on-surface-variant">{data.instructions.length} bước</span>
-            </h2>
-            {data.instructions.length === 0 ? (
-              <p className="mt-space-md font-body-md text-body-md text-on-surface-variant">Công thức chưa có các bước thực hiện.</p>
-            ) : (
-              <ol className="mt-space-md flex flex-col gap-space-md">
-                {data.instructions.map((step, index) => (
-                  <li key={index} className="flex gap-space-md">
-                    <span
-                      aria-hidden="true"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-container font-label-md text-label-md text-on-primary"
-                    >
-                      {index + 1}
+            {(() => {
+              const normalizedSteps = normalizeInstructions(data.instructions);
+              return (
+                <>
+                  <h2 id="steps-title" className="flex items-center justify-between gap-2 font-headline-sm text-headline-sm text-on-surface">
+                    Cách làm
+                    <span className="font-label-md text-label-md text-on-surface-variant font-sans font-semibold">
+                      {normalizedSteps.length} bước
                     </span>
-                    <p className="pt-1 font-body-md text-body-md leading-relaxed break-words whitespace-pre-line text-on-surface">
-                      <span className="sr-only">Bước {index + 1}: </span>
-                      {step}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
+                  </h2>
+                  {normalizedSteps.length === 0 ? (
+                    <p className="mt-space-md font-body-md text-body-md text-on-surface-variant">Công thức chưa có các bước thực hiện.</p>
+                  ) : (
+                    <ol className="mt-space-md flex flex-col gap-5">
+                      {normalizedSteps.map((rawStep, index) => {
+                        const cleanStep = rawStep.replace(/^Bước\s*\d+[:.]\s*/i, '').trim() || rawStep;
+                        return (
+                          <li
+                            key={index}
+                            className="flex items-start gap-4 py-1"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary font-bold text-sm shadow-xs mt-0.5"
+                            >
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="font-semibold text-xs text-primary mb-1">
+                                Bước {index + 1}
+                              </p>
+                              <p className="font-body-md text-body-md leading-relaxed break-words text-on-surface">
+                                {cleanStep}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </>
+              );
+            })()}
           </section>
         </div>
       </article>
