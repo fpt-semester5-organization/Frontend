@@ -10,11 +10,23 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   hour12: false,
 });
 
+/** "2026-10-26T10:00:00" (không có Z hay +07:00). */
+const NO_TIMEZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+/**
+ * Backend lưu DateTime.UtcNow. API đã trả kèm Z, nhưng chuỗi thiếu múi giờ (mock, bên thứ ba, phản hồi lỗi) sẽ bị `new Date()`
+ * hiểu là giờ máy và lệch 7 giờ, nên chuỗi không có múi giờ được coi là UTC.
+ */
+export function parseServerDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(NO_TIMEZONE.test(value) ? `${value}Z` : value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** "2026-10-05T10:00:00Z" → "05/10/2026 17:00". */
 export function formatDateTime(value: string | Date | null | undefined): string {
-  if (!value) return '';
-  const date = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return '';
+  const date = typeof value === 'string' ? parseServerDate(value) : value;
+  if (!date || Number.isNaN(date.getTime())) return '';
   const parts = Object.fromEntries(
     dateTimeFormatter.formatToParts(date).map((part) => [part.type, part.value])
   );

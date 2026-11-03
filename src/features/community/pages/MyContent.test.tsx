@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { mockApi } from '@/test/mockApi';
 import { renderPage } from '@/test/utils';
 import { useAuthStore } from '@/stores/auth.store';
+import { useUiStore } from '@/stores/ui.store';
 import MyContent from './MyContent';
 
 const POSTS = [
@@ -38,7 +39,10 @@ describe('MyContent (Nội dung của tôi)', () => {
   });
 
   describe('Thành viên', () => {
-    beforeEach(() => signIn(true));
+    beforeEach(() => {
+      signIn(true);
+      useUiStore.setState({ toasts: [] });
+    });
 
     it('tab Bài viết mặc định: GET /posts theo tác giả là mình, mới nhất trước', async () => {
       const calls = mockPosts();
@@ -64,6 +68,60 @@ describe('MyContent (Nội dung của tôi)', () => {
       renderPage(<MyContent />, { route: '/me/content?tab=recipes' });
       expect(screen.getByRole('tab', { name: 'Công thức' })).toHaveAttribute('aria-selected', 'true');
       expect(calls).toHaveLength(0);
+    });
+
+    describe('xóa bài', () => {
+      const openDeleteDialog = async () => {
+        await userEvent.click(await screen.findByRole('button', { name: 'Xóa bài "Bữa sáng chay nhanh gọn cho sinh viên"' }));
+        return within(screen.getByRole('dialog')).getByRole('button', { name: 'Xóa bài viết' });
+      };
+
+      it('dòng biến mất và hộp thoại đóng ngay, báo kết quả của server', async () => {
+        let left = POSTS;
+        const calls = mockApi((req) => {
+          if (req.method === 'DELETE') {
+            left = POSTS.slice(1);
+            return { message: 'Đã xóa bài viết.' };
+          }
+          return { data: left, meta: { page: 1, size: 10, total: left.length } };
+        });
+        renderPage(<MyContent />, { route: '/me/content' });
+        await userEvent.click(await openDeleteDialog());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByRole('link', { name: 'Bữa sáng chay nhanh gọn cho sinh viên' })).not.toBeInTheDocument());
+        expect(screen.getByRole('link', { name: 'Sữa đậu nành tự làm tại nhà' })).toBeInTheDocument();
+        await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.url === '/posts/5')).toBe(true));
+        await waitFor(() => expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Đã xóa bài viết.'));
+      });
+
+      it('xóa lỗi: bài hiện lại và báo lỗi', async () => {
+        mockApi((req) =>
+          req.method === 'DELETE'
+            ? { status: 403, errorCode: 'ERR_CONTENT_NOT_OWNER', message: 'Không phải tác giả của nội dung.' }
+            : { data: POSTS, meta: { page: 1, size: 10, total: POSTS.length } }
+        );
+        renderPage(<MyContent />, { route: '/me/content' });
+        await userEvent.click(await openDeleteDialog());
+        await waitFor(() => expect(useUiStore.getState().toasts.map((t) => t.message)).toContain('Không phải tác giả của nội dung.'));
+        expect(await screen.findByRole('link', { name: 'Bữa sáng chay nhanh gọn cho sinh viên' })).toBeInTheDocument();
+      });
+
+      it('xóa hết bài ở trang cuối: lùi về trang trước, không báo "Bạn chưa đăng bài nào"', async () => {
+        let total = 11;
+        const calls = mockApi((req) => {
+          if (req.method === 'DELETE') {
+            total = 10;
+            return { message: 'Đã xóa bài viết.' };
+          }
+          const page = (req.params as { page: number }).page;
+          return { data: page === 2 && total === 11 ? [POSTS[0]] : page === 1 ? [POSTS[1]] : [], meta: { page, size: 10, total } };
+        });
+        renderPage(<MyContent />, { route: '/me/content?page=2' });
+        await userEvent.click(await openDeleteDialog());
+        expect(await screen.findByRole('link', { name: 'Sữa đậu nành tự làm tại nhà' })).toBeInTheDocument();
+        expect(screen.queryByText('Bạn chưa đăng bài nào')).not.toBeInTheDocument();
+        expect(calls.some((c) => c.method === 'GET' && (c.params as { page: number }).page === 1)).toBe(true);
+      });
     });
 
     it('lọc bài viết theo từng tab trạng thái và hiển thị badge tương ứng', async () => {

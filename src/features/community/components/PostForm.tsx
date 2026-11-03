@@ -161,10 +161,12 @@ export const PostForm: React.FC<PostFormProps> = ({ mode, defaultValues, submitt
               Lưu bản nháp
             </Button>
           )}
-          <p className="font-label-sm text-label-sm text-on-surface-variant">
-            Bài mới được AI kiểm duyệt; sửa bài đã đăng sẽ được kiểm duyệt lại. Giới hạn đăng: 02 bài/ngày (tài khoản dưới 3
-            ngày), sau đó 10 bài/ngày.
-          </p>
+          {mode === 'create' && (
+            <p className="font-label-sm text-label-sm text-on-surface-variant">
+              Bài mới được AI kiểm duyệt; sửa bài đã đăng sẽ được kiểm duyệt lại. Giới hạn đăng: 02 bài/ngày (tài khoản dưới 3
+              ngày), sau đó 10 bài/ngày.
+            </p>
+          )}
           <Link
             to={cancelTo}
             className="block w-full rounded-lg px-space-lg py-2 text-center font-label-sm text-label-sm text-outline no-underline hover:text-on-surface"
