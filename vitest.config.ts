@@ -2,9 +2,9 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 
 // Unit test dùng chung cấu hình Vite (alias @, plugin React). Chạy: npm test
-export default mergeConfig(
-  viteConfig as any,
-  defineConfig({
+// vite.config.ts là dạng hàm (đọc env theo mode) nên phải gọi trước khi gộp.
+export default defineConfig((configEnv) =>
+  mergeConfig(viteConfig(configEnv), {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],

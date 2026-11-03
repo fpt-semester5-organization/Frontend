@@ -39,6 +39,23 @@ export function addRecentCreatedItem(item: CommunityFeedItem) {
   }
 }
 
+/**
+ * Gỡ một mục theo `key` (POST-5, RECIPE-5): bài viết và công thức có thể trùng id nên không gỡ theo id.
+ * Trả về mục đã gỡ để khôi phục khi thao tác thất bại.
+ */
+export function removeRecentCreatedItem(key: string): CommunityFeedItem | undefined {
+  try {
+    const current = getRecentCreatedItems();
+    const removed = current.find((item) => item.key === key);
+    if (!removed) return undefined;
+    sessionStorage.setItem(RECENT_KEY, JSON.stringify(current.filter((item) => item !== removed)));
+    window.dispatchEvent(new Event('vl_recent_item_added'));
+    return removed;
+  } catch {
+    return undefined;
+  }
+}
+
 export function updateRecentCreatedItem(
   predicate: (item: CommunityFeedItem) => boolean,
   updater: (item: CommunityFeedItem) => CommunityFeedItem
