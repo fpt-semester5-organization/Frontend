@@ -8,6 +8,7 @@ export interface FridgeItem {
   ingredientId: number;
   name: string;
   freshnessStatus: Freshness;
+  thumbnailUrl?: string | null;
 }
 
 export interface DetectedItem {
@@ -58,7 +59,7 @@ export interface ImageOptimizationResult {
   originalSize: number;
   compressedSize: number;
   wasCompressed: boolean;
-  width: number;
-  height: number;
-  reductionPercentage: number;
+  width?: number;
+  height?: number;
+  reductionPercentage?: number;
 }
