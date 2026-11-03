@@ -26,7 +26,9 @@ export function loadImage(source: File | Blob | string): Promise<HTMLImageElemen
     img.crossOrigin = 'anonymous';
 
     const isCreatedUrl = typeof source !== 'string';
-    const objectUrl = isCreatedUrl ? URL.createObjectURL(source) : source;
+    const objectUrl = isCreatedUrl
+      ? URL.createObjectURL(source)
+      : (source.startsWith('http') ? `${source}${source.includes('?') ? '&' : '?'}cors=1` : source);
 
     img.onload = () => {
       if (isCreatedUrl) {

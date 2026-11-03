@@ -403,7 +403,7 @@ async function realUploadFridgeImage(
           const detectedList = backendData.detectedIngredients || backendData.detected || [];
 
           const mappedDetected: DetectedIngredient[] = detectedList.map((item: any, idx: number) => ({
-            inventoryId: item.inventoryId ?? (idx + 1),
+            inventoryId: item.inventoryId ?? null,
             ingredientId: item.ingredientId ?? null,
             name: item.name,
             freshnessStatus: (item.freshness || item.freshnessStatus || 'FRESH') as FreshnessStatus,

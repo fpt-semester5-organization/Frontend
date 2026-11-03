@@ -114,16 +114,6 @@ export function RegisterPage() {
                 </Link>
               </span>
             </label>
-            <div className="pl-6.5">
-              <button
-                type="button"
-                onClick={() => setPreviewDoc('TERMS')}
-                className="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[15px]">description</span>
-                <span>Xem nhanh văn bản pháp lý chính thức</span>
-              </button>
-            </div>
             {form.formState.errors.agreeTerms && <p role="alert" className="font-label-sm text-label-sm text-error">{form.formState.errors.agreeTerms.message}</p>}
           </div>
           <SubmitButton loading={reg.isPending}>Tạo tài khoản</SubmitButton>

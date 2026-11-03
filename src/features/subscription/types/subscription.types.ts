@@ -54,12 +54,37 @@ export interface SubscriptionTransaction {
   amountVnd: number;
   status: string;
   createdAt: string;
+  planName?: string;
+  orderCode?: string;
+  completedAt?: string | null;
+  receiptUrl?: string | null;
+  canViewReceipt?: boolean;
 }
 export interface MySubscription {
   isVip: boolean;
   plan?: Plan | null;
   endsAt?: string | null;
   transactions: SubscriptionTransaction[];
+}
+
+/** FN-SUB-04 · GET /subscriptions/transactions/{transactionId}/receipt */
+export interface PaymentReceipt {
+  receiptNumber: string;
+  transactionId: number;
+  orderCode: string;
+  gateway: string;
+  status: string;
+  paymentDate: string;
+  userId: number;
+  fullName: string;
+  email: string;
+  planId: number;
+  planName: string;
+  durationDays: number;
+  amountVnd: number;
+  vipStartsAt: string;
+  vipEndsAt: string;
+  note: string;
 }
 
 export const STATUS_LABEL: Record<TransactionStatus, { text: string; tone: 'ok' | 'wait' | 'bad' }> = {

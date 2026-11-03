@@ -19,10 +19,12 @@ import { EditDetectedItemModal } from '../components/EditDetectedItemModal';
 import { FreshnessBadge } from '../components/FreshnessBadge';
 import { BoundingBoxOverlay } from '../components/BoundingBoxOverlay';
 import { FridgeScanner } from '@/components/FridgeScanner';
+import { useFridgeScanStore } from '../stores/fridgeScan.store';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createFridgeItem,
   deleteFridgeItem,
+  getLatestFridgeSession,
   updateFridgeItem,
 } from '../api/fridge.api';
 import {
@@ -119,6 +121,55 @@ function isNonVegetarianMeat(item: { name: string; foodGroup?: string | null; is
   return meatKeywords.some((k) => name.includes(k));
 }
 
+// Chuyển Blob/File thành Base64 Data URL để lưu trữ bền vững trong Zustand store
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert blob to base64'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+const getCachedThumbnail = (name: string): string | null => {
+  try {
+    const raw = localStorage.getItem('vl_fridge_thumbnails');
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    const clean = name.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+    return map[name.toLowerCase()] || map[clean] || null;
+  } catch {
+    return null;
+  }
+};
+
+const saveThumbnailsToCache = (items: DetectedItem[]) => {
+  try {
+    const raw = localStorage.getItem('vl_fridge_thumbnails');
+    const map: Record<string, string> = raw ? JSON.parse(raw) : {};
+    let changed = false;
+    for (const it of items) {
+      if (it.thumbnailUrl) {
+        const clean = it.name.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+        map[it.name.toLowerCase()] = it.thumbnailUrl;
+        map[clean] = it.thumbnailUrl;
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem('vl_fridge_thumbnails', JSON.stringify(map));
+    }
+  } catch {
+    // Ignore storage quota
+  }
+};
+
 export const FridgePage: React.FC = () => {
   const authed = useAuthStore(selectIsAuthenticated);
   const vip = useAuthStore(selectIsVip);
@@ -129,7 +180,6 @@ export const FridgePage: React.FC = () => {
 
   // Trạng thái chọn và nén ảnh
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -137,17 +187,29 @@ export const FridgePage: React.FC = () => {
 
   const queryClient = useQueryClient();
 
-  // Trạng thái kết quả nhận diện AI & Bounding Box
-  const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
-  const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
-  const [deletedInventoryIds, setDeletedInventoryIds] = useState<number[]>([]);
+  // Dữ liệu nhận diện AI lưu trữ toàn cục (giữ nguyên khi đổi tab hoặc chuyển trang)
+  const {
+    previewUrl,
+    detectionResult,
+    detectedItems,
+    deletedInventoryIds,
+    isSavedToFridge,
+    showBoundingBoxes,
+    memberQuota,
+    hoveredIndex,
+    setScanData,
+    updateDetectedItem,
+    removeDetectedItem,
+    setIsSavedToFridge,
+    setShowBoundingBoxes,
+    setHoveredIndex,
+    clearDeletedInventoryIds,
+    resetScan,
+  } = useFridgeScanStore();
+
   const [isSavingToFridge, setIsSavingToFridge] = useState(false);
-  const [isSavedToFridge, setIsSavedToFridge] = useState(false);
   const [editingDetectedIndex, setEditingDetectedIndex] = useState<number | null>(null);
-  const [memberQuota, setMemberQuota] = useState<DetectionQuota | null>(null);
   const [serverError, setServerError] = useState<{ message: string; isTooSmall: boolean } | null>(null);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
   const [mainTab, setMainTab] = useState<'vision' | 'inventory'>('vision');
 
   // Trạng thái kho tủ lạnh ảo
@@ -174,39 +236,70 @@ export const FridgePage: React.FC = () => {
     storage.remove('vl_guest_fridge_items');
   }, []);
 
+  const hasLoadedInitialSessionRef = useRef(false);
+
+  // Khi mở trang, nếu chưa có dữ liệu quét trong store và người dùng chưa bấm quét ảnh mới, nạp kết quả phiên gần nhất từ CSDL một lần duy nhất
+  useEffect(() => {
+    if (!authed || hasLoadedInitialSessionRef.current) return;
+    hasLoadedInitialSessionRef.current = true;
+
+    const current = useFridgeScanStore.getState();
+    if (current.detectionResult || current.hasUserReset) return;
+
+    let isMounted = true;
+    void getLatestFridgeSession()
+      .then(async (latest) => {
+        if (!isMounted || !latest || !latest.detected || latest.detected.length === 0) return;
+        const stateNow = useFridgeScanStore.getState();
+        if (!stateNow.detectionResult && !stateNow.hasUserReset) {
+          let enriched = latest.detected;
+          if (latest.imageCdnUrl) {
+            try {
+              enriched = await cropAllDetectedThumbnails(latest.imageCdnUrl, latest.detected);
+            } catch (err) {
+              console.warn('Không thể cắt thumbnail từ imageCdnUrl:', err);
+            }
+          }
+          if (!isMounted) return;
+          saveThumbnailsToCache(enriched);
+          setScanData({
+            previewUrl: latest.imageCdnUrl,
+            selectedFileName: `Lịch sử quét (${new Date(latest.createdAt).toLocaleDateString('vi-VN')})`,
+            detectionResult: {
+              saved: true,
+              detected: enriched,
+            },
+            detectedItems: enriched,
+            isSavedToFridge: true,
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Không thể tải phiên nhận diện gần nhất từ CSDL:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authed, setScanData]);
+
   // Reset ảnh để chụp/quét ảnh mới
   const handleResetImage = () => {
+    if (detectedItems.length > 0) {
+      saveThumbnailsToCache(detectedItems);
+    }
+    resetScan();
     setSelectedFile(null);
-    setDetectionResult(null);
-    setDetectedItems([]);
-    setDeletedInventoryIds([]);
-    setIsSavedToFridge(false);
     setServerError(null);
     setImageError(null);
     setCompressionResult(null);
-    setHoveredIndex(null);
   };
-
-  // Quản lý URL xem trước ảnh
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
 
   // Xử lý khi người dùng chọn hoặc thả tệp ảnh
   const handleFilePick = async (file: File | undefined) => {
-    setDetectionResult(null);
-    setDetectedItems([]);
-    setDeletedInventoryIds([]);
-    setIsSavedToFridge(false);
+    resetScan();
     setServerError(null);
     setCompressionResult(null);
-    setHoveredIndex(null);
 
     if (!file) return;
 
@@ -269,32 +362,36 @@ export const FridgePage: React.FC = () => {
 
     detectMutation.mutate(selectedFile, {
       onSuccess: async (res) => {
-        setDetectionResult(res);
-        setIsSavedToFridge(res.saved);
-        if (authed && res.quota) {
-          setMemberQuota(res.quota);
-        }
-
-        // Tự động cắt thumbnail cận cảnh bằng Canvas cho các nguyên liệu có box2d
+        let base64Preview = previewUrl;
         if (selectedFile) {
           try {
-            const enriched = await cropAllDetectedThumbnails(selectedFile, res.detected);
-            setDetectedItems(enriched);
+            base64Preview = await blobToBase64(selectedFile);
           } catch {
-            setDetectedItems(res.detected);
+            // ignore
           }
-        } else {
-          setDetectedItems(res.detected);
         }
 
-        if (authed) {
-          if (res.saved) {
-            await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
-            const savedCount = res.detected.filter((d) => d.inventoryId != null).length;
-            toast.success(`Đã nhận diện ${res.detected.length} món và tự động lưu ${savedCount} nguyên liệu vào tủ lạnh!`);
-          } else {
-            toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu trong tủ lạnh!`);
+        let enriched: DetectedItem[] = res.detected;
+        if (selectedFile) {
+          try {
+            enriched = await cropAllDetectedThumbnails(selectedFile, res.detected);
+          } catch {
+            enriched = res.detected;
           }
+        }
+        saveThumbnailsToCache(enriched);
+
+        setScanData({
+          previewUrl: base64Preview || '',
+          selectedFileName: selectedFile?.name,
+          detectionResult: res,
+          detectedItems: enriched,
+          isSavedToFridge: false,
+          memberQuota: authed && res.quota ? res.quota : null,
+        });
+
+        if (authed) {
+          toast.success(`Đã nhận diện thành công ${res.detected.length} nguyên liệu trong tủ lạnh! Hãy bấm "Lưu vào tủ lạnh cá nhân" để đưa vào kho.`);
         } else {
           toast.info(`Đã nhận diện ${res.detected.length} nguyên liệu (kết quả dùng thử không lưu).`);
         }
@@ -333,11 +430,7 @@ export const FridgePage: React.FC = () => {
 
   // Sửa tay nguyên liệu AI nhận diện được
   const handleSaveDetectedEdit = (idx: number, updatedItem: DetectedItem) => {
-    setDetectedItems((prev) => {
-      const copy = [...prev];
-      copy[idx] = updatedItem;
-      return copy;
-    });
+    updateDetectedItem(idx, updatedItem);
     setIsSavedToFridge(false);
     toast.success(`Đã cập nhật “${updatedItem.name}” (${updatedItem.freshnessStatus})`);
   };
@@ -345,10 +438,7 @@ export const FridgePage: React.FC = () => {
   // Xóa thủ công một nguyên liệu trong kết quả nhận diện
   const handleRemoveDetected = (idx: number) => {
     const item = detectedItems[idx];
-    if (item?.inventoryId) {
-      setDeletedInventoryIds((prev) => [...prev, item.inventoryId!]);
-    }
-    setDetectedItems((prev) => prev.filter((_, i) => i !== idx));
+    removeDetectedItem(idx);
     setIsSavedToFridge(false);
     toast.info(`Đã loại bỏ “${item?.name || 'nguyên liệu'}” khỏi danh sách.`);
   };
@@ -374,7 +464,7 @@ export const FridgePage: React.FC = () => {
         await Promise.allSettled(
           deletedInventoryIds.map((id) => deleteFridgeItem(id))
         );
-        setDeletedInventoryIds([]);
+        clearDeletedInventoryIds();
       }
 
       // 2. Cập nhật các mục đã có trong kho hoặc thêm mới các mục chưa có
@@ -382,11 +472,13 @@ export const FridgePage: React.FC = () => {
       const operations: Promise<unknown>[] = [];
       for (const item of detectedItems) {
         const itemDisplayName = item.quantity ? `${item.name} (${item.quantity})` : item.name;
+        const itemThumb = item.thumbnailUrl || getCachedThumbnail(item.name) || undefined;
         if (item.inventoryId) {
           operations.push(
             updateFridgeItem(item.inventoryId, {
               customItemName: itemDisplayName,
               freshnessStatus: item.freshnessStatus,
+              thumbnailUrl: itemThumb,
             })
           );
           savedCount++;
@@ -396,6 +488,7 @@ export const FridgePage: React.FC = () => {
               ingredientId: item.ingredientId ?? undefined,
               customItemName: itemDisplayName,
               freshnessStatus: item.freshnessStatus,
+              thumbnailUrl: itemThumb,
             })
           );
           savedCount++;
@@ -601,37 +694,42 @@ export const FridgePage: React.FC = () => {
             <div className="w-full flex justify-center py-2">
               <FridgeScanner
                 onSuccess={async (result, imageInfo) => {
-                  const file =
-                    imageInfo.file ??
-                    new File([imageInfo.blob], imageInfo.name, { type: imageInfo.mimeType });
-                  setSelectedFile(file);
-
+                  let base64Preview = imageInfo.previewUrl;
                   try {
-                    const enriched = await cropAllDetectedThumbnails(
+                    base64Preview = await blobToBase64(imageInfo.blob);
+                  } catch {
+                    // Giữ imageInfo.previewUrl nếu lỗi
+                  }
+
+                  let enriched: DetectedItem[] = (result.data.detected as DetectedItem[]) || [];
+                  try {
+                    enriched = await cropAllDetectedThumbnails(
                       imageInfo.blob,
                       result.data.detected as DetectedItem[],
                     );
-                    setDetectedItems(enriched);
                   } catch {
-                    setDetectedItems(result.data.detected as DetectedItem[]);
+                    enriched = (result.data.detected as DetectedItem[]) || [];
                   }
+                  saveThumbnailsToCache(enriched);
 
-                  setDetectionResult(result.data);
-                  const isSaved = authed && (result.data.saved ?? true);
-                  setIsSavedToFridge(isSaved);
-                  if (isSaved) {
-                    void queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
-                  }
-                  if (result.data.quota) {
-                    setMemberQuota(result.data.quota);
-                  }
+                  // Lưu trữ vào store toàn cục (tồn tại khi chuyển tab hoặc trang)
+                  // Quét xong CHƯA lưu vào kho tủ lạnh cá nhân cho đến khi bấm nút "Lưu vào tủ lạnh cá nhân"
+                  setScanData({
+                    previewUrl: base64Preview,
+                    selectedFileName: imageInfo.name,
+                    detectionResult: result.data,
+                    detectedItems: enriched,
+                    isSavedToFridge: false,
+                    memberQuota: result.data.quota ?? null,
+                  });
+
                   if (result.data.detected.length === 0) {
                     toast.error(
                       'Không nhận diện được nguyên liệu! Không có bất kỳ nguyên liệu thực phẩm nào trong ảnh (đồ điện tử, gia dụng... không phải là nguyên liệu, thực phẩm).',
                     );
                   } else {
                     toast.success(
-                      `Đã nhận diện thành công ${result.data.detected.length} nguyên liệu trong tủ lạnh!`,
+                      `Đã nhận diện thành công ${result.data.detected.length} nguyên liệu trong tủ lạnh! Hãy bấm "Lưu vào tủ lạnh cá nhân" để đưa vào kho.`,
                     );
                   }
                 }}
@@ -693,7 +791,7 @@ export const FridgePage: React.FC = () => {
                     className="inline-flex items-center gap-1.5"
                   >
                     <Icon name="photo_camera" className="text-[16px]" />
-                    <span>Quét ảnh khác</span>
+                    <span>Quét ảnh mới</span>
                   </Button>
                 </div>
               </div>
@@ -755,10 +853,10 @@ export const FridgePage: React.FC = () => {
                         >
                           <div className="flex items-center gap-3.5 min-w-0">
                             {/* Thumbnail to rõ nét cắt cận cảnh từ Bounding Box hoặc Icon */}
-                            {item.thumbnailUrl ? (
+                            {item.thumbnailUrl || getCachedThumbnail(item.name) ? (
                               <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-xl border border-outline-variant/60 bg-surface-container shadow-xs">
                                 <img
-                                  src={item.thumbnailUrl}
+                                  src={item.thumbnailUrl || getCachedThumbnail(item.name)!}
                                   alt={item.name}
                                   className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                                 />
@@ -878,7 +976,7 @@ export const FridgePage: React.FC = () => {
                       className="inline-flex items-center gap-2"
                     >
                       <Icon name="photo_camera" className="text-[18px]" />
-                      <span>Quét ảnh khác</span>
+                      <span>Quét ảnh mới</span>
                     </Button>
 
                     <Button
@@ -909,7 +1007,10 @@ export const FridgePage: React.FC = () => {
                         variant="primary"
                         size="md"
                         onClick={() => {
-                          document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                          setMainTab('inventory');
+                          setTimeout(() => {
+                            document.getElementById('recipe-suggestions-section')?.scrollIntoView({ behavior: 'smooth' });
+                          }, 100);
                         }}
                         type="button"
                         className="inline-flex items-center gap-2 shadow-md shadow-primary/25 font-semibold"
@@ -1102,12 +1203,20 @@ export const FridgePage: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                 {visibleItems.map((item) => {
+                  const cleanItemName = item.name.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+                  const rawItemName = item.name.trim().toLowerCase();
                   const matchingDetected = detectedItems.find(
                     (d) =>
                       (item.ingredientId && d.ingredientId === item.ingredientId) ||
-                      d.name.toLowerCase() === item.name.toLowerCase()
+                      d.name.toLowerCase() === rawItemName ||
+                      d.name.toLowerCase() === cleanItemName ||
+                      cleanItemName.includes(d.name.toLowerCase()) ||
+                      d.name.toLowerCase().includes(cleanItemName)
                   );
-                  const itemThumbnail = matchingDetected?.thumbnailUrl;
+                  const itemThumbnail =
+                    item.thumbnailUrl ||
+                    matchingDetected?.thumbnailUrl ||
+                    getCachedThumbnail(item.name);
                   const visual = getIngredientVisual(item.name);
 
                   return (
@@ -1175,13 +1284,11 @@ export const FridgePage: React.FC = () => {
               </div>
             )}
             </div>
-        </section>
-      )}
 
-      {/* SECTION GỢI Ý MÓN ĂN NẤU NGAY (EMPTY THE FRIDGE - FN-VIS-03) */}
-      {/* Hiển thị cho cả 2 tab (AI Vision & Kho tủ lạnh) để người dùng thấy gợi ý món ngay sau khi chụp ảnh */}
-      <div
-        id="recipe-suggestions-section"
+            {/* SECTION GỢI Ý MÓN ĂN NẤU NGAY (EMPTY THE FRIDGE - FN-VIS-03) */}
+            {/* Chỉ hiển thị bên Kho Nguyên Liệu Tủ Lạnh */}
+            <div
+              id="recipe-suggestions-section"
         className="mt-8 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm"
       >
         {/* Header section */}
@@ -1426,6 +1533,8 @@ export const FridgePage: React.FC = () => {
           )}
         </div>
       </div>
+        </section>
+      )}
 
       {/* CÁC MODAL HỖ TRỢ */}
       {/* 1. Modal thêm thủ công nguyên liệu */}

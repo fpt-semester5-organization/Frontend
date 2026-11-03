@@ -101,8 +101,8 @@ export function PaymentResultPage() {
   const detail = tx ?? order;
   const info = statusInfo(status);
   const tone = ICON[info.tone];
-  // Giao dịch không trả tên gói; gói hiện tại của tài khoản chỉ đúng với đơn đã thành công.
-  const planName = order?.planName ?? (status === 'SUCCESS' ? sub.data?.plan?.planName : undefined);
+  // Ưu tiên tên gói của chính giao dịch; gói hiện tại của tài khoản chỉ đúng với đơn đã thành công.
+  const planName = tx?.planName || (order?.planName ?? (status === 'SUCCESS' ? sub.data?.plan?.planName : undefined));
   const plans = usePlans();
   const { data: publicSettings } = usePublicSettings();
   const vipRows = benefitRows(plans.data?.benefits, publicSettings).vip;
@@ -136,11 +136,22 @@ export function PaymentResultPage() {
             {detail && (
               <dl className="w-full rounded-xl bg-surface-container-lowest p-space-md text-left shadow-sm">
                 <div className="flex justify-between py-1.5"><dt className="text-on-surface-variant">Mã giao dịch</dt><dd className="font-mono font-semibold">#{detail.transactionId}</dd></div>
-                {planName && <div className="flex justify-between py-1.5"><dt className="text-on-surface-variant">Gói</dt><dd className="font-semibold">{planName}</dd></div>}
+                {planName && <div className="flex justify-between gap-space-md py-1.5"><dt className="shrink-0 text-on-surface-variant">Gói</dt><dd className="min-w-0 text-right font-semibold">{planName}</dd></div>}
                 <div className="flex justify-between py-1.5"><dt className="text-on-surface-variant">Cổng</dt><dd className="font-semibold">{GATEWAY_LABEL[detail.gateway] ?? detail.gateway}</dd></div>
                 <div className="flex justify-between py-1.5"><dt className="text-on-surface-variant">Số tiền</dt><dd className="font-semibold">{formatVnd(detail.amountVnd)}</dd></div>
                 {status === 'SUCCESS' && sub.data?.endsAt && <div className="flex justify-between py-1.5"><dt className="text-on-surface-variant">Hiệu lực đến</dt><dd className="font-semibold">{formatServerDateTime(sub.data.endsAt)}</dd></div>}
               </dl>
+            )}
+            {status === 'SUCCESS' && tx?.canViewReceipt && (
+              <div className="flex w-full flex-col gap-space-sm">
+                <Link to={PATHS.SUBSCRIPTION.RECEIPT(tx.transactionId)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-3 font-label-md text-label-md text-on-secondary hover:opacity-90">
+                  <Icon name="receipt_long" className="text-[20px]" />
+                  Xem và lưu biên lai PDF
+                </Link>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Biên lai cũng được gửi tới {user?.email || 'email của bạn'}. Nếu chưa thấy thư sau vài phút, hãy kiểm tra thư rác hoặc lưu biên lai ngay tại đây.
+                </p>
+              </div>
             )}
             {status === 'SUCCESS' && (
               <section aria-labelledby="vip-unlocked" className="w-full rounded-xl bg-surface-container-lowest p-space-md text-left shadow-sm">

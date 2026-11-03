@@ -78,16 +78,27 @@ export function addRecentCreatedItem(item: CommunityFeedItem) {
   }
 }
 
-export function removeRecentCreatedItem(predicate: (item: CommunityFeedItem) => boolean) {
+/**
+ * Gỡ một mục theo `key` (POST-5, RECIPE-5) hoặc theo `predicate` lọc điều kiện.
+ * Trả về mục đã gỡ để khôi phục khi thao tác thất bại.
+ */
+export function removeRecentCreatedItem(
+  target: string | ((item: CommunityFeedItem) => boolean)
+): CommunityFeedItem | undefined {
   try {
     const current = getRecentCreatedItems();
-    const updated = current.filter((item) => !predicate(item));
-    if (updated.length !== current.length) {
-      sessionStorage.setItem(RECENT_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new Event('vl_recent_item_added'));
-    }
+    const predicate =
+      typeof target === 'string'
+        ? (item: CommunityFeedItem) => item.key === target
+        : target;
+    const removed = current.find(predicate);
+    if (!removed) return undefined;
+    const updated = current.filter((item) => item !== removed);
+    sessionStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('vl_recent_item_added'));
+    return removed;
   } catch {
-    // Bỏ qua lỗi storage
+    return undefined;
   }
 }
 

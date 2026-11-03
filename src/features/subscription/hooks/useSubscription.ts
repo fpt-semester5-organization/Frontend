@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiErrorStatus } from '@/api/http';
 import { useAuthStore } from '@/stores/auth.store';
 import * as api from '../api/subscription.api';
 import { refreshVipSessionClaims } from '../lib/sessionClaims';
@@ -8,6 +9,7 @@ import type { CheckoutRequest } from '../types/subscription.types';
 export const subscriptionKeys = {
   plans: ['subscription', 'plans'] as const,
   me: ['subscription', 'me'] as const,
+  receipt: (transactionId: number | null) => ['subscription', 'receipt', transactionId] as const,
 };
 
 /** FN-SUB-01 — bảng giá + quyền lợi (công khai). */
@@ -22,6 +24,15 @@ export const useMySubscription = (opts: { enabled?: boolean; pollMs?: number | f
     refetchInterval: opts.pollMs || false,
     // Dữ liệu thanh toán phải luôn mới khi mở trang.
     staleTime: 0,
+  });
+
+/** FN-SUB-04 — biên lai của một giao dịch. 400/403/404 là kết quả cố định nên không thử lại. */
+export const usePaymentReceipt = (transactionId: number | null) =>
+  useQuery({
+    queryKey: subscriptionKeys.receipt(transactionId),
+    queryFn: () => api.getPaymentReceipt(transactionId as number),
+    enabled: transactionId !== null,
+    retry: (count, error) => count < 1 && ![400, 403, 404].includes(apiErrorStatus(error) ?? 0),
   });
 
 /** Đồng hồ cho những gì đổi theo thời gian (đếm ngược, đơn quá hạn); chỉ chạy khi `active`. */

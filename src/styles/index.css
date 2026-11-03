@@ -352,6 +352,7 @@ button:not(:disabled):active {
   .service-banner,
   .main-footer,
   button,
+  .toast-container,
   #btn-chat-options,
   [role="menu"],
   [aria-label="Lịch sử chat"],

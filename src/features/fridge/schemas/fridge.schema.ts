@@ -45,6 +45,7 @@ export const addItemSchema = z.object({
   quantity: z.string().trim().max(50, 'Số lượng tối đa 50 ký tự').optional(),
   unit: z.string().trim().max(30, 'Đơn vị tối đa 30 ký tự').optional(),
   freshnessStatus: z.enum(['FRESH', 'NON-FRESH']).default('FRESH'),
+  thumbnailUrl: z.string().optional(),
 });
 export type AddItemForm = z.infer<typeof addItemSchema>;
 
@@ -54,6 +55,7 @@ export const editItemSchema = z.object({
   quantity: z.string().trim().max(50, 'Số lượng tối đa 50 ký tự').optional(),
   unit: z.string().trim().max(30, 'Đơn vị tối đa 30 ký tự').optional(),
   freshnessStatus: z.enum(['FRESH', 'NON-FRESH']).default('FRESH'),
+  thumbnailUrl: z.string().optional(),
 });
 export type EditItemForm = z.infer<typeof editItemSchema>;
 

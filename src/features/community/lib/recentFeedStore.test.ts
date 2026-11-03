@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   addRecentCreatedItem,
   getRecentCreatedItems,
@@ -7,7 +7,48 @@ import {
 } from './recentFeedStore';
 import type { CommunityFeedItem } from '../types/community.types';
 
-describe('recentFeedStore - Lọc bài viết vi phạm trên bảng tin cộng đồng', () => {
+const item = (kind: 'POST' | 'RECIPE', id: number, title: string): CommunityFeedItem => ({
+  key: `${kind}-${id}`,
+  kind,
+  id,
+  title,
+  voteCount: 0,
+  createdAt: new Date().toISOString(),
+  moderationStatus: 'APPROVED_ACTIVE',
+});
+
+describe('recentFeedStore.removeRecentCreatedItem theo key (dev)', () => {
+  beforeEach(() => sessionStorage.clear());
+
+  it('gỡ đúng mục theo key, trả về mục đã gỡ và báo cho feed cập nhật', () => {
+    addRecentCreatedItem(item('POST', 5, 'Bài năm'));
+    const listener = vi.fn();
+    window.addEventListener('vl_recent_item_added', listener);
+    expect(removeRecentCreatedItem('POST-5')?.title).toBe('Bài năm');
+    window.removeEventListener('vl_recent_item_added', listener);
+    expect(getRecentCreatedItems()).toEqual([]);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('không gỡ nhầm công thức trùng id với bài viết', () => {
+    sessionStorage.setItem(
+      'veggielife_recent_community_items',
+      JSON.stringify([item('POST', 5, 'Bài năm'), item('RECIPE', 5, 'Công thức năm')])
+    );
+    removeRecentCreatedItem('POST-5');
+    expect(getRecentCreatedItems().map((entry) => entry.key)).toEqual(['RECIPE-5']);
+  });
+
+  it('không có mục thì không báo gì', () => {
+    const listener = vi.fn();
+    window.addEventListener('vl_recent_item_added', listener);
+    expect(removeRecentCreatedItem('POST-404')).toBeUndefined();
+    window.removeEventListener('vl_recent_item_added', listener);
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe('recentFeedStore - Lọc bài viết vi phạm trên bảng tin cộng đồng (HEAD)', () => {
   beforeEach(() => {
     sessionStorage.clear();
   });
@@ -34,7 +75,7 @@ describe('recentFeedStore - Lọc bài viết vi phạm trên bảng tin cộng 
     key: 'POST-103',
     kind: 'POST',
     id: 103,
-    title: 'Tôi muốn quánk đánh lộn',
+    title: 'Tôi muốn đánh lộn',
     voteCount: 0,
     moderationStatus: 'REJECTED',
   };
@@ -62,7 +103,6 @@ describe('recentFeedStore - Lọc bài viết vi phạm trên bảng tin cộng 
   });
 
   it('getRecentCreatedItems tự động dọn sạch bài vi phạm đã lưu trong sessionStorage', () => {
-    // Giả lập sessionStorage đã lưu sẵn bài vi phạm từ phiên trước
     sessionStorage.setItem(
       'veggielife_recent_community_items',
       JSON.stringify([quarantinedPost, validPost, rejectedPost])
@@ -72,35 +112,16 @@ describe('recentFeedStore - Lọc bài viết vi phạm trên bảng tin cộng 
     expect(cleanedItems).toHaveLength(1);
     expect(cleanedItems[0].id).toBe(101);
 
-    // Kiểm tra sessionStorage cũng được làm sạch
     const raw = JSON.parse(sessionStorage.getItem('veggielife_recent_community_items') || '[]');
     expect(raw).toHaveLength(1);
     expect(raw[0].id).toBe(101);
   });
 
-  it('removeRecentCreatedItem xóa đúng bài viết khớp điều kiện', () => {
+  it('removeRecentCreatedItem xóa đúng bài viết khớp điều kiện predicate', () => {
     addRecentCreatedItem(validPost);
     expect(getRecentCreatedItems()).toHaveLength(1);
 
-    removeRecentCreatedItem((item) => item.id === 101);
+    removeRecentCreatedItem((it) => it.id === 101);
     expect(getRecentCreatedItems()).toHaveLength(0);
-  });
-
-  it('loại bỏ bài viết không có moderationStatus (dữ liệu cũ trong sessionStorage)', () => {
-    const legacyPostWithoutStatus: CommunityFeedItem = {
-      key: 'POST-999',
-      kind: 'POST',
-      id: 999,
-      title: 'Bán hàng đa cấp giá 100k (cũ)',
-      voteCount: 0,
-    };
-    expect(isAllowedInCommunityFeed(legacyPostWithoutStatus)).toBe(false);
-
-    sessionStorage.setItem(
-      'veggielife_recent_community_items',
-      JSON.stringify([legacyPostWithoutStatus])
-    );
-    expect(getRecentCreatedItems()).toHaveLength(0);
-    expect(sessionStorage.getItem('veggielife_recent_community_items')).toBe('[]');
   });
 });

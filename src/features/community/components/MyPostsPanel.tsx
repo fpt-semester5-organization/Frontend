@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -68,16 +68,29 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
     setSearchParams(params);
   };
 
+  // Dòng đã biến mất ngay (cập nhật lạc quan) nên đóng hộp thoại luôn. Dùng promise để vẫn báo kết quả nếu người dùng đã rời trang.
   const handleDelete = () => {
     if (!toDelete) return;
-    deletePost.mutate(toDelete.postId, {
-      onSuccess: (res) => notifySuccess(res.message),
-      onError: notifyApiError,
-      onSettled: () => setToDelete(null),
-    });
+    setToDelete(null);
+    deletePost.mutateAsync(toDelete.postId).then((res) => notifySuccess(res.message), notifyApiError);
   };
 
   const allItems = posts.data?.items ?? [];
+
+  // Xóa hết bài ở trang cuối: lùi về trang còn dữ liệu, không báo nhầm "Bạn chưa đăng bài nào".
+  const lastPage = posts.data ? Math.max(1, Math.ceil(posts.data.meta.total / PAGE_SIZE)) : page;
+  useEffect(() => {
+    if (page <= lastPage) return;
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (lastPage > 1) params.set('page', String(lastPage));
+        else params.delete('page');
+        return params;
+      },
+      { replace: true }
+    );
+  }, [page, lastPage, setSearchParams]);
 
   // Lọc bài viết hoàn toàn ở Frontend theo trạng thái đã chọn
   const filteredItems = React.useMemo(() => {
@@ -164,7 +177,7 @@ export const MyPostsPanel: React.FC<{ userId: number }> = ({ userId }) => {
         />
       </div>
 
-      {posts.isPending ? (
+      {posts.isPending || page > lastPage ? (
         <div className="space-y-space-md" role="status" aria-busy="true" aria-label="Đang tải bài viết">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-28" />

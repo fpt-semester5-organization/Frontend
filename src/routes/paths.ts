@@ -79,6 +79,8 @@ export const PATHS = {
     PRICING: '/vip',
     CHECKOUT: (planId: string | number) => `/vip/checkout/${planId}`,
     RESULT: '/vip/result',
+    /** Biên lai thanh toán (FN-SUB-04, chưa có màn hình trong docs/11). */
+    RECEIPT: (transactionId: string | number) => `/vip/receipt/${transactionId}`,
   },
   /** Cổng thanh toán chuyển về (đường dẫn do Backend quy định, chưa có trong docs/11); trang đích rồi chuyển tiếp sang SUBSCRIPTION.RESULT. */
   PAYMENT: {

@@ -37,14 +37,14 @@ export function benefitRows(
 
   return {
     free: [
-      ['Trợ lý AI', `${benefits?.free?.chatPerDay ?? defaultFreeChat} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? defaultFreePlan} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? defaultFreeFridge} ảnh/ngày`],
+      ['Số lần người dùng được hỏi Trợ lý AI', `${benefits?.free?.chatPerDay ?? defaultFreeChat} câu/ngày`],
+      ['Số lần được tạo Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? defaultFreePlan} lần/tuần`],
+      ['Số lần được dùng tính năng Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? defaultFreeFridge} ảnh/ngày`],
     ] as [string, string][],
     vip: [
-      ['Trợ lý AI', `${vipChat} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? defaultVipPlan} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? defaultVipFridge} ảnh/ngày`],
+      ['Số lần người dùng được hỏi Trợ lý AI', `${vipChat} câu/ngày`],
+      ['Số lần được tạo Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? defaultVipPlan} lần/tuần`],
+      ['Số lần được dùng tính năng Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? defaultVipFridge} ảnh/ngày`],
     ] as [string, string][],
   };
 }

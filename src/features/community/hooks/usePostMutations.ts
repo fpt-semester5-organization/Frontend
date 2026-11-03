@@ -1,12 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { type InfiniteData, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { watchVideoTranscript } from '@/features/videos/hooks/useTranscriptWatchStore';
 import { recipeKeys } from '@/features/recipes/hooks/recipeKeys';
-import { createPost, deletePost, updatePost, uploadPostMedia } from '../api/community.api';
+import { createPost, deletePost, updatePost, uploadPostMedia, type Paged } from '../api/community.api';
 import { getAttachmentKind } from '../types/community.schemas';
 import type { CreatePostBody, PostListItem, UpdatePostBody } from '../types/community.types';
 import { addRecentCreatedItem, removeRecentCreatedItem, updateRecentCreatedItem } from '../lib/recentFeedStore';
 import { communityKeys } from './communityKeys';
+
+/** Cache danh sách bài viết có hai dạng: phân trang (usePostList) và cuộn vô hạn (useInfinitePosts). */
+type PostListCache = Paged<PostListItem> | InfiniteData<Paged<PostListItem>>;
+
+const hasPost = (page: Paged<PostListItem>, postId: number) => page.items.some((item) => item.postId === postId);
+
+const withoutPost = (page: Paged<PostListItem>, postId: number): Paged<PostListItem> => ({
+  ...page,
+  items: page.items.filter((item) => item.postId !== postId),
+  meta: { ...page.meta, total: Math.max(0, page.meta.total - 1) },
+});
+
+function removePostFromList(data: PostListCache | undefined, postId: number): PostListCache | undefined {
+  if (!data) return data;
+  if ('pages' in data) {
+    if (!data.pages.some((page) => hasPost(page, postId))) return data;
+    return { ...data, pages: data.pages.map((page) => withoutPost(page, postId)) };
+  }
+  return hasPost(data, postId) ? withoutPost(data, postId) : data;
+}
 
 export function useCreatePost() {
   const queryClient = useQueryClient();
@@ -61,9 +81,23 @@ export function useDeletePost() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (postId: number) => deletePost(postId),
+    // Gỡ khỏi màn hình ngay, không chờ server; xóa lỗi thì khôi phục đúng dữ liệu cũ.
+    onMutate: async (postId) => {
+      const lists = { queryKey: communityKeys.postLists() };
+      await queryClient.cancelQueries(lists);
+      const previous = queryClient.getQueriesData<PostListCache>(lists);
+      queryClient.setQueriesData<PostListCache>(lists, (data) => removePostFromList(data, postId));
+      return { previous, recent: removeRecentCreatedItem(`POST-${postId}`) };
+    },
+    onError: (_error, _postId, context) => {
+      context?.previous.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      if (context?.recent) addRecentCreatedItem(context.recent);
+    },
     onSuccess: (_data, postId) => {
       removeRecentCreatedItem((item) => item.kind === 'POST' && item.id === postId);
       queryClient.removeQueries({ queryKey: communityKeys.post(postId) });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: communityKeys.postLists() });
     },
   });

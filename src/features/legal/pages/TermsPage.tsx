@@ -73,9 +73,9 @@ export default function TermsPage() {
     },
     {
       id: 'VEGAN_DISCLAIMER',
-      label: 'Quy chuẩn ăn chay & Miễn trừ',
+      label: 'Quy định AI & Miễn trừ (NĐ 142/2026/NĐ-CP)',
       url: legalDocs?.veganDisclaimerUrl,
-      pdfPath: '/legal/Quy_Chuan_Am_Thuc_Chay_Va_Mien_Tru_Y_Te_VeggieLife.pdf',
+      pdfPath: '/legal/Quy_Dinh_AI_Va_Mien_Tru_Nghi_Dinh_142_2026.pdf',
     },
   ];
 
