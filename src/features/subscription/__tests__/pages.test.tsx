@@ -9,6 +9,7 @@ import { renderWithProviders } from '@/test/test-utils';
 import * as api from '../api/subscription.api';
 import { CheckoutPage } from '../pages/CheckoutPage';
 import { MySubscriptionPage } from '../pages/MySubscriptionPage';
+import { PaymentReceiptPage } from '../pages/PaymentReceiptPage';
 import { PaymentResultPage } from '../pages/PaymentResultPage';
 import { PaymentReturnPage } from '../pages/PaymentReturnPage';
 import { PricingPage } from '../pages/PricingPage';
@@ -305,6 +306,132 @@ describe('PaymentResultPage (SCR-32)', () => {
     expect(await screen.findByText(/hết hạn sau 5 phút/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Thử lại' })).toHaveAttribute('href', '/vip');
   });
+
+  const withReceipt = (status: string, extra = {}) => {
+    const data = tx(status);
+    return { ...data, transactions: [{ ...data.transactions[0], canViewReceipt: status === 'SUCCESS', ...extra }] };
+  };
+
+  it('SUCCESS có biên lai: link tới trang biên lai và báo email nhận biên lai', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue(withReceipt('SUCCESS'));
+    renderWithProviders(<PaymentResultPage />, '/vip/result?transactionId=3001');
+    expect(await screen.findByRole('link', { name: /Xem và lưu biên lai PDF/ })).toHaveAttribute('href', '/vip/receipt/3001');
+    expect(screen.getByText(/Biên lai cũng được gửi tới an@x\.vn/)).toBeInTheDocument();
+  });
+
+  it('server không báo có biên lai: không hiện link và không hứa đã gửi email', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue(tx('SUCCESS'));
+    renderWithProviders(<PaymentResultPage />, '/vip/result?transactionId=3001');
+    await screen.findByText('VIP đã được kích hoạt.');
+    expect(screen.queryByRole('link', { name: /biên lai/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Biên lai cũng được gửi/)).not.toBeInTheDocument();
+  });
+
+  it('giao dịch thất bại không có biên lai', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue(withReceipt('FAILED'));
+    renderWithProviders(<PaymentResultPage />, '/vip/result?transactionId=3001');
+    await screen.findByText('Giao dịch không thành công.');
+    expect(screen.queryByRole('link', { name: /biên lai/ })).not.toBeInTheDocument();
+  });
+
+  it('gia hạn sang gói khác: hiện tên gói của giao dịch, không phải gói đang dùng', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue(withReceipt('SUCCESS', { planName: 'VIP 12 tháng' }));
+    renderWithProviders(<PaymentResultPage />, '/vip/result?transactionId=3001');
+    expect(await screen.findByText('VIP 12 tháng')).toBeInTheDocument();
+    expect(screen.queryByText('VIP 1 tháng')).not.toBeInTheDocument();
+  });
+});
+
+describe('PaymentReceiptPage (FN-SUB-04)', () => {
+  const receipt = {
+    receiptNumber: 'REC-20261103-003001',
+    transactionId: 3001,
+    orderCode: 'VL_1793516377203',
+    gateway: 'VIETQR',
+    status: 'SUCCESS',
+    paymentDate: '2026-11-03T10:00:00',
+    userId: 7,
+    fullName: 'Nguyễn Văn An',
+    email: 'an@x.vn',
+    planId: 1,
+    planName: 'VIP 1 tháng',
+    durationDays: 30,
+    amountVnd: 49000,
+    vipStartsAt: '2026-11-03T10:00:00',
+    vipEndsAt: '2026-12-03T23:59:59',
+    note: 'Thanh toán kích hoạt gói VIP VIP 1 tháng (30 ngày)',
+  };
+  const renderReceipt = (id = '3001') =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/vip/receipt/:transactionId" element={<PaymentReceiptPage />} />
+      </Routes>,
+      `/vip/receipt/${id}`
+    );
+
+  it('hiển thị dữ liệu biên lai từ API, giờ server đổi sang giờ Việt Nam', async () => {
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
+    renderReceipt();
+    expect(await screen.findByRole('heading', { name: 'Biên lai thanh toán' })).toBeInTheDocument();
+    expect(api.getPaymentReceipt).toHaveBeenCalledWith(3001);
+    const sheet = screen.getByRole('article');
+    expect(within(sheet).getByText('REC-20261103-003001')).toBeInTheDocument();
+    expect(within(sheet).getByText('Nguyễn Văn An')).toBeInTheDocument();
+    expect(within(sheet).getByText('an@x.vn')).toBeInTheDocument();
+    expect(within(sheet).getByText('VIP 1 tháng')).toBeInTheDocument();
+    expect(within(sheet).getByText('30 ngày')).toBeInTheDocument();
+    expect(within(sheet).getByText('#3001')).toBeInTheDocument();
+    expect(within(sheet).getByText('VL_1793516377203')).toBeInTheDocument();
+    expect(within(sheet).getByText('VietQR')).toBeInTheDocument();
+    expect(within(sheet).getByText('49.000 ₫')).toBeInTheDocument();
+    expect(within(sheet).getByText('Thành công')).toBeInTheDocument();
+    expect(within(sheet).getAllByText('03/11/2026 17:00')).toHaveLength(2);
+    expect(within(sheet).getByText('04/12/2026 06:59')).toBeInTheDocument();
+  });
+
+  it('In / Lưu PDF: mở hộp thoại in với tên file theo số biên lai rồi trả lại tiêu đề trang', async () => {
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
+    let titleWhenPrinting = '';
+    const print = vi.spyOn(window, 'print').mockImplementation(() => { titleWhenPrinting = document.title; });
+    document.title = 'VeggieLife';
+    renderReceipt();
+    await userEvent.click(await screen.findByRole('button', { name: /In \/ Lưu PDF/ }));
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(titleWhenPrinting).toBe('Bien-lai-REC-20261103-003001');
+    window.dispatchEvent(new Event('afterprint'));
+    expect(document.title).toBe('VeggieLife');
+    print.mockRestore();
+  });
+
+  it.each([
+    [404, 'ERR_PAY_ORDER_NOT_FOUND', 'Không tìm thấy thông tin giao dịch thanh toán.', 'Không tìm thấy biên lai'],
+    [403, 'ERR_FORBIDDEN', 'Bạn không có quyền truy cập biên lai của giao dịch này.', 'Bạn không xem được biên lai này'],
+    [400, 'ERR_VALIDATION', 'Giao dịch chưa hoàn tất thanh toán thành công, không thể lập biên lai.', 'Giao dịch này chưa có biên lai'],
+  ])('%i -> báo rõ theo message của server, không có nút thử lại hay nút lưu', async (status, code, message, title) => {
+    vi.mocked(api.getPaymentReceipt).mockRejectedValue(apiError(status, code, message));
+    renderReceipt();
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Gói của tôi/ })).toHaveAttribute('href', '/me/subscription');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(api.getPaymentReceipt).toHaveBeenCalledTimes(1);
+  });
+
+  it('mã giao dịch không hợp lệ: không gọi API', async () => {
+    renderReceipt('abc');
+    expect(await screen.findByRole('heading', { name: 'Không tìm thấy biên lai' })).toBeInTheDocument();
+    expect(api.getPaymentReceipt).not.toHaveBeenCalled();
+  });
+
+  it('lỗi hệ thống: tự thử lại một lần, sau đó có nút thử lại và tải được biên lai', async () => {
+    vi.mocked(api.getPaymentReceipt).mockRejectedValue(apiError(500, 'ERR_SYS_DATABASE_UNAVAILABLE', 'Lỗi hệ thống'));
+    renderReceipt();
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent('Lỗi hệ thống');
+    expect(api.getPaymentReceipt).toHaveBeenCalledTimes(2);
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
+    await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(await screen.findByRole('heading', { name: 'Biên lai thanh toán' })).toBeInTheDocument();
+  });
 });
 
 describe('PaymentReturnPage (cổng thanh toán chuyển về)', () => {
@@ -423,6 +550,21 @@ describe('MySubscriptionPage (SCR-33)', () => {
     renderWithProviders(<MySubscriptionPage />);
     expect(await screen.findByText('Đã hủy')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Tiếp tục thanh toán' })).not.toBeInTheDocument();
+  });
+
+  it('lịch sử: chỉ giao dịch server cho phép mới có link xem biên lai', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({
+      isVip: true,
+      plan: plans.plans[0],
+      endsAt: '2026-11-04T23:59:59Z',
+      transactions: [
+        { transactionId: 3001, gateway: 'VIETQR', amountVnd: 49000, status: 'SUCCESS', createdAt: '2026-10-05T10:00:00Z', canViewReceipt: true },
+        { transactionId: 3002, gateway: 'VIETQR', amountVnd: 49000, status: 'FAILED', createdAt: '2026-10-06T10:00:00Z', canViewReceipt: false },
+      ],
+    });
+    renderWithProviders(<MySubscriptionPage />);
+    expect(await screen.findByRole('link', { name: 'Xem biên lai giao dịch #3001' })).toHaveAttribute('href', '/vip/receipt/3001');
+    expect(screen.queryByRole('link', { name: 'Xem biên lai giao dịch #3002' })).not.toBeInTheDocument();
   });
 
   it('lỗi tải -> thử lại', async () => {

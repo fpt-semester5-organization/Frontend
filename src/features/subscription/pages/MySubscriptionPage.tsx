@@ -78,9 +78,9 @@ export function MySubscriptionPage() {
                 <PageEmpty title="Chưa có giao dịch" hint="Các lần nâng cấp VIP của bạn sẽ hiển thị ở đây." />
               ) : (
                 <div className="overflow-x-auto p-space-sm">
-                  <table className="w-full min-w-[560px] text-left font-body-sm text-body-sm">
+                  <table className="w-full min-w-[640px] text-left font-body-sm text-body-sm">
                     <thead className="font-label-sm text-label-sm text-on-surface-variant">
-                      <tr>{['Mã', 'Ngày', 'Cổng', 'Số tiền', 'Trạng thái'].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+                      <tr>{['Mã', 'Ngày', 'Cổng', 'Số tiền', 'Trạng thái', 'Biên lai'].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-surface-container">
                       {txs.map((t) => {
@@ -92,6 +92,11 @@ export function MySubscriptionPage() {
                             <td className="px-3 py-3">{GATEWAY_LABEL[t.gateway] ?? t.gateway}</td>
                             <td className="px-3 py-3 font-semibold">{formatVnd(t.amountVnd)}</td>
                             <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-0.5 font-label-sm text-label-sm ${TONE[s.tone]}`}>{s.text}</span></td>
+                            <td className="px-3 py-3">
+                              {t.canViewReceipt && (
+                                <Link to={PATHS.SUBSCRIPTION.RECEIPT(t.transactionId)} aria-label={`Xem biên lai giao dịch #${t.transactionId}`} className="font-label-md text-label-md text-secondary hover:underline">Xem</Link>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}

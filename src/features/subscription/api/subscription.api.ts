@@ -1,6 +1,6 @@
 import { http, unwrap } from '@/api/http';
 import type { ApiEnvelope } from '@/api/types';
-import type { CancelPendingResult, CheckoutRequest, CheckoutResult, MySubscription, PlansResponse } from '../types/subscription.types';
+import type { CancelPendingResult, CheckoutRequest, CheckoutResult, MySubscription, PaymentReceipt, PlansResponse } from '../types/subscription.types';
 
 /** FN-SUB-01 — GET /subscription-plans (công khai; Khách dùng Anonymous JWT). */
 export async function listPlans(): Promise<PlansResponse> {
@@ -25,3 +25,7 @@ export async function getMySubscription(): Promise<MySubscription> {
   const d = await unwrap<MySubscription>(http.get('/users/me/subscription'));
   return { ...d, transactions: Array.isArray(d?.transactions) ? d.transactions : [] };
 }
+
+/** FN-SUB-04 — GET /subscriptions/transactions/{transactionId}/receipt (JSON, chỉ giao dịch SUCCESS của chính người dùng). */
+export const getPaymentReceipt = (transactionId: number) =>
+  unwrap<PaymentReceipt>(http.get(`/subscriptions/transactions/${transactionId}/receipt`));

@@ -16,7 +16,7 @@ const MockSessionPanel =
  * `children` dùng khi guard cần hiện một trang trạng thái (ví dụ 403) trong khung chung thay cho route con.
  */
 export const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => (
-  <div className="flex min-h-screen flex-col bg-background">
+  <div className="flex min-h-screen flex-col bg-background print:min-h-0 print:bg-white">
     <a
       href="#main-content"
       className="sr-only rounded-lg bg-surface-container-lowest px-3 py-2 font-label-md text-label-md text-primary focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60]"

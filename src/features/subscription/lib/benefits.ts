@@ -10,14 +10,14 @@ export function benefitRows(benefits: { free?: TierBenefits; vip?: TierBenefits 
   const vipChat = chatVip === null || chatVip === undefined || chatVip === '' ? `tối đa ${QUOTA.chatPerDay.vip}` : String(chatVip);
   return {
     free: [
-      ['Trợ lý AI', `${benefits?.free?.chatPerDay ?? QUOTA.chatPerDay.free} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.free} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.free} ảnh/ngày`],
+      ['Số lần người dùng được hỏi Trợ lý AI', `${benefits?.free?.chatPerDay ?? QUOTA.chatPerDay.free} câu/ngày`],
+      ['Số lần được tạo Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.free} lần/tuần`],
+      ['Số lần được dùng tính năng Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.free} ảnh/ngày`],
     ] as [string, string][],
     vip: [
-      ['Trợ lý AI', `${vipChat} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.vip} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.vip} ảnh/ngày`],
+      ['Số lần người dùng được hỏi Trợ lý AI', `${vipChat} câu/ngày`],
+      ['Số lần được tạo Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.vip} lần/tuần`],
+      ['Số lần được dùng tính năng Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.vip} ảnh/ngày`],
     ] as [string, string][],
   };
 }
