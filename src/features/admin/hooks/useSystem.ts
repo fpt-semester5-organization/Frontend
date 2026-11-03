@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from '@/stores/ui.store';
 import * as api from '../api/system.api';
 import { adminKeys } from '../lib/keys';
-import type { AuditQuery, DateRange, KnowledgeScope, PlanCreateBody, PlanUpdateBody, ReconcileBody, VenueQuery } from '../types/admin.types';
+import type { AuditQuery, DateRange, KnowledgeScope, PlanCreateBody, PlanUpdateBody, ReconcileBody } from '../types/admin.types';
 
 const auditStale = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ queryKey: ['admin', 'audit-logs'] });
 
@@ -45,52 +45,41 @@ export function useReconcilePayment() {
   });
 }
 
-/* ---- Quán chay ---- */
-export const useAdminVenues = (q: VenueQuery) =>
-  useQuery({ queryKey: adminKeys.venues(q), queryFn: () => api.listAdminVenues(q), placeholderData: keepPreviousData });
-
-export function useSetVenueActive() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; isActive: boolean }) => api.setVenueActive(v.id, v.isActive),
-    onSuccess: (r) => {
-      toast.success(r.message || 'Đã cập nhật quán.');
-      void qc.invalidateQueries({ queryKey: adminKeys.venuesAll });
-      void auditStale(qc);
-    },
-  });
-}
-export function useSyncVenues() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (province: string) => api.syncVenues(province),
-    onSuccess: (r) => {
-      toast.success(r.message || 'Đã gửi yêu cầu đồng bộ.');
-      void qc.invalidateQueries({ queryKey: adminKeys.venuesAll });
-      void auditStale(qc);
-    },
-  });
-}
-
 /* ---- Nhật ký, thống kê ---- */
 export const useAuditLogs = (q: AuditQuery) =>
-  useQuery({ queryKey: adminKeys.audit(q), queryFn: () => api.listAuditLogs(q), placeholderData: keepPreviousData });
+  useQuery({
+    queryKey: adminKeys.audit(q),
+    queryFn: async () => (await api.listAuditLogs(q)) ?? { items: [], meta: { page: q.page, size: q.size, total: 0 } },
+    placeholderData: keepPreviousData,
+  });
 
 export const useAnalyticsOverview = (q: DateRange) =>
-  useQuery({ queryKey: adminKeys.analytics(q), queryFn: () => api.getAnalyticsOverview(q), placeholderData: keepPreviousData });
+  useQuery({
+    queryKey: adminKeys.analytics(q),
+    queryFn: async () => (await api.getAnalyticsOverview(q)) ?? null,
+    placeholderData: keepPreviousData,
+  });
 
 /* ---- AI / LLMOps / kho tri thức ---- */
 export const useAiMetrics = (q: DateRange & { module?: string }) =>
-  useQuery({ queryKey: adminKeys.aiMetrics(q), queryFn: () => api.getAiMetrics(q), placeholderData: keepPreviousData });
+  useQuery({
+    queryKey: adminKeys.aiMetrics(q),
+    queryFn: async () => (await api.getAiMetrics(q)) ?? null,
+    placeholderData: keepPreviousData,
+  });
 
 export const useLlmops = (q: DateRange & { groupBy?: 'DAY' | 'FEATURE' }) =>
-  useQuery({ queryKey: adminKeys.llmops(q), queryFn: () => api.getLlmopsDashboard(q), placeholderData: keepPreviousData });
+  useQuery({
+    queryKey: adminKeys.llmops(q),
+    queryFn: async () => (await api.getLlmopsDashboard(q)) ?? null,
+    placeholderData: keepPreviousData,
+  });
 
 /** Tự làm mới 3 giây/lần khi còn mục chờ đồng bộ (`pending > 0`) hoặc vừa kích hoạt job. */
 export const useKnowledgeStatus = (watchJob: boolean) =>
   useQuery({
     queryKey: adminKeys.knowledge,
-    queryFn: api.getKnowledgeStatus,
+    queryFn: async () => (await api.getKnowledgeStatus()) ?? null,
     refetchInterval: (query) => (watchJob || (query.state.data?.pending ?? 0) > 0 ? 3000 : false),
   });
 

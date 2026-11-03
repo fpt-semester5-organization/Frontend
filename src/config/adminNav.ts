@@ -45,16 +45,10 @@ export const ADMIN_NAV: AdminNavItem[] = [
     description: 'Tra cứu tài khoản, xem vi phạm và xử lý kỷ luật.',
   },
   {
-    label: 'Quán chay',
-    to: PATHS.ADMIN.VENUES,
-    icon: 'storefront',
-    description: 'Ẩn/hiện quán và đồng bộ từ nguồn dữ liệu.',
-  },
-  {
-    label: 'Gói VIP & đối soát',
+    label: 'Cấu hình hệ thống',
     to: PATHS.ADMIN.SUBSCRIPTION_PLANS,
-    icon: 'workspace_premium',
-    description: 'Giá gói VIP và xử lý giao dịch lỗi.',
+    icon: 'settings',
+    description: 'Cấu hình chỉ số hệ thống, giá gói VIP và lịch sử giao dịch.',
   },
   {
     label: 'Giám sát AI',

@@ -162,29 +162,46 @@ const RecipeDetail: React.FC = () => {
       <article className="flex flex-col gap-space-xl">
         <header className="grid items-start gap-space-lg lg:grid-cols-2 lg:gap-space-xl">
           <figure className="relative overflow-hidden rounded-2xl bg-surface-container">
-            {data.type === 'VIDEO' && data.imageUrl?.includes('/video/upload/') ? (
-              <video
-                src={data.imageUrl.replace(/\.jpg$/i, '.mp4')}
-                poster={data.imageUrl}
-                controls
-                playsInline
-                className="aspect-[4/3] h-auto w-full object-cover"
-              />
-            ) : data.imageUrl ? (
-              <img
-                src={data.imageUrl}
-                alt={`Ảnh công thức ${data.title}`}
-                width={960}
-                height={720}
-                // Ảnh món là phần tử lớn nhất màn đầu (LCP) nên tải ngay.
-                {...{ fetchpriority: 'high' }}
-                className="aspect-[4/3] h-auto w-full object-cover"
-              />
-            ) : (
-              <div className="flex aspect-[4/3] items-center justify-center bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60">
-                <Icon name="restaurant" className="text-[56px] text-on-primary-fixed-variant" />
-              </div>
-            )}
+            {(() => {
+              const videoSrc =
+                data.videoUrl ||
+                data.videos?.[0]?.videoUrl ||
+                (data.imageUrl?.includes('/video/upload/') || data.imageUrl?.match(/\.(mp4|mov)$/i)
+                  ? data.imageUrl.replace(/\.jpg$/i, '.mp4')
+                  : null);
+              const isVideoContent = data.type === 'VIDEO' || Boolean(videoSrc);
+
+              if (isVideoContent && videoSrc) {
+                return (
+                  <video
+                    src={videoSrc}
+                    poster={data.imageUrl ?? undefined}
+                    controls
+                    playsInline
+                    className="aspect-[4/3] h-auto w-full object-cover"
+                  />
+                );
+              }
+
+              if (data.imageUrl) {
+                return (
+                  <img
+                    src={data.imageUrl}
+                    alt={`Ảnh công thức ${data.title}`}
+                    width={960}
+                    height={720}
+                    {...{ fetchpriority: 'high' }}
+                    className="aspect-[4/3] h-auto w-full object-cover"
+                  />
+                );
+              }
+
+              return (
+                <div className="flex aspect-[4/3] items-center justify-center bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60">
+                  <Icon name="restaurant" className="text-[56px] text-on-primary-fixed-variant" />
+                </div>
+              );
+            })()}
           </figure>
 
           <div className="flex flex-col gap-space-md">

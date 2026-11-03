@@ -91,7 +91,20 @@ export const RelatedPosts: React.FC<RelatedPostsProps> = ({ currentPostId, class
 
   if (isError || !data?.items) return null;
 
-  const related = data.items.filter((p) => p.postId !== currentPostId).slice(0, 3);
+  const related = data.items
+    .filter((p) => {
+      if (p.postId === currentPostId) return false;
+      if (!p.moderationStatus) return true;
+      const s = p.moderationStatus.toUpperCase();
+      return (
+        s !== 'QUARANTINED_HIDDEN' &&
+        s !== 'REJECTED' &&
+        s !== 'PENDING_REVIEW' &&
+        s !== 'DRAFT' &&
+        s !== 'DELETED'
+      );
+    })
+    .slice(0, 3);
   if (related.length === 0) return null;
 
   return (

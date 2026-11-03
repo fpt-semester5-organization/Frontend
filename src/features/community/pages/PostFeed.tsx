@@ -15,7 +15,7 @@ import { FeedFilters } from '../components/FeedFilters';
 import { PostCard, PostFeedSkeleton } from '../components/PostCard';
 import { PostListToolbar } from '../components/PostListToolbar';
 import { useInfinitePosts } from '../hooks/usePosts';
-import { getRecentCreatedItems } from '../lib/recentFeedStore';
+import { getRecentCreatedItems, isAllowedInCommunityFeed } from '../lib/recentFeedStore';
 import {
   fromPost,
   fromRecipe,
@@ -90,22 +90,49 @@ const PostFeed: React.FC = () => {
     { enabled: wantRecipes }
   );
 
-  // 4. Hợp nhất các trang bài viết và công thức đã nạp
+  // 4. Hợp nhất các trang bài viết và công thức đã nạp, lọc bỏ các nội dung vi phạm/tạm ẩn/chờ duyệt
   const postItems = useMemo(() => {
     if (!wantPosts || !postsQuery.data) return [];
-    return postsQuery.data.pages.flatMap((page: { items: PostListItem[] }) => page.items.map(fromPost));
+    return postsQuery.data.pages
+      .flatMap((page: { items: PostListItem[] }) => page.items)
+      .filter((post) => {
+        if (!post.moderationStatus) return true;
+        const s = post.moderationStatus.toUpperCase();
+        return (
+          s !== 'QUARANTINED_HIDDEN' &&
+          s !== 'REJECTED' &&
+          s !== 'PENDING_REVIEW' &&
+          s !== 'DRAFT' &&
+          s !== 'DELETED'
+        );
+      })
+      .map(fromPost);
   }, [wantPosts, postsQuery.data]);
 
   const recipeItems = useMemo(() => {
     if (!wantRecipes || !recipesQuery.data) return [];
-    return recipesQuery.data.pages.flatMap(
-      (page: { items: import('@/features/recipes/types/recipe.types').RecipeListItem[] }) =>
-        page.items.map(fromRecipe)
-    );
+    return recipesQuery.data.pages
+      .flatMap(
+        (page: { items: import('@/features/recipes/types/recipe.types').RecipeListItem[] }) =>
+          page.items
+      )
+      .filter((recipe) => {
+        const s = (recipe as { status?: string }).status?.toUpperCase();
+        if (!s) return true;
+        return (
+          s !== 'QUARANTINED_HIDDEN' &&
+          s !== 'REJECTED' &&
+          s !== 'PENDING_REVIEW' &&
+          s !== 'DRAFT' &&
+          s !== 'DELETED'
+        );
+      })
+      .map(fromRecipe);
   }, [wantRecipes, recipesQuery.data]);
 
   const feedItems: CommunityFeedItem[] = useMemo(() => {
     const recent = getRecentCreatedItems().filter((item) => {
+      if (!isAllowedInCommunityFeed(item)) return false;
       if (type === 'POST' && item.kind !== 'POST') return false;
       if (type === 'RECIPE' && item.kind !== 'RECIPE') return false;
       if (keyword && !item.title.toLowerCase().includes(keyword.toLowerCase())) return false;
@@ -115,9 +142,7 @@ const PostFeed: React.FC = () => {
     const latestRecent = recent[0];
     const raw =
       wantPosts && wantRecipes
-        ? latestRecent?.kind === 'RECIPE'
-          ? interleaveItems(recipeItems, postItems)
-          : interleaveItems(postItems, recipeItems)
+        ? interleaveItems(recipeItems, postItems)
         : wantPosts
           ? postItems
           : recipeItems;

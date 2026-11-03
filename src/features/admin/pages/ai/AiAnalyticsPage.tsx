@@ -263,9 +263,9 @@ export const AiAnalyticsPage: React.FC = () => {
               )}
             </div>
 
-            {/* Khối Phân bổ Hạng & Top Spenders */}
+            {/* Khối Top 5 tài khoản tiêu thụ (đã bỏ Phân bổ theo Hạng Hội viên theo yêu cầu) */}
             <TopSpendersCard
-              tierDistribution={data.userTierDistribution}
+              showTierDistribution={false}
               topSpenders={data.topSpenders}
             />
           </div>

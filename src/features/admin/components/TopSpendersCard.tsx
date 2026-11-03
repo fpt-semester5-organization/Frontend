@@ -12,11 +12,13 @@ import type { TopSpender, UserTierDistribution } from '../types/admin.types';
 interface TopSpendersCardProps {
   tierDistribution?: UserTierDistribution;
   topSpenders?: TopSpender[];
+  showTierDistribution?: boolean;
 }
 
 export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
   tierDistribution,
   topSpenders = [],
+  showTierDistribution = true,
 }) => {
   const vipTokens = tierDistribution?.vipTokens ?? 0;
   const vipCostUsd = tierDistribution?.vipCostUsd ?? 0;
@@ -32,9 +34,10 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
 
   return (
     <div className={cn(CARD, 'flex flex-col gap-space-lg p-space-md sm:p-space-lg')}>
-      <div className="grid gap-space-lg lg:grid-cols-2">
+      <div className={cn('grid gap-space-lg', showTierDistribution ? 'lg:grid-cols-2' : 'grid-cols-1')}>
         {/* Cột 1: Phân bổ theo Hạng Hội viên */}
-        <div className="flex flex-col gap-space-md">
+        {showTierDistribution && (
+          <div className="flex flex-col gap-space-md">
           <div className="flex flex-col gap-1">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">
               Phân bổ theo Hạng Hội viên
@@ -171,6 +174,7 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
             </div>
           </div>
         </div>
+        )}
 
         {/* Cột 2: Top 5 tài khoản tiêu thụ nhiều nhất */}
         <div className="flex flex-col gap-space-md">

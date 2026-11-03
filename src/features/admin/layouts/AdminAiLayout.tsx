@@ -28,22 +28,22 @@ export const AI_SUB_NAV: AiSubNavItem[] = [
     description: 'Biểu đồ chi phí token theo ngày, tính năng, phân rã Input/Output và Top Spenders.',
   },
   {
+    label: 'Kho tri thức RAG',
+    to: PATHS.ADMIN.AI_RAG,
+    icon: 'database',
+    description: 'Trạng thái Vector Database, tài liệu dinh dưỡng PDF và quản lý tri thức.',
+  },
+  {
+    label: 'Chất lượng Chatbot',
+    to: PATHS.ADMIN.AI_QUALITY,
+    icon: 'verified',
+    description: 'Chỉ số SLA vận hành và phiếu khảo sát đánh giá chất lượng Chatbot từ người dùng.',
+  },
+  {
     label: 'Nhật ký cuộc gọi',
     to: PATHS.ADMIN.AI_LOGS,
     icon: 'receipt_long',
     description: 'Tra cứu toàn bộ lịch sử gọi AI, kiểm tra prompt, response, latency và mã lỗi.',
-  },
-  {
-    label: 'Kho tri thức RAG',
-    to: PATHS.ADMIN.AI_RAG,
-    icon: 'database',
-    description: 'Trạng thái Vector Database, số điểm tri thức theo nguồn và kích hoạt đồng bộ lại.',
-  },
-  {
-    label: 'Chất lượng & SLA',
-    to: PATHS.ADMIN.AI_QUALITY,
-    icon: 'verified',
-    description: 'Trạng thái ngắt mạch (Circuit Breaker), cảnh báo suy giảm độ chính xác và ma trận lỗi.',
   },
 ];
 

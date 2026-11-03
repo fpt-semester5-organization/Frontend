@@ -22,6 +22,7 @@ import { FieldError, FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import { QUOTA } from '@/constants/quota';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { listFridgeItems } from '@/features/fridge/api/fridge.api';
 import { useCurrentUser } from '@/features/profile/hooks/useProfile';
 import { GENDER_OPTIONS, GOAL_OPTIONS, labelOf } from '@/features/profile/lib/healthMetrics';
@@ -268,7 +269,10 @@ export const MealPlanGenerate: React.FC = () => {
 
   const health = profile.data?.health;
   const allergens = profile.data?.allergens ?? [];
-  const limit = isVip ? QUOTA.mealPlanPerWeek.vip : QUOTA.mealPlanPerWeek.free;
+  const { data: publicSettings } = usePublicSettings();
+  const vipLimit = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
+  const freeLimit = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
+  const limit = isVip ? vipLimit : freeLimit;
   const generating = createPlan.isPending;
 
   // Tính toán tiêu đề kế hoạch dạng chuẩn: "Thực đơn từ Thứ Hai 03/11/2026 đến Chủ Nhật 09/11/2026 (7 ngày)"
@@ -334,7 +338,7 @@ export const MealPlanGenerate: React.FC = () => {
                     failure.status === 503 || failure.status === 502
                       ? 'Dịch vụ tạm gián đoạn'
                       : failure.errorCode === 'ERR_QUOTA_MEAL_PLAN_EXCEEDED'
-                      ? `Bạn đã dùng hết ${QUOTA.mealPlanPerWeek.vip} thực đơn của tuần này`
+                      ? `Bạn đã dùng hết ${vipLimit} thực đơn của tuần này`
                       : 'Chưa đủ món phù hợp để lên thực đơn'
                   }
                 >
@@ -857,7 +861,7 @@ export const MealPlanGenerate: React.FC = () => {
                     to={PATHS.SUBSCRIPTION.PRICING}
                     className="mt-space-md inline-block font-label-sm text-label-sm font-semibold text-secondary hover:underline"
                   >
-                    Nâng cấp VIP để tạo {QUOTA.mealPlanPerWeek.vip} thực đơn/tuần →
+                    Nâng cấp VIP để tạo {vipLimit} thực đơn/tuần →
                   </Link>
                 )}
               </article>
@@ -875,8 +879,8 @@ export const MealPlanGenerate: React.FC = () => {
           <>
             <p>{upsellMessage}</p>
             <p className="mt-1">
-              Gói Free được tạo {QUOTA.mealPlanPerWeek.free} thực đơn mỗi tuần. Nâng cấp VIP để tạo tới{' '}
-              {QUOTA.mealPlanPerWeek.vip} thực đơn.
+              Gói Free được tạo {freeLimit} thực đơn mỗi tuần. Nâng cấp VIP để tạo tới{' '}
+              {vipLimit} thực đơn.
             </p>
           </>
         }

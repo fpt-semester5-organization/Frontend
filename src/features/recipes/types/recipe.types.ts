@@ -44,6 +44,15 @@ export interface RecipeOwnerFields {
   categoryId?: number;
   dietarySchoolId?: number;
   difficultyLevel?: DifficultyLevel | null;
+  videoUrl?: string | null;
+  videos?: Array<{
+    videoId: number;
+    title: string;
+    videoUrl: string;
+    thumbnailUrl?: string | null;
+    durationSeconds: number;
+    status: string;
+  }>;
 }
 
 /** GET /recipes/{id} (FN-POST-02). Các trường không bắt buộc của công thức có thể rỗng. */
@@ -122,4 +131,5 @@ export type RecipeStatus =
 export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']> & {
   imageUrl?: string;
   videoUrl?: string;
+  moderationStatus?: string;
 };

@@ -11,6 +11,7 @@ import {
   createChatSession,
   createSurvey,
   deleteChatSession,
+  getChatQuota,
   listChatMessages,
   listChatSessions,
   sendChatMessage,
@@ -62,14 +63,16 @@ export function flattenMessages(data: MessagesData | undefined): ChatMessage[] {
   return all.filter((m) => (seen.has(m.messageId) ? false : (seen.add(m.messageId), true)));
 }
 
-/** Hạn mức của Thành viên: lấy từ quota của lần gửi gần nhất. */
+/** Hạn mức của Thành viên: tự động tra cứu từ GET /api/v1/chat/quota đồng bộ thời gian thực theo SystemSettings. */
 export function useChatQuota() {
+  const isAuthed = useAuthStore((s) => s.isAuthenticated);
   return useQuery<ChatQuota | null>({
     queryKey: chatKeys.quota,
-    queryFn: () => null,
-    enabled: false,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    queryFn: () => getChatQuota(),
+    enabled: isAuthed,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 

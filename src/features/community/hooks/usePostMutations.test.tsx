@@ -52,7 +52,7 @@ describe('useDeletePost', () => {
     addRecentCreatedItem({ key: 'RECIPE-5', kind: 'RECIPE', id: 5, title: 'Công thức năm', voteCount: 0 });
     sessionStorage.setItem(
       'veggielife_recent_community_items',
-      JSON.stringify([{ key: 'POST-5', kind: 'POST', id: 5, title: 'Bài năm', voteCount: 0 }, ...getRecentCreatedItems()])
+      JSON.stringify([{ key: 'POST-5', kind: 'POST', id: 5, title: 'Bài năm', voteCount: 0, moderationStatus: 'APPROVED_ACTIVE' }, ...getRecentCreatedItems()])
     );
     const { result } = setup();
     act(() => result.current.mutate(5));
@@ -72,7 +72,7 @@ describe('useDeletePost', () => {
   });
 
   it('xóa lỗi: khôi phục danh sách, chi tiết và bài vừa tạo', async () => {
-    addRecentCreatedItem({ key: 'POST-5', kind: 'POST', id: 5, title: 'Bài năm', voteCount: 0 });
+    addRecentCreatedItem({ key: 'POST-5', kind: 'POST', id: 5, title: 'Bài năm', voteCount: 0, moderationStatus: 'APPROVED_ACTIVE' });
     const { queryClient, invalidate, result, respond } = setup();
     act(() => result.current.mutate(5));
     await waitFor(() => expect(getRecentCreatedItems()).toEqual([]));

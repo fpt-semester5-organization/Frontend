@@ -27,6 +27,8 @@ export function featureColor(feature: string): string {
 export interface CostCell {
   costUsd: number;
   tokens: number;
+  promptTokens?: number;
+  completionTokens?: number;
 }
 
 export interface CostMatrix {

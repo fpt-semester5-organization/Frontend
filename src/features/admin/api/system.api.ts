@@ -2,7 +2,6 @@ import { http } from '@/api/http';
 import { apiCall, cleanParams, unwrapPaged } from '../lib/api';
 import type {
   AdminPlan,
-  AdminVenue,
   AiMetrics,
   AnalyticsOverview,
   AuditLog,
@@ -15,7 +14,6 @@ import type {
   PlanUpdateBody,
   ReconcileBody,
   ReconcileResult,
-  VenueQuery,
 } from '../types/admin.types';
 
 /* FN-ADM-13 */
@@ -23,11 +21,6 @@ export const listAdminPlans = async () => (await apiCall<AdminPlan[]>(http.get('
 export const createPlan = (body: PlanCreateBody) => apiCall<{ planId: number }>(http.post('/admin/subscription-plans', body));
 export const updatePlan = (id: number, body: PlanUpdateBody) => apiCall<{ planId: number; priceVnd?: number }>(http.put(`/admin/subscription-plans/${id}`, body));
 export const reconcilePayment = (id: number, body: ReconcileBody) => apiCall<ReconcileResult>(http.post(`/admin/payments/${id}/reconcile`, body));
-
-/* FN-ADM-14 */
-export const listAdminVenues = (q: VenueQuery) => unwrapPaged<AdminVenue>(http.get('/admin/venues', { params: cleanParams(q) }));
-export const setVenueActive = (id: number, isActive: boolean) => apiCall<{ venueId: number; isActive: boolean }>(http.put(`/admin/venues/${id}`, { isActive }));
-export const syncVenues = (province: string) => apiCall<{ jobId: string }>(http.post('/admin/venues/sync', { province }));
 
 /* FN-ADM-17 / FN-ADM-18 — Khi S7-N1 (Nguyễn Ngọc Anh) chưa merge, bắt 404 và fallback dữ liệu mẫu để giao diện không bị gián đoạn */
 export const listAuditLogs = async (q: AuditQuery) => {

@@ -2,6 +2,7 @@ import http from '@/api/http';
 import type { ApiEnvelope, PageMeta } from '@/api/types';
 import type {
   ChatMessage,
+  ChatQuota,
   ChatSession,
   ChatSessionItem,
   ContextType,
@@ -18,6 +19,12 @@ export async function createChatSession(body: {
   contextType?: ContextType | string;
 }): Promise<ChatSession> {
   const res = await http.post<ApiEnvelope<ChatSession>>('/chat/sessions', body);
+  return res.data.data;
+}
+
+/** GET /api/v1/chat/quota — Lấy hạn mức và số câu hỏi đã dùng hôm nay của người dùng đồng bộ từ SystemSettings */
+export async function getChatQuota(): Promise<ChatQuota> {
+  const res = await http.get<ApiEnvelope<ChatQuota>>('/chat/quota');
   return res.data.data;
 }
 

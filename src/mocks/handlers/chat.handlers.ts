@@ -273,4 +273,18 @@ export const chatHandlers = [
 
     return ok({ surveyId }, 'Cảm ơn bạn đã đánh giá.', 201);
   }),
+
+  // GET /api/v1/chat/quota
+  http.get(api('/chat/quota'), async ({ request }) => {
+    await latency();
+    const user = currentUser(request);
+    const isVip = user?.role === 'VIP';
+    const limit = isVip ? 50 : user ? 20 : 3;
+    return ok({
+      used: 0,
+      limit,
+      remaining: limit,
+      scope: 'daily',
+    });
+  }),
 ];

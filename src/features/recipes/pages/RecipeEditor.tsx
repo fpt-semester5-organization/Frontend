@@ -7,7 +7,7 @@
  * UNSPECIFIED (giả định 17/10/2026, chờ Leader chốt): trang sửa đọc GET /recipes/{id} với các trường dành cho tác giả
  * (authorId, status, categoryId, dietarySchoolId, difficultyLevel, isOptional) — xem RecipeOwnerFields trong recipe.types.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import type { UseFormSetError } from 'react-hook-form';
@@ -23,7 +23,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { getAttachmentKind } from '@/features/community/types/community.schemas';
 import { useCountdown } from '@/hooks/useCountdown';
 import { toApiError } from '@/lib/apiError';
-import { getErrorMessage, notifyApiError, notifyInfo, notifySuccess } from '@/lib/notify';
+import { getErrorMessage, notifyApiError, notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
 import { PATHS, withReturnUrl } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { listIngredients } from '../api/recipes.api';
@@ -100,11 +100,6 @@ const PAGE = 'mx-auto w-full max-w-[1200px] px-margin-mobile pb-space-xl sm:px-m
 const PRIMARY_LINK =
   'inline-flex rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary no-underline hover:bg-primary';
 
-interface PendingOutcome {
-  status: RecipeStatus;
-  message: string;
-}
-
 const RecipeEditor: React.FC = () => {
   const { id } = useParams();
   const editId = id === undefined ? null : Number(id);
@@ -135,7 +130,6 @@ const RecipeEditor: React.FC = () => {
   const [serverAlert, setServerAlert] = useState<{ tone: 'error' | 'warning'; title: string; message: string } | null>(null);
   const [lockedDialog, setLockedDialog] = useState<string | null>(null);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const [outcome, setOutcome] = useState<PendingOutcome | null>(null);
   const lockedSeconds = useCountdown(lockedUntil);
 
   const location = useLocation();
@@ -200,11 +194,15 @@ const RecipeEditor: React.FC = () => {
     };
   });
 
-  useEffect(() => {
-    if (!sttPrefill || isEdit) return;
-    const allDone = prefillQueries.every((q) => q.isSuccess || q.isError);
-    if (!allDone) return;
+  const prefillAppliedRef = useRef(false);
+  const allPrefillDone =
+    prefillQueries.length > 0 && prefillQueries.every((q) => q.isSuccess || q.isError);
 
+  useEffect(() => {
+    if (!sttPrefill || isEdit || prefillAppliedRef.current) return;
+    if (!allPrefillDone) return;
+
+    prefillAppliedRef.current = true;
     const mappedIngredients = (sttPrefill.ingredients ?? []).map((ing, idx) => {
       const q = prefillQueries[idx];
       const items = q?.data?.items ?? [];
@@ -241,7 +239,7 @@ const RecipeEditor: React.FC = () => {
       ingredients: mappedIngredients.length > 0 ? mappedIngredients : [emptyIngredientRow()],
       instructions,
     });
-  }, [sttPrefill, isEdit, prefillQueries]);
+  }, [sttPrefill, isEdit, allPrefillDone]);
 
   // Trang sửa: công thức từ API không có status nghĩa là bản công khai (GET chỉ trả APPROVED_ACTIVE cho người khác).
   const editStatus: MyRecipeStatus = (recipe.data?.status as MyRecipeStatus | undefined) ?? 'APPROVED_ACTIVE';
@@ -257,7 +255,6 @@ const RecipeEditor: React.FC = () => {
     setCreatedId(null);
     setSavedAt(null);
     setServerAlert(null);
-    setOutcome(null);
     setFormKey((key) => key + 1);
     if (isEdit) navigate(PATHS.RECIPES.NEW);
   };
@@ -268,6 +265,7 @@ const RecipeEditor: React.FC = () => {
     if (applyRecipeFieldErrors(error, setError)) return;
     if (apiError.status === 422) {
       setServerAlert({ tone: 'error', title: REJECT_TITLE[apiError.errorCode] ?? 'Công thức chưa được chấp nhận', message: getErrorMessage(apiError) });
+      notifyError(getErrorMessage(apiError) || 'Công thức của bạn vi phạm tiêu chuẩn cộng đồng và chờ kiểm duyệt nên chưa hiển thị công khai.');
     } else if (apiError.status === 409) {
       setLockedDialog(getErrorMessage(apiError));
     } else if (apiError.status === 502 || apiError.status === 503) {
@@ -283,7 +281,7 @@ const RecipeEditor: React.FC = () => {
   };
 
   /** Tạo mới: lần đầu POST đủ trường, các lần lưu sau trong phiên PUT đủ trường. Sửa: PUT trường đã đổi. */
-  const save = async ({ values, dirty, intent }: RecipeFormSubmission): Promise<{ id: number; status: RecipeStatus; message: string } | 'unchanged'> => {
+  const save = async ({ values, dirty, removeExistingMedia, intent }: RecipeFormSubmission): Promise<{ id: number; status: RecipeStatus; message: string } | 'unchanged'> => {
     if (!isEdit && createdId === null) {
       const res = await createRecipe.mutateAsync(toRecipeBody(values, intent === 'submit'));
       setCreatedId(res.data.recipeId);
@@ -293,6 +291,9 @@ const RecipeEditor: React.FC = () => {
     let body: UpdateRecipeBody;
     if (isEdit) {
       body = toUpdateBody(values, dirty, variant === 'draft' ? intent === 'submit' : undefined);
+      if (removeExistingMedia) {
+        body.imageUrl = '';
+      }
       const changed = Object.keys(body).some((key) => key !== 'submit');
       if (!changed && intent !== 'submit') return 'unchanged';
     } else {
@@ -321,14 +322,21 @@ const RecipeEditor: React.FC = () => {
         }
         result = { id: editId as number, status: editStatus, message: '' };
       }
-      const { id: recipeId, status, message } = result;
+      let { id: recipeId, status, message } = result;
 
       if (file) {
         try {
           const res = await uploadMedia.mutateAsync({ file, recipeId });
           clearFile();
-          if (getAttachmentKind(file) === 'video') notifyInfo(res.message || 'Đã nhận video, đang xử lý.');
-          else if (!message) notifySuccess(res.message || 'Đã tải ảnh lên.');
+          if (res.data?.moderationStatus) {
+            status = res.data.moderationStatus as RecipeStatus;
+          }
+          if (res.data?.status === 'BANNED') {
+            status = 'QUARANTINED_HIDDEN';
+          }
+          if (res.message) {
+            message = res.message;
+          }
         } catch (uploadError) {
           if (isFileError(uploadError)) setFileError(getErrorMessage(uploadError));
           else notifyApiError(uploadError);
@@ -340,6 +348,7 @@ const RecipeEditor: React.FC = () => {
             return;
           }
           notifyInfo(`Công thức đã được lưu nhưng chưa tải được tệp: ${getErrorMessage(uploadError)}`);
+          return;
         }
       }
 
@@ -347,12 +356,19 @@ const RecipeEditor: React.FC = () => {
         setSavedAt(new Date());
         markSaved();
         if (message) notifySuccess(message);
-      } else if (status === 'APPROVED_ACTIVE') {
-        notifySuccess(message || 'Đã lưu công thức.');
-        navigate(PATHS.RECIPES.DETAIL(recipeId), { replace: true });
+      } else if (status === 'QUARANTINED_HIDDEN') {
+        notifyError('Công thức của bạn vi phạm tiêu chuẩn cộng đồng và chờ kiểm duyệt nên chưa hiển thị công khai.');
+        if (!isEdit) {
+          navigate(PATHS.RECIPES.EDIT(recipeId), { replace: true });
+        } else {
+          recipe.refetch();
+        }
+      } else if (status === 'PENDING_REVIEW' || status === 'REJECTED') {
+        notifyInfo('Công thức đang chờ kiểm duyệt nên chưa hiển thị công khai.');
+        navigate(PATHS.ME.CONTENT('recipes'));
       } else {
-        // Điểm vi phạm ≥ 85% hoặc chờ duyệt (BR-ADM-CNT-002): chưa hiển thị công khai.
-        setOutcome({ status, message });
+        notifySuccess(message || 'Công thức đã được kiểm duyệt hợp lệ và đăng công khai.');
+        navigate(PATHS.RECIPES.DETAIL(recipeId), { replace: true });
       }
     } finally {
       setSubmitting(null);
@@ -408,35 +424,6 @@ const RecipeEditor: React.FC = () => {
       {body}
     </div>
   );
-
-  if (outcome) {
-    return shell(
-      <EmptyState
-        icon="hourglass_top"
-        title="Công thức đang chờ kiểm duyệt"
-        description={`${outcome.message ? `${outcome.message} ` : ''}Công thức chưa hiển thị công khai cho tới khi quản trị viên duyệt xong.`}
-        className="rounded-2xl bg-surface-container-lowest shadow-card"
-        action={
-          <>
-            <Link to={PATHS.ME.CONTENT('recipes')} className={PRIMARY_LINK}>
-              Xem nội dung của tôi
-            </Link>
-            {fromCommunity && (
-              <Link
-                to={PATHS.COMMUNITY.ROOT}
-                className="inline-flex rounded-lg bg-surface-container px-5 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
-              >
-                Về Cộng đồng
-              </Link>
-            )}
-            <Button variant="outline" onClick={startOver}>
-              Soạn công thức khác
-            </Button>
-          </>
-        }
-      />
-    );
-  }
 
   if (isEdit) {
     if (!validEditId) {
@@ -501,6 +488,15 @@ const RecipeEditor: React.FC = () => {
     }
   }
 
+  const isQuarantined = isEdit && editStatus === 'QUARANTINED_HIDDEN';
+  const initialVideoUrl =
+    recipe.data?.videoUrl ||
+    recipe.data?.videos?.[0]?.videoUrl ||
+    (recipe.data?.imageUrl?.includes('/video/upload/') || recipe.data?.imageUrl?.match(/\.(mp4|mov)$/i)
+      ? recipe.data.imageUrl.replace(/\.jpg$/i, '.mp4')
+      : undefined);
+  const initialImageUrl = recipe.data?.imageUrl;
+
   const statusNote = (
     <>
       {isEdit && (
@@ -524,6 +520,14 @@ const RecipeEditor: React.FC = () => {
   return shell(
     <>
       {!isEdit && <ContentTypeTabs activeType="RECIPE" />}
+      {isQuarantined && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-error/30 bg-error-container/20 px-space-md py-2.5 text-error shadow-sm mb-space-md">
+          <Icon name="warning" className="text-[20px] shrink-0" />
+          <span className="font-label-md text-label-md font-semibold">
+            Công thức đang tạm ẩn do chưa phù hợp tiêu chuẩn cộng đồng
+          </span>
+        </div>
+      )}
       {sttPrefill && (
         <div className="mb-space-md flex items-start gap-3 rounded-xl border border-primary/30 bg-gradient-to-r from-primary-container/30 via-surface-container-low to-secondary-container/20 p-space-md shadow-sm">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary shadow-sm">
@@ -548,6 +552,9 @@ const RecipeEditor: React.FC = () => {
         cancelTo={isEdit ? PATHS.ME.CONTENT('recipes') : fromCommunity ? PATHS.COMMUNITY.ROOT : PATHS.RECIPES.ROOT}
         onSubmit={handleSubmit}
         statusNote={statusNote}
+        initialImageUrl={initialImageUrl}
+        initialVideoUrl={initialVideoUrl}
+        isQuarantined={isQuarantined}
         alert={
           serverAlert && (
             <FormAlert tone={serverAlert.tone} title={serverAlert.title}>

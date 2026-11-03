@@ -62,9 +62,11 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
   const [duration, setDuration] = useState<number>(video?.durationSeconds ?? 10);
   const videoId = video?.videoId ?? 0;
   const videoUrl = video?.videoUrl;
+  const isVideoProcessing = video?.status === 'PROCESSING';
+  const isVideoBanned = video?.status === 'BANNED';
 
   const { data: transcriptData, isLoading: isTranscriptLoading } = useVideoTranscript(videoId, {
-    enabled: Boolean(videoId),
+    enabled: Boolean(videoId) && !isVideoProcessing && !isVideoBanned,
     poll: false,
   });
 
@@ -72,14 +74,14 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
   const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
   const [aiLiveSummary, setAiLiveSummary] = useState<string | null>(null);
 
-  // Chỉ gọi AI STT đúng 1 lần nếu CSDL Backend chưa có, sau đó tự động LƯU XUỐNG BACKEND luôn
+  // Chỉ gọi AI STT đúng 1 lần nếu video đã READY và CSDL Backend chưa có
   useEffect(() => {
     const hasDbData = Boolean(
       transcriptData?.transcript?.rawTranscript ||
       transcriptData?.transcript?.extractedRecipe ||
       transcriptData?.transcript?.aiSummary
     );
-    if (videoUrl && !isTranscriptLoading && !hasDbData && !aiLiveTranscript) {
+    if (videoUrl && !isTranscriptLoading && !hasDbData && !aiLiveTranscript && video?.status === 'READY') {
       extractAndSaveVideoRecipe(videoId, videoUrl)
         .then((res) => {
           if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
@@ -90,7 +92,7 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
           console.warn('AI STT direct call error in PostDetail:', err);
         });
     }
-  }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript, videoId]);
+  }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript, videoId, video?.status]);
 
   const activeRecipe = transcriptData?.transcript?.extractedRecipe || aiLiveRecipe;
   const activeAiSummary = transcriptData?.transcript?.aiSummary || aiLiveSummary;
@@ -127,9 +129,25 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
     }
     return {
       activeSegments: [] as TranscriptSegment[],
-      transcriptSource: isTranscriptLoading ? 'Đang tải CSDL...' : 'Đang xử lý STT...',
+      transcriptSource: isVideoProcessing
+        ? 'Đang xử lý STT & kiểm duyệt...'
+        : isTranscriptLoading
+        ? 'Đang tải CSDL...'
+        : 'Chưa có bản phiên âm',
     };
-  }, [transcriptData, aiLiveTranscript, duration, isTranscriptLoading]);
+  }, [transcriptData, aiLiveTranscript, duration, isTranscriptLoading, isVideoProcessing]);
+
+  if (isVideoBanned) {
+    return (
+      <div className="mb-space-lg flex flex-col items-center justify-center gap-2 rounded-2xl border border-error/40 bg-error-container/10 p-space-xl text-center text-error">
+        <Icon name="videocam_off" className="text-[40px]" />
+        <p className="font-headline-sm text-headline-sm font-semibold">Video đã bị tạm ẩn</p>
+        <p className="font-body-sm text-body-sm text-on-surface-variant max-w-md">
+          Video đính kèm chứa hình ảnh hoặc nội dung vi phạm tiêu chuẩn cộng đồng ẩm thực chay.
+        </p>
+      </div>
+    );
+  }
 
   // Nếu bài viết có video thì hiển thị SyncedVideoScriptPlayer ngay vị trí chính (thay thế ảnh tĩnh đứng yên)
   if (video && video.videoUrl) {
@@ -262,6 +280,22 @@ const PostDetail: React.FC = () => {
       </nav>
 
       <article className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-lg shadow-card md:p-space-xl">
+        {data.moderationStatus === 'QUARANTINED_HIDDEN' && (
+          <div className="mb-space-md flex items-center gap-2.5 rounded-xl border border-error/30 bg-error-container/20 px-space-md py-2.5 text-error shadow-sm">
+            <Icon name="warning" className="text-[20px] shrink-0" />
+            <span className="font-label-md text-label-md font-semibold">
+              Bài viết đang tạm ẩn do chưa phù hợp tiêu chuẩn cộng đồng (chỉ bạn xem được)
+            </span>
+          </div>
+        )}
+        {data.moderationStatus === 'PENDING_REVIEW' && (
+          <div className="mb-space-md flex items-center gap-2.5 rounded-xl border border-secondary/30 bg-secondary-container/20 px-space-md py-2.5 text-secondary shadow-sm">
+            <Icon name="hourglass_top" className="text-[20px] shrink-0" />
+            <span className="font-label-md text-label-md font-semibold">
+              Bài viết đang chờ AI kiểm duyệt và bóc tách video (chỉ bạn xem được)
+            </span>
+          </div>
+        )}
         <header className="flex flex-wrap items-center justify-between gap-space-md pb-space-lg">
           <div className="flex items-center gap-space-sm">
             <Avatar name={data.author.fullName} src={data.author.avatarUrl} size="lg" />

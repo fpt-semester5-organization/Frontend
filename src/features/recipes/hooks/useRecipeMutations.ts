@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { communityKeys } from '@/features/community/hooks/communityKeys';
-import { addRecentCreatedItem, updateRecentCreatedItem } from '@/features/community/lib/recentFeedStore';
+import { addRecentCreatedItem, removeRecentCreatedItem, updateRecentCreatedItem } from '@/features/community/lib/recentFeedStore';
 import { getAttachmentKind } from '@/features/community/types/community.schemas';
 import { createRecipe, deleteRecipe, updateRecipe, uploadRecipeMedia } from '../api/recipes.api';
 import type { CreateRecipeBody, DeleteRecipeMode, UpdateRecipeBody } from '../types/recipe.types';
@@ -13,21 +13,28 @@ export function useCreateRecipe() {
     mutationFn: (body: CreateRecipeBody) => createRecipe(body),
     onSuccess: (res, body) => {
       const user = useAuthStore.getState().user;
-      addRecentCreatedItem({
-        key: `RECIPE-${res.data.recipeId}`,
-        kind: 'RECIPE',
-        id: res.data.recipeId,
-        title: body.title,
-        authorName: user?.fullName ?? 'Bếp Chay VeggieLife',
-        authorAvatarUrl: user?.avatarUrl ?? '/logo.png',
-        createdAt: new Date().toISOString(),
-        voteCount: 0,
-        cookTimeMinutes: body.cookTimeMinutes,
-        dietarySchool: body.dietarySchoolId ? String(body.dietarySchoolId) : null,
-        isVerified: false,
-        type: 'RECIPE',
-        hasVideo: false,
-      });
+      const status = (res.data as { status?: string }).status;
+
+      if (!status || status === 'APPROVED_ACTIVE') {
+        addRecentCreatedItem({
+          key: `RECIPE-${res.data.recipeId}`,
+          kind: 'RECIPE',
+          id: res.data.recipeId,
+          title: body.title,
+          authorName: user?.fullName ?? 'Bếp Chay VeggieLife',
+          authorAvatarUrl: user?.avatarUrl ?? '/logo.png',
+          createdAt: new Date().toISOString(),
+          voteCount: 0,
+          cookTimeMinutes: body.cookTimeMinutes,
+          dietarySchool: body.dietarySchoolId ? String(body.dietarySchoolId) : null,
+          isVerified: false,
+          type: 'RECIPE',
+          hasVideo: false,
+          moderationStatus: status,
+        });
+      } else {
+        removeRecentCreatedItem((item) => item.kind === 'RECIPE' && item.id === res.data.recipeId);
+      }
 
       queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
       queryClient.invalidateQueries({ queryKey: communityKeys.postLists() });
@@ -55,14 +62,6 @@ export function useUploadRecipeMedia() {
   return useMutation({
     mutationFn: uploadRecipeMedia,
     onSuccess: async (res, { file, recipeId }) => {
-      if (res.data.imageUrl) {
-        try {
-          await updateRecipe(recipeId, { imageUrl: res.data.imageUrl });
-        } catch {
-          // Bỏ qua nếu có lỗi
-        }
-      }
-
       const isVideo = getAttachmentKind(file) === 'video';
       const derivedVideoUrl =
         res.data.imageUrl?.includes('/video/upload/')
@@ -94,6 +93,7 @@ export function useDeleteRecipe() {
   return useMutation({
     mutationFn: ({ recipeId, mode }: { recipeId: number; mode: DeleteRecipeMode }) => deleteRecipe(recipeId, mode),
     onSuccess: (_res, { recipeId }) => {
+      removeRecentCreatedItem((item) => item.kind === 'RECIPE' && item.id === recipeId);
       queryClient.removeQueries({ queryKey: recipeKeys.detail(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.lists() });
     },

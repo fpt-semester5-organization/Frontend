@@ -6,6 +6,7 @@ import {
   createDetection,
   createFridgeItem,
   deleteFridgeItem,
+  getFridgeQuota,
   listFridgeItems,
   listRecipeSuggestions,
   searchIngredients,
@@ -19,6 +20,7 @@ export const fridgeKeys = {
   items: (freshness?: Freshness) => ['fridge', 'items', freshness ?? 'ALL'] as const,
   suggestions: (min: number, limit: number) => ['fridge', 'suggestions', min, limit] as const,
   ingredients: (kw: string) => ['fridge', 'ingredients', kw] as const,
+  quota: ['fridge', 'quota'] as const,
 };
 
 /**
@@ -31,6 +33,19 @@ export function useFridgeItems(freshness?: Freshness) {
     queryKey: fridgeKeys.items(freshness),
     queryFn: () => listFridgeItems(freshness),
     enabled: authed,
+  });
+}
+
+/**
+ * Lấy hạn mức nhận diện ảnh tủ lạnh của người dùng trong ngày (FN-VIS-01).
+ */
+export function useFridgeQuota() {
+  const authed = useAuthStore(selectIsAuthenticated);
+  return useQuery({
+    queryKey: fridgeKeys.quota,
+    queryFn: getFridgeQuota,
+    enabled: authed,
+    staleTime: 30_000,
   });
 }
 
@@ -62,6 +77,7 @@ export function useFridgeDetection() {
       if (res.quota) {
         mergeGuestQuota({ ai: res.quota }, !isAuth);
       }
+      void qc.invalidateQueries({ queryKey: fridgeKeys.quota });
       if (res.saved) {
         void qc.invalidateQueries({ queryKey: fridgeKeys.all });
       }

@@ -36,6 +36,7 @@ export interface RecipeFormSubmission {
   /** Trường người dùng đã sửa so với giá trị ban đầu (khi sửa chỉ gửi các trường này). */
   dirty: Partial<Record<keyof RecipeFormValues, unknown>>;
   file: File | null;
+  removeExistingMedia?: boolean;
   intent: RecipeSubmitIntent;
 }
 
@@ -57,6 +58,12 @@ interface RecipeFormProps {
   statusNote?: React.ReactNode;
   /** Khung cảnh báo từ server (422, 503…) hiện ngay trên nút gửi. */
   alert?: React.ReactNode;
+  /** Ảnh đại diện hiện tại đã lưu trên máy chủ (chế độ sửa). */
+  initialImageUrl?: string | null;
+  /** Video hiện tại đã lưu trên máy chủ (chế độ sửa). */
+  initialVideoUrl?: string | null;
+  /** Cờ báo hiệu nội dung/video đang bị cách ly Red-Flag. */
+  isQuarantined?: boolean;
   onSubmit: (submission: RecipeFormSubmission, helpers: RecipeFormHelpers) => void;
   cancelTo: string;
 }
@@ -96,10 +103,14 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
   lockedSeconds,
   statusNote,
   alert,
+  initialImageUrl,
+  initialVideoUrl,
+  isQuarantined,
   onSubmit,
   cancelTo,
 }) => {
   const [file, setFile] = useState<File | null>(null);
+  const [removeExistingMedia, setRemoveExistingMedia] = useState(false);
   const [fileError, setFileError] = useState<string>();
   const { requireMember } = useRequireMember();
   const schools = useDietarySchools();
@@ -144,8 +155,16 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
       void handleSubmit((values) => {
         setFileError(undefined);
         onSubmit(
-          { values, dirty: dirtyFields, file, intent },
-          { setError, setFileError, clearFile: () => setFile(null), markSaved: () => reset(getValues()) }
+          { values, dirty: dirtyFields, file, removeExistingMedia, intent },
+          {
+            setError,
+            setFileError,
+            clearFile: () => {
+              setFile(null);
+              setRemoveExistingMedia(false);
+            },
+            markSaved: () => reset(getValues()),
+          }
         );
       })();
     });
@@ -373,6 +392,12 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                 setFile(next);
                 setFileError(undefined);
               }}
+              initialImageUrl={initialImageUrl}
+              initialVideoUrl={initialVideoUrl}
+              isInitialRemoved={removeExistingMedia}
+              onRemoveInitial={() => setRemoveExistingMedia(true)}
+              onRestoreInitial={() => setRemoveExistingMedia(false)}
+              isQuarantined={isQuarantined}
               serverError={fileError}
               disabled={busy}
             />
@@ -384,17 +409,21 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             {statusNote}
             {alert}
             {variant === 'published' ? (
-              <Button size="lg" className="w-full" onClick={submitWith('save')} loading={submitting === 'save'} disabled={blocked}>
+              <Button size="lg" className="w-full cursor-pointer" onClick={submitWith('save')} loading={submitting === 'save'} disabled={blocked}>
                 {submitting !== 'save' && <Icon name="save" className="text-[18px]" />}
-                Lưu thay đổi
+                {submitting === 'save' && file && (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i))
+                  ? 'Đang tải & AI duyệt video...'
+                  : 'Lưu thay đổi'}
               </Button>
             ) : (
               <>
-                <Button size="lg" className="w-full" onClick={submitWith('submit')} loading={submitting === 'submit'} disabled={blocked}>
+                <Button size="lg" className="w-full cursor-pointer" onClick={submitWith('submit')} loading={submitting === 'submit'} disabled={blocked}>
                   {submitting !== 'submit' && <Icon name="send" className="text-[18px]" />}
-                  Gửi duyệt & đăng
+                  {submitting === 'submit' && file && (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i))
+                    ? 'Đang tải & AI duyệt video...'
+                    : 'Gửi duyệt & đăng'}
                 </Button>
-                <Button variant="outline" className="w-full" onClick={submitWith('draft')} loading={submitting === 'draft'} disabled={blocked}>
+                <Button variant="outline" className="w-full cursor-pointer" onClick={submitWith('draft')} loading={submitting === 'draft'} disabled={blocked}>
                   {submitting !== 'draft' && <Icon name="save" className="text-[18px] text-outline" />}
                   Lưu nháp
                 </Button>
@@ -407,14 +436,11 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             )}
             {variant === 'published' ? (
               <p className="font-label-sm text-label-sm text-on-surface-variant">
-                Bản sửa được AI kiểm duyệt lại trước khi ghi; nếu chưa đạt, bản đang công khai được giữ nguyên. Đổi trường phái hoặc
-                nguyên liệu cũng cần kiểm duyệt lại.
+                Bản chỉnh sửa sẽ được AI kiểm duyệt nội dung theo tiêu chuẩn cộng đồng trước khi cập nhật.
               </p>
             ) : (
               <p className="font-label-sm text-label-sm text-on-surface-variant">
-                AI kiểm duyệt công thức trước khi đăng: điểm vi phạm dưới 85% được đăng ngay, từ 85% trở lên chờ quản trị viên duyệt;
-                nguyên liệu trái trường phái bị gỡ ngay (Red Alert). Giới hạn 02 bài/ngày với tài khoản dưới 3 ngày, sau đó 10
-                bài/ngày (không tính nháp).
+                Công thức sẽ được AI kiểm duyệt nội dung theo tiêu chuẩn cộng đồng trước khi hiển thị công khai.
               </p>
             )}
             <Link

@@ -17,7 +17,6 @@ export interface CommentThreadContext {
   currentUserId: number | null;
   /** Thành viên được bình luận trên nội dung này (memberActions.canComment). */
   canComment: boolean;
-  cooldownSeconds: number;
   submitReply: (parentCommentId: number, content: string) => Promise<unknown>;
   /** Thao tác ghi: Khách thì mở SignupPromptModal. */
   requireMember: (action: () => void) => void;
@@ -164,7 +163,6 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
               rows={2}
               placeholder={`Phản hồi ${comment.author.fullName}…`}
               autoFocus
-              cooldownSeconds={context.cooldownSeconds}
               onCancel={() => setMode('view')}
               onSubmit={async (content) => {
                 await context.submitReply(comment.commentId, content);

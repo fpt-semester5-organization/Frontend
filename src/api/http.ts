@@ -131,7 +131,7 @@ http.interceptors.response.use(
       if (auth.user) toast.warning(cleanUserMessage(body?.message) || cleanUserMessage(errorMessage(code))); // Thành viên Free: trang tự hiện gợi ý nâng cấp VIP
       else ui.openSignupPrompt('quota');
     } else if (status === 429) {
-      toast.warning('Thao tác quá nhanh, thử lại sau');
+      toast.warning(cleanUserMessage(body?.message) || 'Thao tác quá nhanh, thử lại sau');
     } else if (status === 503) {
       ui.setServiceBanner('Dịch vụ tạm gián đoạn, vui lòng thử lại sau.');
     } else if (status && status >= 500) {

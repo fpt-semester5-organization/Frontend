@@ -175,11 +175,12 @@ describe('RecipeEditor (SCR-13)', () => {
       expect(await screen.findByText('dau-phu.png')).toBeInTheDocument();
 
       await userEvent.click(submitButton());
-      expect(await screen.findByText('Công thức đang chờ kiểm duyệt')).toBeInTheDocument();
-      const upload = writes(calls).find((c) => c.url === '/videos');
-      expect(upload?.body).toBeInstanceOf(FormData);
-      expect((upload?.body as FormData).get('recipeId')).toBe('700');
-      expect(writes(calls).map((c) => c.url)).toEqual(['/recipes', '/videos']);
+      await waitFor(() => {
+        const upload = writes(calls).find((c) => c.url === '/videos');
+        expect(upload?.body).toBeInstanceOf(FormData);
+        expect((upload?.body as FormData).get('recipeId')).toBe('700');
+        expect(writes(calls).map((c) => c.url)).toEqual(['/recipes', '/videos']);
+      });
     });
 
     it('422 Red Alert: hiện khung cảnh báo với message của server, giữ dữ liệu đã nhập', async () => {

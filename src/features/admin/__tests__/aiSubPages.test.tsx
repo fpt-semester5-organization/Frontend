@@ -99,11 +99,64 @@ const KNOWLEDGE = {
   },
 };
 
+const SAMPLE_DOCS = [
+  {
+    id: 'DOC_BOOK_1',
+    title: 'Becoming Vegan (Comprehensive Edition)',
+    author: 'Brenda Davis, RD',
+    fileName: 'Becoming_Vegan.pdf',
+    fileType: 'PDF' as const,
+    chunks: 1113,
+    isActive: true,
+    updatedAt: '2026-10-20T08:00:00Z',
+  },
+];
+
+const SAMPLE_SURVEYS = {
+  surveys: {
+    items: [
+      {
+        surveyId: 8001,
+        userId: 2,
+        userFullName: 'Trần Văn Nam',
+        userEmail: 'nam@gmail.com',
+        userAvatarUrl: null,
+        sessionId: 501,
+        sessionTitle: 'Tư vấn thực đơn chay',
+        ratingScore: 5,
+        contextQuestion: 'Tư vấn thực đơn giảm cân ăn chay có hữu ích không?',
+        feedbackContent: 'Bot tư vấn rất chi tiết, có con số calo rõ ràng và giải thích dễ hiểu!',
+        createdAt: '2026-10-30T10:00:00Z',
+      },
+    ],
+    pageNumber: 1,
+    pageSize: 10,
+    totalItems: 1,
+    totalPages: 1,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  },
+  summary: {
+    totalSurveys: 1,
+    averageRating: 5.0,
+    positiveCount: 1,
+    positiveRate: 1.0,
+    negativeCount: 0,
+    negativeRate: 0.0,
+    neutralCount: 0,
+  },
+};
+
 const handler = (): MockHandler => (req) => {
   if (req.url === '/admin/llmops/dashboard') return { data: LLMOPS };
   if (req.url === '/admin/llmops/logs') return { data: LOGS };
   if (req.url === '/admin/ai/metrics') return { data: METRICS };
+  if (req.url === '/admin/ai/surveys') return { data: SAMPLE_SURVEYS };
   if (req.url === '/admin/knowledge/status') return { data: KNOWLEDGE };
+  if (req.url === '/admin/knowledge/documents') return { data: SAMPLE_DOCS };
+  if (req.url === '/admin/knowledge/documents/upload') return { status: 201, data: SAMPLE_DOCS[0] };
+  if (req.url?.startsWith('/admin/knowledge/documents/') && req.method === 'PUT') return { data: { ...SAMPLE_DOCS[0], isActive: false } };
+  if (req.url?.startsWith('/admin/knowledge/documents/') && req.method === 'DELETE') return { data: null };
   if (req.url === '/admin/knowledge/reindex') return { status: 202, message: 'Đã xếp job đồng bộ.', data: { jobId: 'job_123' } };
   return undefined;
 };
@@ -116,9 +169,9 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     const nav = screen.getByRole('navigation', { name: 'Điều hướng phân hệ AI' });
     expect(within(nav).getByText('Tổng quan')).toBeInTheDocument();
     expect(within(nav).getByText('Phân tích Chi phí')).toBeInTheDocument();
-    expect(within(nav).getByText('Nhật ký cuộc gọi')).toBeInTheDocument();
     expect(within(nav).getByText('Kho tri thức RAG')).toBeInTheDocument();
-    expect(within(nav).getByText('Chất lượng & SLA')).toBeInTheDocument();
+    expect(within(nav).getByText('Chất lượng Chatbot')).toBeInTheDocument();
+    expect(within(nav).getByText('Nhật ký cuộc gọi')).toBeInTheDocument();
   });
 
   it('2. AiOverviewPage hiển thị các thẻ KPI tổng quan và khối Tiêu thụ theo Người dùng', async () => {
@@ -138,7 +191,7 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
 
     expect(await screen.findByRole('button', { name: 'Xem bảng số liệu' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Cách xem' })).toBeInTheDocument();
-    expect(screen.getByText('Phân bổ theo Hạng Hội viên')).toBeInTheDocument();
+    expect(screen.queryByText('Phân bổ theo Hạng Hội viên')).not.toBeInTheDocument();
     expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
 
     // Kiểm tra chuyển đổi các loại biểu đồ
@@ -178,25 +231,75 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     const calls = mockApi(handler());
     renderWithProviders(<AiRagPage />, '/admin/ai/rag');
 
-    expect(await screen.findByText('veggielife_nutrition_kb')).toBeInTheDocument();
-    expect(screen.getByText('2.450')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Kho tri thức Chatbot (Qdrant Vector DB)' })).toBeInTheDocument();
+    expect(await screen.findByText('2.450')).toBeInTheDocument();
     expect(screen.getAllByText('Tài liệu dinh dưỡng').length).toBeGreaterThanOrEqual(1);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Đồng bộ lại' }));
-    expect(await screen.findByText(/Xác nhận đồng bộ lại/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Bắt đầu đồng bộ' }));
+    expect(screen.getByText('Danh sách Tài liệu Dinh dưỡng PDF trong Vector DB')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Làm mới' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đồng bộ lại' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Tải lên tài liệu PDF mới' })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(calls.some((c) => c.method === 'POST' && c.url === '/admin/knowledge/reindex')).toBe(true);
+      expect(calls.some((c) => c.method === 'GET' && c.url === '/admin/knowledge/documents')).toBe(true);
+    });
+
+    // Thao tác ẩn tài liệu: gọi PUT /admin/knowledge/documents/:id/status
+    const hideBtn = await screen.findByTitle('Ẩn tài liệu khỏi Chatbot');
+    await userEvent.click(hideBtn);
+    expect(await screen.findByText(/Ẩn tài liệu khỏi Chatbot\?/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ẩn tài liệu' }));
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.method === 'PUT' && c.url === '/admin/knowledge/documents/DOC_BOOK_1/status')).toBe(true);
+    });
+
+    // Thao tác xóa tài liệu: gọi DELETE /admin/knowledge/documents/:id
+    const deleteBtn = screen.getByTitle('Xóa khỏi Vector DB');
+    await userEvent.click(deleteBtn);
+    expect(await screen.findByText(/Xác nhận xóa tài liệu khỏi Vector DB\?/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Xóa tài liệu' }));
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.method === 'DELETE' && c.url === '/admin/knowledge/documents/DOC_BOOK_1')).toBe(true);
     });
   });
 
-  it('6. AiQualityPage hiển thị Circuit Breaker và ma trận SLA theo tính năng', async () => {
+  it('6. AiQualityPage hiển thị 4 KPI cốt lõi và danh sách Khảo sát người dùng', async () => {
     mockApi(handler());
     renderWithProviders(<AiQualityPage />, '/admin/ai/quality');
 
-    expect(await screen.findByText('Cơ chế Ngắt mạch AI (Circuit Breaker)')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Chất lượng theo tính năng AI' })).toBeInTheDocument();
-    expect(screen.getByText('Trợ lý dinh dưỡng', { selector: 'td' })).toBeInTheDocument();
+    expect(await screen.findByText('Tổng lượt trò chuyện')).toBeInTheDocument();
+    expect(screen.getByText('Độ trễ TB')).toBeInTheDocument();
+    expect(screen.getByText('Điểm đánh giá TB')).toBeInTheDocument();
+    expect(screen.getByText('Đánh giá hài lòng')).toBeInTheDocument();
+
+    // Khảo sát người dùng
+    expect(await screen.findByText('Trần Văn Nam')).toBeInTheDocument();
+    expect(screen.getByText(/Tư vấn thực đơn giảm cân ăn chay có hữu ích không\?/)).toBeInTheDocument();
+    expect(screen.getByText('5 sao', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('7. AiRagPage gửi tệp PDF lên POST /admin/knowledge/documents/upload', async () => {
+    const calls = mockApi(handler());
+    renderWithProviders(<AiRagPage />, '/admin/ai/rag');
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Tải lên tài liệu PDF mới' }));
+    expect(await screen.findByText('Tải lên Tài liệu Dinh dưỡng PDF')).toBeInTheDocument();
+
+    const titleInput = screen.getByLabelText(/Tiêu đề tài liệu/);
+    const authorInput = screen.getByLabelText(/Tác giả/);
+    const fileInput = screen.getByLabelText('Chọn file PDF');
+
+    await userEvent.type(titleInput, 'Cẩm nang dinh dưỡng chay');
+    await userEvent.type(authorInput, 'Chuyên gia WHO');
+
+    const file = new File(['Nội dung kiểm thử pdf'], 'cam-nang.pdf', { type: 'application/pdf' });
+    await userEvent.upload(fileInput, file);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tải lên & Vector hoá' }));
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.method === 'POST' && c.url === '/admin/knowledge/documents/upload')).toBe(true);
+    });
   });
 });

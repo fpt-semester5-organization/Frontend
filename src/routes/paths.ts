@@ -107,7 +107,6 @@ export const PATHS = {
     E_NUMBERS: '/admin/e-numbers',
     INGREDIENTS: '/admin/ingredients',
     SUBSCRIPTION_PLANS: '/admin/subscription-plans',
-    VENUES: '/admin/venues',
   },
 } as const;
 

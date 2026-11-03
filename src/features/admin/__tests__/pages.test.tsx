@@ -219,6 +219,73 @@ describe('Nhật ký kiểm toán (SCR-40)', () => {
     );
     renderWithProviders(<AuditLogsPage />);
     expect(await screen.findByText('USER_SANCTION')).toBeInTheDocument();
+    expect(screen.getByText('Xử phạt người dùng')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Xóa|Sửa/ })).not.toBeInTheDocument();
+  });
+
+  it('bấm nút Chi tiết mở modal xem thông tin thay đổi dữ liệu', async () => {
+    vi.mocked(system.listAuditLogs).mockResolvedValue(
+      paged(
+        [
+          {
+            auditId: 99,
+            actorUserId: 1,
+            actorRole: 'ADMIN',
+            action: 'USER_SANCTION',
+            targetTable: 'Users',
+            targetId: '5',
+            note: 'Khóa tài khoản vi phạm',
+            oldValue: '{"status":"ACTIVE"}',
+            newValue: '{"status":"SUSPENDED"}',
+            createdAt: '2026-10-05T10:00:00Z',
+          },
+        ],
+        1,
+      ),
+    );
+    renderWithProviders(<AuditLogsPage />);
+    const detailBtn = await screen.findByRole('button', { name: /Chi tiết/ });
+    await userEvent.click(detailBtn);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Thay đổi dữ liệu (Data Changes)')).toBeInTheDocument();
+    expect(screen.getByText('Trước thay đổi (Old Value)')).toBeInTheDocument();
+    expect(screen.getByText('Sau thay đổi (New Value)')).toBeInTheDocument();
+
+    const closeBtn = screen.getByRole('button', { name: 'Đóng hộp thoại' });
+    await userEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('bấm nút Xuất tất cả CSV gọi API tải đủ các trang dữ liệu', async () => {
+    vi.mocked(system.listAuditLogs).mockResolvedValue(
+      paged(
+        [
+          {
+            auditId: 10,
+            actorUserId: 1,
+            actorRole: 'ADMIN',
+            action: 'USER_SANCTION',
+            targetTable: 'Users',
+            targetId: '5',
+            note: 'Xử phạt',
+            createdAt: '2026-10-05T10:00:00Z',
+          },
+        ],
+        1,
+      ),
+    );
+    renderWithProviders(<AuditLogsPage />);
+    const exportBtn = await screen.findByRole('button', { name: /Xuất tất cả/i });
+    expect(exportBtn).toBeInTheDocument();
+    await userEvent.click(exportBtn);
+
+    // Kiểm tra đã gọi listAuditLogs với size 100 để lấy toàn bộ dữ liệu
+    expect(system.listAuditLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        size: 100,
+      }),
+    );
   });
 });

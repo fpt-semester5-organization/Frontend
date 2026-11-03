@@ -47,7 +47,7 @@ export function notifyApiError(error: unknown): ApiError {
   if (handledByInterceptor(error, apiError)) return apiError;
 
   if (apiError.status === 429) {
-    pushToast('warning', apiError.message || TOO_FAST_MESSAGE);
+    pushToast('warning', cleanUserMessage(apiError.message) || TOO_FAST_MESSAGE);
   } else if (apiError.status === 502 || apiError.status === 503) {
     pushToast('danger', apiError.message || SERVICE_DOWN_MESSAGE);
   } else if (apiError.status >= 500) {
@@ -64,3 +64,5 @@ export function notifyApiError(error: unknown): ApiError {
 
 export const notifySuccess = (message: string) => useUiStore.getState().pushToast('success', message);
 export const notifyInfo = (message: string) => useUiStore.getState().pushToast('info', message);
+export const notifyWarning = (message: string) => useUiStore.getState().pushToast('warning', message);
+export const notifyError = (message: string) => useUiStore.getState().pushToast('danger', message);

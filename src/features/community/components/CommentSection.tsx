@@ -3,15 +3,13 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useCountdown } from '@/hooks/useCountdown';
 import { useRequireMember } from '@/hooks/useRequireMember';
 import { toApiError } from '@/lib/apiError';
 import { formatNumber } from '@/lib/format';
-import { notifyInfo, notifySuccess } from '@/lib/notify';
+import { notifyInfo, notifySuccess, notifyWarning } from '@/lib/notify';
 import { useAuthStore } from '@/stores/auth.store';
 import { useCreateComment } from '../hooks/useCommentMutations';
 import { useComments } from '../hooks/useComments';
-import { COMMENT_COOLDOWN_SECONDS } from '../types/community.schemas';
 import type { ContentRef } from '../types/community.types';
 import { CommentForm } from './CommentForm';
 import { CommentItem, type CommentThreadContext } from './CommentItem';
@@ -33,24 +31,26 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
   const comments = useComments(target);
   const createComment = useCreateComment(target);
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const cooldownSeconds = useCountdown(cooldownUntil);
   const [reportCommentId, setReportCommentId] = useState<number | null>(null);
+  const [moderationNotice, setModerationNotice] = useState<string | null>(null);
 
   const { mutateAsync: createCommentAsync } = createComment;
 
   const submitComment = useCallback(
     async (content: string, parentCommentId: number | null) => {
-      const startCooldown = () => setCooldownUntil(Date.now() + COMMENT_COOLDOWN_SECONDS * 1000);
       try {
         const res = await createCommentAsync({ content, parentCommentId });
-        startCooldown();
-        // AI kiểm duyệt gắn cờ (≥ 85%) thì bình luận không hiển thị ngay (BR-USR-03).
-        if (res.data.status !== 'ACTIVE') notifyInfo('Bình luận của bạn đang chờ kiểm duyệt.');
-        else notifySuccess(res.message);
+        // AI kiểm duyệt gắn cờ (QUARANTINED_HIDDEN hoặc status !== 'ACTIVE')
+        if (res.data.status !== 'ACTIVE') {
+          const warningMsg =
+            'Bình luận của bạn có dấu hiệu vi phạm tiêu chuẩn cộng đồng và đang được tạm ẩn để quản trị viên kiểm duyệt, nên chưa hiển thị công khai.';
+          setModerationNotice(warningMsg);
+          notifyWarning('Bình luận của bạn vi phạm tiêu chuẩn cộng đồng và đang chờ kiểm duyệt nên chưa hiển thị công khai.');
+        } else {
+          setModerationNotice(null);
+          notifySuccess(res.message || 'Đã gửi bình luận thành công.');
+        }
       } catch (error) {
-        // ERR_COMMENT_TOO_FAST: khóa nút gửi và đếm ngược thời gian chờ (Business Rules mục 3).
-        if (toApiError(error).errorCode === 'ERR_COMMENT_TOO_FAST') startCooldown();
         throw error;
       }
     },
@@ -63,12 +63,11 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId
       authorId,
       currentUserId,
       canComment,
-      cooldownSeconds,
       submitReply: (parentId, content) => submitComment(content, parentId),
       requireMember,
       onReport: setReportCommentId,
     }),
-    [target, authorId, currentUserId, canComment, cooldownSeconds, submitComment, requireMember]
+    [target, authorId, currentUserId, canComment, submitComment, requireMember]
   );
 
   const items = comments.data?.pages.flatMap((page) => page.items) ?? [];
@@ -86,12 +85,36 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId
         </span>
       </h2>
 
+      {moderationNotice && (
+        <div
+          role="alert"
+          className="mb-space-md flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-container/20 p-space-md text-on-surface shadow-xs animate-in fade-in"
+        >
+          <Icon name="warning" className="mt-0.5 text-[22px] text-warning shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-label-md text-label-md font-bold text-warning">
+              Bình luận bị tạm ẩn do vi phạm tiêu chuẩn cộng đồng
+            </p>
+            <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+              {moderationNotice}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setModerationNotice(null)}
+            className="text-on-surface-variant hover:text-on-surface p-1 rounded-md"
+            aria-label="Đóng cảnh báo"
+          >
+            <Icon name="close" className="text-[18px]" />
+          </button>
+        </div>
+      )}
+
       <div className="mb-space-xl rounded-lg bg-surface-container-low p-space-md">
         {isMember && canComment && (
           <CommentForm
             label="Viết bình luận"
             submitLabel="Gửi bình luận"
-            cooldownSeconds={cooldownSeconds}
             onSubmit={(content) => submitComment(content, null)}
           />
         )}
