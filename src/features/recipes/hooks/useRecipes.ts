@@ -5,6 +5,7 @@ import {
   getRecipe,
   listCategories,
   listDietarySchools,
+  listFoods,
   listIngredients,
   listRecipes,
   listRelatedRecipes,
@@ -94,6 +95,17 @@ export function useFoodSearch(keyword: string, enabled: boolean) {
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: retryServerErrorsOnce,
+  });
+}
+
+/** Danh sách món ăn (GET /foods) phân trang và tìm kiếm. */
+export function useFoods(params?: { q?: string; page?: number; size?: number }, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['foods', 'list', params],
+    queryFn: () => listFoods(params),
+    staleTime: 60 * 1000,
+    retry: retryServerErrorsOnce,
+    enabled: options?.enabled ?? true,
   });
 }
 

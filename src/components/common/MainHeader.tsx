@@ -67,7 +67,12 @@ export const MainHeader: React.FC = () => {
                   aria-label="Tài khoản"
                   className="flex items-center gap-space-xs rounded-lg p-1 hover:bg-surface-container"
                 >
-                  <Avatar name={user.fullName} src={user.avatarUrl} size="sm" />
+                  <Avatar
+                    name={user.fullName}
+                    src={user.avatarUrl}
+                    size="sm"
+                    className="h-9 w-9 ring-2 ring-primary/25 shadow-xs"
+                  />
                   {user.isVip && (
                     <span className="rounded bg-secondary-fixed px-1.5 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed">
                       VIP

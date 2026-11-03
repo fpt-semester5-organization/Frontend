@@ -61,6 +61,12 @@ export async function searchFoods(keyword: string): Promise<Food[]> {
   return Array.isArray(res.data.data) ? res.data.data : [];
 }
 
+/** GET /foods — Danh sách món ăn khái niệm (Foods) có phân trang và tìm kiếm (FN-POST-01). */
+export async function listFoods(params?: { q?: string; page?: number; size?: number }): Promise<Paged<Food>> {
+  const res = await http.get<ApiEnvelope<Food[]>>('/foods', { params });
+  return toPaged(res.data, params ?? {});
+}
+
 /** GET /foods/{id} — tên món để hiện trên bộ lọc khi mở link `?food=`. */
 export async function getFood(id: number): Promise<Food> {
   const res = await http.get<ApiEnvelope<Food>>(`/foods/${id}`);
