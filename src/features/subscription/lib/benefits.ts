@@ -4,20 +4,47 @@ import type { TierBenefits } from '../types/subscription.types';
 /** Tính năng chỉ VIP mới có (BR-PAY-SUB-03), ngoài các hạn mức trong `benefitRows`. */
 export const VIP_EXCLUSIVE_FEATURES = ['Xem calo chi tiết của thực đơn tuần', 'Xuất PDF thực đơn và danh sách đi chợ'];
 
-/** Dòng quyền lợi để hiển thị. `chatPerDay` của VIP có thể null: hiển thị "tối đa N" theo BR (QUOTA.chatPerDay.vip). */
-export function benefitRows(benefits: { free?: TierBenefits; vip?: TierBenefits } | undefined) {
+export interface BenefitFallbackLimits {
+  chatDailyLimitFree?: number;
+  chatDailyLimitVip?: number;
+  chatLimitDailyFree?: number;
+  chatLimitDailyVip?: number;
+  mealPlanWeeklyLimitFree?: number;
+  mealPlanWeeklyLimitVip?: number;
+  fridgeScanDailyLimitFree?: number;
+  fridgeScanDailyLimitVip?: number;
+  fridgeScanLimitDailyFree?: number;
+  fridgeScanLimitDailyVip?: number;
+}
+
+/** Dòng quyền lợi để hiển thị. Hỗ trợ fallback từ dynamic settings hoặc QUOTA mặc định. */
+export function benefitRows(
+  benefits: { free?: TierBenefits; vip?: TierBenefits } | undefined,
+  fallbackLimits?: BenefitFallbackLimits
+) {
+  const defaultFreeChat = fallbackLimits?.chatLimitDailyFree ?? fallbackLimits?.chatDailyLimitFree ?? QUOTA.chatPerDay.free;
+  const defaultVipChat = fallbackLimits?.chatLimitDailyVip ?? fallbackLimits?.chatDailyLimitVip ?? QUOTA.chatPerDay.vip;
+  const defaultFreePlan = fallbackLimits?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
+  const defaultVipPlan = fallbackLimits?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
+  const defaultFreeFridge = fallbackLimits?.fridgeScanLimitDailyFree ?? fallbackLimits?.fridgeScanDailyLimitFree ?? QUOTA.fridgeImagesPerDay.free;
+  const defaultVipFridge = fallbackLimits?.fridgeScanLimitDailyVip ?? fallbackLimits?.fridgeScanDailyLimitVip ?? QUOTA.fridgeImagesPerDay.vip;
+
   const chatVip = benefits?.vip?.chatPerDay;
-  const vipChat = chatVip === null || chatVip === undefined || chatVip === '' ? `tối đa ${QUOTA.chatPerDay.vip}` : String(chatVip);
+  const vipChat =
+    chatVip === null || chatVip === undefined || chatVip === ''
+      ? `tối đa ${defaultVipChat}`
+      : String(chatVip);
+
   return {
     free: [
-      ['Trợ lý AI', `${benefits?.free?.chatPerDay ?? QUOTA.chatPerDay.free} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.free} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.free} ảnh/ngày`],
+      ['Trợ lý AI', `${benefits?.free?.chatPerDay ?? defaultFreeChat} câu/ngày`],
+      ['Thực đơn tuần', `${benefits?.free?.mealPlansPerWeek ?? defaultFreePlan} lần/tuần`],
+      ['Quét tủ lạnh', `${benefits?.free?.fridgePhotosPerDay ?? defaultFreeFridge} ảnh/ngày`],
     ] as [string, string][],
     vip: [
       ['Trợ lý AI', `${vipChat} câu/ngày`],
-      ['Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? QUOTA.mealPlanPerWeek.vip} lần/tuần`],
-      ['Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? QUOTA.fridgeImagesPerDay.vip} ảnh/ngày`],
+      ['Thực đơn tuần', `${benefits?.vip?.mealPlansPerWeek ?? defaultVipPlan} lần/tuần`],
+      ['Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? defaultVipFridge} ảnh/ngày`],
     ] as [string, string][],
   };
 }

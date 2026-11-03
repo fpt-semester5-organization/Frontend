@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { toApiError } from '@/lib/apiError';
 import { applyServerFieldErrors } from '@/lib/formErrors';
-import { getErrorMessage, notifyApiError, notifyInfo, notifySuccess } from '@/lib/notify';
+import { getErrorMessage, notifyApiError, notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { PostForm, type PostFormHelpers, type PostFormSubmission, type PostSubmitIntent } from '../components/PostForm';
@@ -44,18 +44,22 @@ const PostEditor: React.FC = () => {
     if (status === 'DRAFT') {
       notifySuccess(message || 'Đã lưu nháp.');
       navigate(PATHS.ME.CONTENT());
-    } else if (status === 'QUARANTINED_HIDDEN' || status === 'PENDING_REVIEW' || status === 'REJECTED') {
+    } else if (status === 'QUARANTINED_HIDDEN') {
+      // Bị AI gán cờ Red Flag vi phạm tiêu chuẩn cộng đồng (BR-ADM-CNT-002, BR-USR-03).
+      notifyError('Nội dung bị đánh Red-Flag do vi phạm tiêu chuẩn cộng đồng và đã bị tạm ẩn.');
+      navigate(PATHS.COMMUNITY.EDIT_POST(targetId), { replace: true });
+    } else if (status === 'PENDING_REVIEW' || status === 'REJECTED') {
       // Kiểm duyệt AI ≥ 85% hoặc bài sửa đang chờ duyệt lại (BR-ADM-CNT-002, BR-USR-REC-01).
       notifyInfo('Bài viết đang chờ kiểm duyệt nên chưa hiển thị công khai.');
       navigate(PATHS.ME.CONTENT());
     } else {
-      notifySuccess(message || 'Đã lưu bài viết.');
+      notifySuccess(message || 'Đã lưu và đăng bài viết thành công.');
       navigate(isEdit ? PATHS.COMMUNITY.POST_DETAIL(targetId) : PATHS.COMMUNITY.ROOT);
     }
   };
 
   const handleSubmit = async (
-    { values, dirty, file, intent }: PostFormSubmission,
+    { values, dirty, file, removeExistingMedia, intent }: PostFormSubmission,
     { setError, setFileError }: PostFormHelpers
   ) => {
     setSubmitting(intent);
@@ -80,6 +84,11 @@ const PostEditor: React.FC = () => {
         if (dirty.content) body.content = values.content;
         if (dirty.visibility && values.visibility !== 'KEEP') body.visibility = values.visibility;
 
+        // Nếu người dùng chọn xóa tệp đính kèm cũ và không chọn tải tệp mới:
+        if (removeExistingMedia && !file) {
+          body.imageUrl = '';
+        }
+
         if (Object.keys(body).length === 0 && !file) {
           notifyInfo('Bạn chưa thay đổi nội dung nào.');
           return;
@@ -93,7 +102,16 @@ const PostEditor: React.FC = () => {
 
       if (file) {
         try {
-          await uploadMedia.mutateAsync({ file, postId: targetId });
+          const uploadRes = await uploadMedia.mutateAsync({ file, postId: targetId });
+          if (uploadRes.data?.moderationStatus) {
+            status = uploadRes.data.moderationStatus as ModerationStatus;
+          }
+          if (uploadRes.data?.status === 'BANNED') {
+            status = 'QUARANTINED_HIDDEN';
+          }
+          if (uploadRes.message) {
+            message = uploadRes.message;
+          }
         } catch (uploadError) {
           if (isEdit) {
             if (isFileError(uploadError)) setFileError(getErrorMessage(uploadError));
@@ -180,14 +198,44 @@ const PostEditor: React.FC = () => {
     if (post.data.author.userId !== currentUserId) {
       return <EmptyState icon="lock" title="Bạn không thể sửa bài viết này" description="Chỉ tác giả mới được sửa bài viết." />;
     }
+    const isQuarantined = post.data.moderationStatus === 'QUARANTINED_HIDDEN';
+    const isPendingReview = post.data.moderationStatus === 'PENDING_REVIEW';
+
     return (
-      <PostForm
-        mode="edit"
-        defaultValues={{ title: post.data.title, content: post.data.content, visibility: 'KEEP' }}
-        submittingIntent={submitting}
-        onSubmit={handleSubmit}
-        cancelTo={PATHS.COMMUNITY.POST_DETAIL(postId)}
-      />
+      <div className="space-y-space-md">
+        {isQuarantined && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-error/30 bg-error-container/20 px-space-md py-2.5 text-error shadow-sm">
+            <Icon name="warning" className="text-[20px] shrink-0" />
+            <span className="font-label-md text-label-md font-semibold">
+              Bài viết đang tạm ẩn do chưa phù hợp tiêu chuẩn cộng đồng
+            </span>
+          </div>
+        )}
+
+        {isPendingReview && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-secondary/30 bg-secondary-container/20 px-space-md py-2.5 text-secondary shadow-sm">
+            <Icon name="hourglass_top" className="text-[20px] shrink-0" />
+            <span className="font-label-md text-label-md font-semibold">
+              Bài viết đang trong hàng đợi kiểm duyệt
+            </span>
+          </div>
+        )}
+
+        <PostForm
+          mode="edit"
+          defaultValues={{ title: post.data.title, content: post.data.content, visibility: 'KEEP' }}
+          initialImageUrl={post.data.imageUrl}
+          initialVideoUrl={
+            post.data.videos?.[0]?.videoUrl ||
+            (post.data.imageUrl?.includes('/video/upload/') ? post.data.imageUrl.replace(/\.jpg$/i, '.mp4') : undefined)
+          }
+          initialVisibility={post.data.visibility}
+          isQuarantined={isQuarantined}
+          submittingIntent={submitting}
+          onSubmit={handleSubmit}
+          cancelTo={PATHS.COMMUNITY.POST_DETAIL(postId)}
+        />
+      </div>
     );
   };
 

@@ -47,6 +47,8 @@ type PostDetailRaw = DeepRequired<Schemas['GetPostResponse']['data']>;
 /** GET /posts/{id} (FN-POST-06). */
 export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes' | 'author'> & {
   imageUrl: string | null;
+  moderationStatus?: ModerationStatus | null;
+  visibility?: 'PUBLIC' | 'PRIVATE' | null;
   author: {
     userId: number;
     fullName: string;
@@ -71,7 +73,9 @@ export type PostComment = Omit<PostCommentRaw, 'parentCommentId' | 'replies' | '
 };
 
 export type CreatePostBody = Schemas['CreatePostRequest'];
-export type UpdatePostBody = Schemas['UpdatePostRequest'];
+export type UpdatePostBody = Schemas['UpdatePostRequest'] & {
+  imageUrl?: string | null;
+};
 export type PostVisibility = NonNullable<CreatePostBody['visibility']>;
 export type PostMutationResult = DeepRequired<Schemas['CreatePostResponse']['data']>;
 export type ModerationStatus = PostMutationResult['moderationStatus'];
@@ -93,6 +97,7 @@ export type CreateReportResult = DeepRequired<Schemas['CreateReportResponse']['d
 export type UploadMediaResult = DeepRequired<Schemas['CreateVideoResponse']['data']> & {
   imageUrl?: string;
   videoUrl?: string;
+  moderationStatus?: string;
 };
 
 export type FeedItemKind = 'POST' | 'RECIPE';
@@ -117,47 +122,77 @@ export interface CommunityFeedItem {
   hasVideo?: boolean;
   videoId?: number;
   videoUrl?: string;
+  moderationStatus?: string | null;
 }
 
-export const fromPost = (p: PostListItem): CommunityFeedItem => ({
-  key: `POST-${p.postId}`,
-  kind: 'POST',
-  id: p.postId,
-  title: p.title,
-  imageUrl: p.imageUrl,
-  authorName: p.authorName,
-  authorAvatarUrl: p.authorAvatarUrl,
-  createdAt: p.createdAt,
-  voteCount: p.voteCount,
-  commentCount: p.commentCount,
-  type: (p as { type?: string }).type,
-  hasVideo: Boolean(
+export const fromPost = (p: PostListItem): CommunityFeedItem => {
+  const recipeId = (p as { recipeId?: number | null }).recipeId;
+  const isRecipeRep = Boolean(recipeId && recipeId > 0);
+  const isVideo = Boolean(
     (p as { hasVideo?: boolean }).hasVideo ||
     (p as { type?: string }).type === 'VIDEO' ||
-    (p as { videoUrl?: string }).videoUrl
-  ),
-  videoId: (p as { videoId?: number }).videoId,
-  videoUrl: (p as { videoUrl?: string }).videoUrl,
-});
+    (p as { videoUrl?: string }).videoUrl ||
+    p.imageUrl?.includes('/video/upload/') ||
+    p.imageUrl?.match(/\.(mp4|mov)$/i)
+  );
+  const derivedVideoUrl =
+    (p as { videoUrl?: string }).videoUrl ||
+    (p.imageUrl?.includes('/video/upload/') || p.imageUrl?.match(/\.(mp4|mov)$/i)
+      ? p.imageUrl.replace(/\.jpg$/i, '.mp4')
+      : undefined);
 
-export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').RecipeListItem): CommunityFeedItem => ({
-  key: `RECIPE-${r.recipeId}`,
-  kind: 'RECIPE',
-  id: r.recipeId,
-  title: r.title,
-  imageUrl: r.imageUrl,
-  authorName: 'Bếp Chay VeggieLife',
-  authorAvatarUrl: '/logo.png',
-  voteCount: r.voteCount,
-  cookTimeMinutes: r.cookTimeMinutes,
-  caloriesKcal: r.caloriesKcal,
-  dietarySchool: r.dietarySchool,
-  isVerified: r.isVerified,
-  type: r.type,
-  hasVideo: Boolean(r.type === 'VIDEO' || (r as { videoUrl?: string }).videoUrl || (r as { videoId?: number }).videoId),
-  videoId: (r as { videoId?: number }).videoId,
-  videoUrl: (r as { videoUrl?: string }).videoUrl,
-});
+  return {
+    key: isRecipeRep ? `RECIPE-${recipeId}` : `POST-${p.postId}`,
+    kind: isRecipeRep ? 'RECIPE' : 'POST',
+    id: isRecipeRep ? recipeId! : p.postId,
+    title: p.title,
+    imageUrl: p.imageUrl,
+    authorName: p.authorName,
+    authorAvatarUrl: p.authorAvatarUrl,
+    createdAt: p.createdAt,
+    voteCount: p.voteCount,
+    commentCount: p.commentCount,
+    moderationStatus: p.moderationStatus,
+    type: isVideo ? 'VIDEO' : isRecipeRep ? 'RECIPE' : ((p as { type?: string }).type || 'POST'),
+    hasVideo: isVideo,
+    videoId: (p as { videoId?: number }).videoId,
+    videoUrl: derivedVideoUrl,
+  };
+};
+
+export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').RecipeListItem): CommunityFeedItem => {
+  const isVideo = Boolean(
+    r.type === 'VIDEO' ||
+    (r as { videoUrl?: string }).videoUrl ||
+    (r as { videoId?: number }).videoId ||
+    r.imageUrl?.includes('/video/upload/') ||
+    r.imageUrl?.match(/\.(mp4|mov)$/i)
+  );
+  const derivedVideoUrl =
+    (r as { videoUrl?: string }).videoUrl ||
+    (r.imageUrl?.includes('/video/upload/') || r.imageUrl?.match(/\.(mp4|mov)$/i)
+      ? r.imageUrl.replace(/\.jpg$/i, '.mp4')
+      : undefined);
+
+  return {
+    key: `RECIPE-${r.recipeId}`,
+    kind: 'RECIPE',
+    id: r.recipeId,
+    title: r.title,
+    imageUrl: r.imageUrl,
+    authorName: (r as { authorName?: string }).authorName || 'Bếp Chay VeggieLife',
+    authorAvatarUrl: (r as { authorAvatarUrl?: string }).authorAvatarUrl || '/logo.png',
+    voteCount: r.voteCount,
+    cookTimeMinutes: r.cookTimeMinutes,
+    caloriesKcal: r.caloriesKcal,
+    dietarySchool: r.dietarySchool,
+    isVerified: r.isVerified,
+    type: isVideo ? 'VIDEO' : 'RECIPE',
+    hasVideo: isVideo,
+    videoId: (r as { videoId?: number }).videoId,
+    videoUrl: derivedVideoUrl,
+  };
+};
 
 /** Trộn xen kẽ hai mảng (bài viết, công thức) để feed Tất cả luôn đa dạng nội dung. */
 export function interleaveItems<T>(a: T[], b: T[]): T[] {

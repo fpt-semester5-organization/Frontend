@@ -157,6 +157,44 @@ export const KNOWLEDGE_SOURCE_LABEL: Record<KnowledgeSource, string> = {
   INGREDIENT: 'Nguyên liệu',
 };
 
+export const formatKnowledgeSourceLabel = (sourceKey: string): string => {
+  if (!sourceKey) return 'Nguồn khác';
+  const upper = sourceKey.trim().toUpperCase() as KnowledgeSource;
+  return KNOWLEDGE_SOURCE_LABEL[upper] ?? sourceKey;
+};
+
+export interface KnowledgeSourceMeta {
+  label: string;
+  icon: string;
+  color: string;
+  barColor: string;
+}
+
+export const getKnowledgeSourceMeta = (sourceKey: string): KnowledgeSourceMeta => {
+  const upper = (sourceKey || '').trim().toUpperCase();
+  const label = formatKnowledgeSourceLabel(upper);
+  switch (upper) {
+    case 'NUTRITION_DOC':
+      return { label, icon: 'menu_book', color: 'text-emerald-600 dark:text-emerald-400', barColor: 'bg-emerald-500' };
+    case 'RECIPE':
+      return { label, icon: 'restaurant_menu', color: 'text-amber-600 dark:text-amber-400', barColor: 'bg-amber-500' };
+    case 'POST':
+      return { label, icon: 'article', color: 'text-blue-600 dark:text-blue-400', barColor: 'bg-blue-500' };
+    case 'E_NUMBER':
+      return { label, icon: 'science', color: 'text-purple-600 dark:text-purple-400', barColor: 'bg-purple-500' };
+    case 'INGREDIENT':
+      return { label, icon: 'eco', color: 'text-lime-600 dark:text-lime-400', barColor: 'bg-lime-500' };
+    case 'ALLERGEN':
+      return { label, icon: 'warning', color: 'text-rose-600 dark:text-rose-400', barColor: 'bg-rose-500' };
+    case 'VIDEO_TRANSCRIPT':
+      return { label, icon: 'videocam', color: 'text-cyan-600 dark:text-cyan-400', barColor: 'bg-cyan-500' };
+    case 'VIDEO_RECIPE':
+      return { label, icon: 'smart_display', color: 'text-indigo-600 dark:text-indigo-400', barColor: 'bg-indigo-500' };
+    default:
+      return { label, icon: 'bookmark', color: 'text-primary', barColor: 'bg-primary' };
+  }
+};
+
 /** Trạng thái ngắt mạch AI (BR-ADM-AI-002). */
 export const CIRCUIT_STATE: Record<string, { label: string; tone: Tone; hint: string }> = {
   CLOSED: { label: 'Bình thường', tone: 'success', hint: 'Các tính năng AI đang gọi dịch vụ bình thường.' },

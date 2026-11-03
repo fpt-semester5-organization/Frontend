@@ -71,7 +71,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
     const resolvedVideoUrl =
       item?.videoUrl ??
       (post as { videoUrl?: string } | undefined)?.videoUrl ??
-      (imageUrl?.includes('/video/upload/') ? imageUrl.replace(/\.jpg$/i, '.mp4') : undefined);
+      (imageUrl?.includes('/video/upload/') || imageUrl?.match(/\.(mp4|mov)$/i) ? imageUrl.replace(/\.jpg$/i, '.mp4') : undefined);
 
     const hasVideoProp = Boolean(
       item?.hasVideo ||

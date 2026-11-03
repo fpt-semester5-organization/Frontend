@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { QUOTA } from '@/constants/quota';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { apiErrorMessage } from '@/api/http';
 import { toApiError } from '@/lib/apiError';
 import { formatNumber } from '@/lib/format';
@@ -29,6 +30,7 @@ import {
   useDeleteFridgeItem,
   useFridgeDetection,
   useFridgeItems,
+  useFridgeQuota,
   useRecipeSuggestions,
 } from '../hooks/useFridge';
 import { compressImage } from '../lib/compressImage';
@@ -156,6 +158,8 @@ export const FridgePage: React.FC = () => {
   const [deletingItem, setDeletingItem] = useState<FridgeItem | null>(null);
 
   // Hooks dữ liệu
+  const { data: publicSettings } = usePublicSettings();
+  const fridgeQuotaQuery = useFridgeQuota();
   const detectMutation = useFridgeDetection();
   const itemsQuery = useFridgeItems(filter === 'ALL' ? undefined : filter);
   const allItemsQuery = useFridgeItems();
@@ -441,7 +445,11 @@ export const FridgePage: React.FC = () => {
   }, [authed, itemsQuery.data, searchQuery]);
 
   // Hạn mức hiển thị
-  const imageLimit = vip ? QUOTA.fridgeImagesPerDay.vip : QUOTA.fridgeImagesPerDay.free;
+  const activeQuota = memberQuota ?? fridgeQuotaQuery.data;
+  const dynamicFridgeVip = publicSettings?.fridgeScanLimitDailyVip ?? QUOTA.fridgeImagesPerDay.vip;
+  const dynamicFridgeFree = publicSettings?.fridgeScanLimitDailyFree ?? QUOTA.fridgeImagesPerDay.free;
+  const dynamicGuestLimit = publicSettings?.chatLimitDailyGuest ?? QUOTA.guest.ai;
+  const imageLimit = vip ? dynamicFridgeVip : dynamicFridgeFree;
 
   // Xóa nguyên liệu khỏi tủ lạnh ảo
   const handleConfirmDelete = () => {
@@ -487,9 +495,9 @@ export const FridgePage: React.FC = () => {
             <Icon name="speed" className="text-[18px] text-primary" />
             <div className="font-label-md text-label-md">
               {authed ? (
-                memberQuota ? (
+                activeQuota ? (
                   <span>
-                    Còn <strong className="text-primary">{memberQuota.remaining}/{memberQuota.limit}</strong> lượt hôm nay
+                    Còn <strong className="text-primary">{activeQuota.remaining}/{activeQuota.limit}</strong> lượt hôm nay
                   </span>
                 ) : (
                   <span>
@@ -498,11 +506,11 @@ export const FridgePage: React.FC = () => {
                 )
               ) : typeof guestAiLeft === 'number' ? (
                 <span>
-                  Dùng thử: Còn <strong className="text-amber-700 dark:text-amber-400">{guestAiLeft}/{QUOTA.guest.ai}</strong> lượt
+                  Dùng thử: Còn <strong className="text-amber-700 dark:text-amber-400">{guestAiLeft}/{dynamicGuestLimit}</strong> lượt
                 </span>
               ) : (
                 <span>
-                  Dùng thử: <strong className="text-amber-700 dark:text-amber-400">{QUOTA.guest.ai} lượt</strong>
+                  Dùng thử: <strong className="text-amber-700 dark:text-amber-400">{dynamicGuestLimit} lượt</strong>
                 </span>
               )}
             </div>

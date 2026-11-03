@@ -3,16 +3,19 @@ import http, { unwrap, unwrapPaged } from '@/api/http';
 import type { ApiEnvelope } from '@/api/types';
 import type {
   AdminIngredient,
+  AdminPaymentFilters,
+  AdminPaymentTransaction,
   AdminPlan,
+  AdminSurveyFilters,
+  AdminSurveyListResult,
   AdminUser,
   AdminUserContents,
   AdminUserContentsFilters,
   AdminUserFilters,
-  AdminVenue,
-  AdminVenueFilters,
   AiMetrics,
   AiMetricsFilters,
   Allergen,
+  ApprovePaymentResult,
   CreateAllergenBody,
   CreateENumberBody,
   CreateIngredientBody,
@@ -27,14 +30,18 @@ import type {
   LlmopsFilters,
   LlmopsLogFilters,
   LlmopsLogsResponse,
+  NutritionDocument,
   ReconcileBody,
   ReconcileResult,
+  SystemSetting,
   UpdateDietarySchoolBody,
   UpdateENumberBody,
   UpdateIngredientBody,
   UpdatePlanBody,
+  UpdateSystemSettingBody,
   UpdateUserStatusBody,
   UpdateUserStatusResult,
+  UploadNutritionDocumentPayload,
   WriteResult,
 } from '../types/admin.types';
 
@@ -132,22 +139,39 @@ export const createAdminPlan = (body: CreatePlanBody) => write<{ planId: number 
 export const updateAdminPlan = (id: number, body: UpdatePlanBody) =>
   write<{ planId: number; priceVnd: number }>(http.put(`/admin/subscription-plans/${id}`, body));
 
+/** DELETE /admin/subscription-plans/{id} — FN-ADM-13: Xóa gói nếu chưa có giao dịch, tự động ẩn nếu đã có giao dịch. */
+export const deleteAdminPlan = (id: number) =>
+  write<unknown>(http.delete(`/admin/subscription-plans/${id}`));
+
 /** POST /admin/payments/{id}/reconcile — FN-ADM-13 (BR-ADM-PAY-002), mỗi giao dịch chỉ đối soát 1 lần. */
 export const reconcileAdminPayment = (transactionId: number, body: ReconcileBody) =>
   write<ReconcileResult>(http.post(`/admin/payments/${transactionId}/reconcile`, body));
 
-// ---------- SCR-45 Quán chay ----------
+/** GET /admin/payments — FN-ADM-13: danh sách giao dịch nạp VIP phân trang, hỗ trợ tìm kiếm & lọc. */
+export const listAdminPayments = (filters: AdminPaymentFilters) =>
+  unwrapPaged<AdminPaymentTransaction>(http.get('/admin/payments', { params: compactParams(filters) }));
 
-/** GET /admin/venues — FN-ADM-14 (cả quán đang ẩn). */
-export const listAdminVenues = (filters: AdminVenueFilters) =>
-  unwrapPaged<AdminVenue>(http.get('/admin/venues', { params: compactParams(filters) }));
+/** POST /admin/payments/{id}/approve — FN-ADM-13: duyệt thủ công giao dịch chuyển khoản khi tiền đã về tài khoản. */
+export const approveAdminPayment = (transactionId: number) =>
+  write<ApprovePaymentResult>(http.post(`/admin/payments/${transactionId}/approve`));
 
-/** PUT /admin/venues/{id} — FN-ADM-14: ẩn/hiện quán (BR-ADM-MAP-001). */
-export const updateAdminVenue = (id: number, isActive: boolean) =>
-  write<{ venueId: number; isActive: boolean }>(http.put(`/admin/venues/${id}`, { isActive }));
+// ---------- Cấu hình hệ thống động (System Settings) ----------
 
-/** POST /admin/venues/sync — FN-ADM-14: xếp job đồng bộ nguồn theo tỉnh/thành (202). */
-export const syncAdminVenues = (province: string) => write<{ jobId: string }>(http.post('/admin/venues/sync', { province }));
+/** GET /admin/settings — FN-ADM-20: lấy toàn bộ hoặc lọc theo danh mục chỉ số hệ thống. */
+export const listAdminSettings = (category?: string) =>
+  unwrap<SystemSetting[]>(http.get('/admin/settings', { params: compactParams({ category }) }));
+
+/** GET /admin/settings/{key} — FN-ADM-20: chi tiết một chỉ số hệ thống. */
+export const getAdminSetting = (key: string) =>
+  unwrap<SystemSetting>(http.get(`/admin/settings/${encodeURIComponent(key)}`));
+
+/** PUT /admin/settings/{key} — FN-ADM-20: cập nhật chỉ số hệ thống. */
+export const updateAdminSetting = (key: string, body: UpdateSystemSettingBody) =>
+  write<SystemSetting>(http.put(`/admin/settings/${encodeURIComponent(key)}`, body));
+
+/** POST /admin/settings/{key}/reset — FN-ADM-20: khôi phục chỉ số về giá trị mặc định. */
+export const resetAdminSetting = (key: string) =>
+  write<SystemSetting>(http.post(`/admin/settings/${encodeURIComponent(key)}/reset`));
 
 // ---------- SCR-41 Giám sát AI ----------
 
@@ -174,3 +198,35 @@ export async function getAdminKnowledgeStatus(): Promise<KnowledgeStatus> {
 /** POST /admin/knowledge/reindex — FN-CHAT-07: xếp job đồng bộ lại (202). */
 export const reindexAdminKnowledge = (scope: KnowledgeScope) =>
   write<{ jobId?: string }>(http.post('/admin/knowledge/reindex', { scope }));
+
+/** GET /admin/knowledge/documents — FN-CHAT-07: danh sách tài liệu dinh dưỡng PDF. */
+export const listAdminNutritionDocuments = () =>
+  unwrap<NutritionDocument[]>(http.get('/admin/knowledge/documents'));
+
+/** POST /admin/knowledge/documents/upload — FN-CHAT-07: tải lên và vector hoá PDF vào Qdrant. */
+export async function uploadAdminNutritionDocument(payload: UploadNutritionDocumentPayload): Promise<NutritionDocument> {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  formData.append('title', payload.title);
+  if (payload.author) {
+    formData.append('author', payload.author);
+  }
+  return unwrap<NutritionDocument>(
+    http.post('/admin/knowledge/documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  );
+}
+
+/** PUT /admin/knowledge/documents/{id}/status — FN-CHAT-07: bật/tắt trạng thái sử dụng tài liệu. */
+export const updateAdminNutritionDocumentStatus = (id: string, isActive: boolean) =>
+  write<NutritionDocument>(http.put(`/admin/knowledge/documents/${encodeURIComponent(id)}/status`, { isActive }));
+
+/** DELETE /admin/knowledge/documents/{id} — FN-CHAT-07: xóa tài liệu khỏi Vector DB. */
+export const deleteAdminNutritionDocument = (id: string) =>
+  write<null>(http.delete(`/admin/knowledge/documents/${encodeURIComponent(id)}`));
+
+/** GET /admin/ai/surveys — FN-ADM-15, FN-CHAT-06: danh sách khảo sát phản hồi Chatbot AI. */
+export const listAdminAiSurveys = (filters: AdminSurveyFilters) =>
+  unwrap<AdminSurveyListResult>(http.get('/admin/ai/surveys', { params: compactParams(filters) }));
+

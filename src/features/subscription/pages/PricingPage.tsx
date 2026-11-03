@@ -9,13 +9,15 @@ import { selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { usePlans } from '../hooks/useSubscription';
 import { benefitRows, perThirtyDays } from '../lib/benefits';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 
 export function PricingPage() {
   const isVip = useAuthStore(selectIsVip);
   const q = usePlans();
+  const { data: publicSettings } = usePublicSettings();
   const plans = (q.data?.plans ?? []).filter((p) => p.isActive).sort((a, b) => a.durationDays - b.durationDays);
   const best = plans.length > 1 ? plans.reduce((a, b) => (perThirtyDays(b.priceVnd, b.durationDays) < perThirtyDays(a.priceVnd, a.durationDays) ? b : a)) : null;
-  const rows = benefitRows(q.data?.benefits);
+  const rows = benefitRows(q.data?.benefits, publicSettings);
 
   return (
     <main className="min-h-screen w-full bg-background">

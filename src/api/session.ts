@@ -25,9 +25,10 @@ export function syncRoleClaims(token: string): boolean {
   const { user, updateUser } = useAuthStore.getState();
   if (!user) return false;
   const claims = decodeJwtClaims(token);
-  const role = claims.role === 'MEMBER' || claims.role === 'VIP' || claims.role === 'ADMIN' ? claims.role : user.role;
-  const isVip = claims.isVip ?? user.isVip;
-  if (role === user.role && isVip === user.isVip) return false;
+  const upperRole = claims.role?.toUpperCase();
+  const role = upperRole === 'MEMBER' || upperRole === 'VIP' || upperRole === 'ADMIN' ? upperRole : user.role;
+  const isVip = typeof claims.isVip === 'boolean' ? claims.isVip : user.isVip;
+  if (role === user.role && Boolean(isVip) === Boolean(user.isVip)) return false;
   updateUser({ role, isVip });
   void queryClient.invalidateQueries();
   return true;

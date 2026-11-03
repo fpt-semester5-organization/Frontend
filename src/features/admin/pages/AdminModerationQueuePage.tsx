@@ -89,6 +89,14 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
       reportId: item.reportId,
       decision,
       label: `${TARGET_LABEL[item.targetType] ?? item.targetType} #${item.targetId}`,
+      targetType: item.targetType,
+      targetId: item.targetId,
+      authorName: item.authorName,
+      violationType: item.violationType,
+      targetTitle: item.targetTitle,
+      targetContent: item.targetContent,
+      evidenceSummary: item.evidenceSummary,
+      reportSource: item.reportSource,
     });
   };
 
@@ -673,8 +681,17 @@ function OriginalContentRenderer({ item }: { item: ModerationItem }) {
     }
     if (recipeQuery.isError || !recipeQuery.data) {
       return (
-        <div className="p-3 rounded-lg bg-surface-container-low text-xs text-on-surface-variant">
-          Không thể tải chi tiết công thức từ máy chủ hoặc công thức đã bị xóa.
+        <div className="flex flex-col gap-2 rounded-xl border border-outline-variant/60 bg-surface-container-low p-3.5 text-xs text-on-surface-variant">
+          <div className="flex items-center gap-1.5 text-error font-medium">
+            <span className="material-symbols-outlined text-[16px]">info</span>
+            <span>Không thể tải đầy đủ chi tiết công thức từ máy chủ hoặc công thức đã bị xóa.</span>
+          </div>
+          {(item.targetTitle || item.targetContent) && (
+            <div className="rounded-lg bg-surface-container-lowest p-2.5 border border-outline-variant/30 flex flex-col gap-1 text-on-surface">
+              {item.targetTitle && <div className="font-bold text-sm">{item.targetTitle}</div>}
+              {item.targetContent && <div className="text-xs whitespace-pre-wrap leading-relaxed">{item.targetContent}</div>}
+            </div>
+          )}
         </div>
       );
     }
@@ -762,8 +779,17 @@ function OriginalContentRenderer({ item }: { item: ModerationItem }) {
     }
     if (postQuery.isError || !postQuery.data) {
       return (
-        <div className="p-3 rounded-lg bg-surface-container-low text-xs text-on-surface-variant">
-          Không thể tải chi tiết bài viết từ máy chủ hoặc bài viết đã bị xóa.
+        <div className="flex flex-col gap-2 rounded-xl border border-outline-variant/60 bg-surface-container-low p-3.5 text-xs text-on-surface-variant">
+          <div className="flex items-center gap-1.5 text-error font-medium">
+            <span className="material-symbols-outlined text-[16px]">info</span>
+            <span>Không thể tải đầy đủ chi tiết bài viết từ máy chủ hoặc bài viết đã bị xóa.</span>
+          </div>
+          {(item.targetTitle || item.targetContent) && (
+            <div className="rounded-lg bg-surface-container-lowest p-2.5 border border-outline-variant/30 flex flex-col gap-1 text-on-surface">
+              {item.targetTitle && <div className="font-bold text-sm">{item.targetTitle}</div>}
+              {item.targetContent && <div className="text-xs whitespace-pre-wrap leading-relaxed">{item.targetContent}</div>}
+            </div>
+          )}
         </div>
       );
     }

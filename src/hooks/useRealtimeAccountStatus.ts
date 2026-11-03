@@ -7,11 +7,11 @@ import { useAuthStore } from '@/stores/auth.store';
  * Tự động kết nối khi đăng nhập và ngắt kết nối khi đăng xuất.
  */
 export function useRealtimeAccountStatus(): void {
-  const accessToken = useAuthStore((s) => s.accessToken);
-  const user = useAuthStore((s) => s.user);
+  const userId = useAuthStore((s) => s.user?.userId);
+  const hasToken = useAuthStore((s) => !!s.accessToken);
 
   useEffect(() => {
-    if (accessToken && user) {
+    if (hasToken && userId) {
       const cleanup = initRealtimeAuth();
       return () => {
         cleanup();
@@ -19,6 +19,6 @@ export function useRealtimeAccountStatus(): void {
     } else {
       stopRealtimeAuth();
     }
-  }, [accessToken, user]);
+  }, [hasToken, userId]);
 }
 

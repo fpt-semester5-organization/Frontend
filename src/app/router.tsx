@@ -69,7 +69,6 @@ const AdminDietarySchoolsPage = lazy(() => import('@/features/admin/pages/AdminD
 const AdminENumbersPage = lazy(() => import('@/features/admin/pages/AdminENumbersPage'));
 const AdminIngredientsPage = lazy(() => import('@/features/admin/pages/AdminIngredientsPage'));
 const AdminSubscriptionPlansPage = lazy(() => import('@/features/admin/pages/AdminSubscriptionPlansPage'));
-const AdminVenuesPage = lazy(() => import('@/features/admin/pages/AdminVenuesPage'));
 
 const router = createBrowserRouter([
   {
@@ -216,7 +215,6 @@ const router = createBrowserRouter([
               { path: PATHS.ADMIN.E_NUMBERS, element: <AdminENumbersPage /> },
               { path: PATHS.ADMIN.INGREDIENTS, element: <AdminIngredientsPage /> },
               { path: PATHS.ADMIN.SUBSCRIPTION_PLANS, element: <AdminSubscriptionPlansPage /> },
-              { path: PATHS.ADMIN.VENUES, element: <AdminVenuesPage /> },
               { path: PATHS.ADMIN.AUDIT_LOGS, element: <AdminAuditLogs /> },
               { path: '*', element: <NotFoundPage /> },
             ],

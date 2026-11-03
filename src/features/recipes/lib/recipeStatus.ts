@@ -21,10 +21,10 @@ export const RECIPE_STATUS_META: Record<MyRecipeStatus, { label: string; icon: s
     hint: 'Đang chờ kiểm duyệt nên chưa hiển thị công khai.',
   },
   QUARANTINED_HIDDEN: {
-    label: 'Đang bị ẩn',
-    icon: 'visibility_off',
-    className: 'bg-warning-container text-warning',
-    hint: 'Bị báo cáo hoặc AI gắn cờ, đang chờ quản trị viên xem xét nên tạm thời chưa sửa được.',
+    label: 'Tạm ẩn do vi phạm',
+    icon: 'warning',
+    className: 'bg-error-container text-on-error-container',
+    hint: 'Chưa phù hợp tiêu chuẩn cộng đồng. Bạn hãy sửa hoặc thay thế ảnh/video và nội dung vi phạm.',
   },
   REJECTED: {
     label: 'Bị từ chối',
@@ -40,9 +40,9 @@ export const RECIPE_STATUS_META: Record<MyRecipeStatus, { label: string; icon: s
   },
 };
 
-/** QUARANTINED_HIDDEN trả 409 ERR_RECIPE_LOCKED; ARCHIVED/DELETED trả 404 khi PUT (FN-POST-04). */
+/** Tác giả có thể sửa công thức ở mọi trạng thái trừ ARCHIVED/DELETED/QUARANTINED_HIDDEN (FN-POST-04). */
 export const canEditRecipe = (status: RecipeStatus | undefined) =>
-  status !== 'QUARANTINED_HIDDEN' && status !== 'ARCHIVED' && status !== 'DELETED';
+  status !== 'ARCHIVED' && status !== 'DELETED' && status !== 'QUARANTINED_HIDDEN';
 
 /** Bản nháp và bản bị từ chối còn bước "gửi duyệt" (PUT submit = true); bản đã gửi thì sửa là kiểm duyệt lại. */
 export const isDraftLike = (status: RecipeStatus | undefined) => status === 'DRAFT' || status === 'REJECTED';

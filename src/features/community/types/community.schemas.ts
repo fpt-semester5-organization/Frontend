@@ -10,8 +10,8 @@ export const COMMENT_MAX = 500;
 export const REPORT_EVIDENCE_MIN = 10;
 export const REPORT_EVIDENCE_MAX = 500;
 export const KEYWORD_MAX = 100;
-/** Giãn cách tối thiểu giữa 2 bình luận (BR-USR-04). */
-export const COMMENT_COOLDOWN_SECONDS = 15;
+/** Giãn cách tối thiểu giữa 2 bình luận (đã bỏ cooldown). */
+export const COMMENT_COOLDOWN_SECONDS = 0;
 
 /** visibility = KEEP chỉ dùng khi sửa bài: GET /posts/{id} không trả visibility nên không gửi field này. */
 export const postFormSchema = z.object({

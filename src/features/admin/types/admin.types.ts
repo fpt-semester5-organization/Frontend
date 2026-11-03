@@ -95,10 +95,77 @@ export interface Allergen {
 
 export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResponse']['data']>>;
 export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'];
-export type UpdatePlanBody = Schemas['UpdateAdminSubscriptionPlanRequest'];
+export type UpdatePlanBody = {
+  planName?: string;
+  durationDays?: number;
+  priceVnd?: number;
+  isActive?: boolean;
+};
 export type ReconcileAction = Schemas['ReconcileAdminPaymentRequest']['action'];
 export type ReconcileBody = Schemas['ReconcileAdminPaymentRequest'];
 export type ReconcileResult = DeepRequired<Schemas['ReconcileAdminPaymentResponse']['data']>;
+
+export interface AdminPaymentTransaction {
+  transactionId: number;
+  partnerTransactionCode: string;
+  userId: number;
+  userEmail: string;
+  userFullName: string;
+  planId: number;
+  planName: string;
+  planDurationDays: number;
+  gatewayProvider: string;
+  amountVnd: number;
+  transactionStatus: 'PENDING' | 'SUCCESS' | 'EXPIRED' | 'FAILED' | 'REFUNDED' | string;
+  createdAt: string;
+  completedAt?: string | null;
+  startsAt: string;
+  endsAt: string;
+  receiptUrl?: string | null;
+  canApprove: boolean;
+  canReconcile: boolean;
+}
+
+export interface AdminPaymentFilters {
+  page?: number;
+  size?: number;
+  status?: string;
+  gateway?: string;
+  keyword?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface ApprovePaymentResult {
+  transactionId: number;
+  partnerTransactionCode: string;
+  userId: number;
+  status: string;
+  planName: string;
+  vipEndsAt: string;
+  receiptUrl?: string | null;
+}
+
+// ---------- Cấu hình hệ thống (System Settings - FN-ADM-20) ----------
+
+export type SettingCategory = 'MEAL_PLAN' | 'AI_QUOTA' | 'LLMOPS' | 'COMMUNITY' | 'GENERAL' | string;
+
+export interface SystemSetting {
+  settingKey: string;
+  settingValue: string;
+  defaultValue: string;
+  dataType: 'INT' | 'DECIMAL' | 'BOOLEAN' | 'STRING' | string;
+  category: SettingCategory;
+  description?: string | null;
+  legalDocumentsUrl?: string | null;
+  updatedAt: string;
+  updatedBy?: number | null;
+}
+
+export interface UpdateSystemSettingBody {
+  settingValue: string;
+  legalDocumentsUrl?: string | null;
+}
 
 // ---------- Quán chay (SCR-45: FN-ADM-14) ----------
 
@@ -142,8 +209,27 @@ export interface TopSpender {
   requestCount: number;
 }
 
+export interface CostCell {
+  costUsd: number;
+  tokens: number;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
+export interface HourlyCost {
+  hour: number;
+  costUsd: number;
+  tokens: number;
+}
+
 export type LlmopsDashboard = Omit<DeepRequired<Schemas['GetAdminLlmopsDashboardResponse']['data']>, 'series'> & {
   series: CostPoint[];
+  dates?: string[];
+  features?: string[];
+  dayTotals?: Record<string, CostCell>;
+  featureTotals?: Record<string, CostCell>;
+  total?: CostCell;
+  hourlyCosts?: HourlyCost[];
   totalPromptTokens?: number;
   totalCompletionTokens?: number;
   promptCostUsd?: number;
@@ -187,11 +273,87 @@ export interface LlmopsLogsResponse {
 }
 
 export type KnowledgeScope = NonNullable<Schemas['CreateAdminKnowledgeReindexRequest']['scope']>;
-export type KnowledgeSource = keyof NonNullable<Schemas['ListAdminKnowledgeStatusResponse']['data']['bySource']>;
+export type KnowledgeSource =
+  | 'RECIPE'
+  | 'POST'
+  | 'VIDEO_TRANSCRIPT'
+  | 'VIDEO_RECIPE'
+  | 'NUTRITION_DOC'
+  | 'E_NUMBER'
+  | 'ALLERGEN'
+  | 'INGREDIENT'
+  | (string & {});
 export type KnowledgeStatus = Omit<DeepRequired<Schemas['ListAdminKnowledgeStatusResponse']['data']>, 'lastIndexedAt' | 'bySource'> & {
   lastIndexedAt: string | null;
-  bySource: Partial<Record<KnowledgeSource, number>>;
+  bySource: Record<string, number>;
 };
+
+export interface NutritionDocument {
+  id: string;
+  title: string;
+  author: string;
+  fileName: string;
+  fileType: 'PDF' | 'MARKDOWN';
+  chunks: number;
+  isActive: boolean;
+  updatedAt: string;
+  fileUrl?: string;
+}
+
+export interface UploadNutritionDocumentPayload {
+  file: File;
+  title: string;
+  author?: string;
+}
+
+// ---------- Khảo sát & Đánh giá Chatbot AI (SCR-41: FN-ADM-15, FN-CHAT-06) ----------
+
+export interface AdminSurvey {
+  surveyId: number;
+  userId: number;
+  userFullName: string;
+  userEmail: string;
+  userAvatarUrl?: string | null;
+  sessionId?: number | null;
+  sessionTitle?: string | null;
+  ratingScore: number;
+  contextQuestion: string;
+  feedbackContent?: string | null;
+  createdAt: string;
+}
+
+export interface AdminSurveySummary {
+  totalSurveys: number;
+  averageRating: number;
+  positiveCount: number;
+  positiveRate: number;
+  negativeCount: number;
+  negativeRate: number;
+  neutralCount: number;
+}
+
+export interface AdminSurveyFilters {
+  rating?: number;
+  isNegative?: boolean;
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminSurveyListResult {
+  surveys: {
+    items: AdminSurvey[];
+    pageNumber: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  };
+  summary: AdminSurveySummary;
+}
 
 // ---------- Kiểm duyệt vi phạm & bình luận (SCR-34/35: FN-ADM-04/05/06) ----------
 
@@ -390,6 +552,8 @@ export interface AuditLog {
   targetId?: string;
   note?: string;
   createdAt: string;
+  oldValue?: string | null;
+  newValue?: string | null;
 }
 
 export interface AuditQuery {
@@ -404,7 +568,14 @@ export interface AuditQuery {
 }
 
 export interface AnalyticsOverview {
-  users?: { total?: number; newInPeriod?: number; byStatus?: Record<string, number> };
+  users?: {
+    total?: number;
+    newInPeriod?: number;
+    byStatus?: Record<string, number>;
+    standardMembers?: number;
+    vipMembers?: number;
+    suspendedMembers?: number;
+  };
   content?: {
     recipes?: number;
     recipesNewInPeriod?: number;

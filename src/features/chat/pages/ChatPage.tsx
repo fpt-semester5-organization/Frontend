@@ -10,6 +10,7 @@ import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { useGuestStore } from '@/stores/guest.store';
 import { useUiStore } from '@/stores/ui.store';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { AssistantBubble, UserBubble } from '../components/MessageBubble';
 import {
   appendMessages,
@@ -112,6 +113,7 @@ export const ChatPage: React.FC = () => {
   const isVip = !!user?.isVip;
   const guestAi = useGuestStore((s) => s.quota?.ai);
   const memberQuota = useChatQuota();
+  const { data: publicSettings } = usePublicSettings();
   const openSignupPrompt = useUiStore((s) => s.openSignupPrompt);
 
   const sessions = useChatSessions();
@@ -191,9 +193,13 @@ export const ChatPage: React.FC = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, pendingText, sendError]);
 
+  const dynamicVipLimit = publicSettings?.chatLimitDailyVip ?? QUOTA.chatPerDay.vip;
+  const dynamicFreeLimit = publicSettings?.chatLimitDailyFree ?? QUOTA.chatPerDay.free;
+  const dynamicGuestLimit = publicSettings?.chatLimitDailyGuest ?? QUOTA.guest.ai;
+
   const limit = !authed
-    ? (guestAi?.limit ?? QUOTA.guest.ai)
-    : (memberQuota.data?.limit ?? (isVip ? QUOTA.chatPerDay.vip : QUOTA.chatPerDay.free));
+    ? (guestAi?.limit ?? dynamicGuestLimit)
+    : (memberQuota.data?.limit ?? (isVip ? dynamicVipLimit : dynamicFreeLimit));
   const used = !authed ? (guestAi?.used ?? 0) : (memberQuota.data?.used ?? 0);
   const unit = authed ? 'câu' : 'lượt';
   const quotaLabel = authed ? 'Lượt hỏi hôm nay' : 'Lượt dùng thử miễn phí';

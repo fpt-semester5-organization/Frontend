@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { useMySubscription, useNow, usePlans, useVipClaimSync } from '../hooks/useSubscription';
 import { benefitRows } from '../lib/benefits';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { displayStatus, readPendingOrder, secondsLeft } from '../lib/pendingOrder';
 import { GATEWAY_LABEL, statusInfo } from '../types/subscription.types';
 
@@ -21,10 +22,11 @@ export function MySubscriptionPage() {
   const [polling, setPolling] = useState(false);
   const q = useMySubscription({ pollMs: polling ? PENDING_POLL_MS : false });
   const plans = usePlans();
+  const { data: publicSettings } = usePublicSettings();
   const userId = useAuthStore((s) => s.user?.userId);
   const d = q.data;
   useVipClaimSync(d?.isVip);
-  const rows = benefitRows(plans.data?.benefits);
+  const rows = benefitRows(plans.data?.benefits, publicSettings);
   const quotas = d?.isVip ? rows.vip : rows.free;
   const txs = [...(d?.transactions ?? [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   // Đơn đã lưu chỉ thôi theo dõi khi server báo kết thúc: danh sách có thể chưa có đơn vừa tạo (Backend cache 5 phút).

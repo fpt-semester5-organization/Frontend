@@ -1,6 +1,7 @@
 import { http, unwrap, unwrapPaged } from '@/api/http';
 import type { AddItemForm, EditItemForm } from '../schemas/fridge.schema';
 import type {
+  DetectionQuota,
   DetectionResult,
   Freshness,
   FridgeItem,
@@ -9,6 +10,13 @@ import type {
 } from '../types/fridge.types';
 
 export const AI_DETECTION_TIMEOUT_MS = 35000;
+
+/**
+ * GET /fridge/quota
+ * Lấy hạn mức nhận diện ảnh tủ lạnh hiện tại của người dùng trong ngày.
+ */
+export const getFridgeQuota = (): Promise<DetectionQuota> =>
+  unwrap<DetectionQuota>(http.get('/fridge/quota'));
 
 /**
  * FN-VIS-01 — POST /fridge/detections (multipart/form-data, trường `image`).

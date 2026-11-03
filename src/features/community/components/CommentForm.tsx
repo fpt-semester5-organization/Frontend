@@ -16,8 +16,6 @@ interface CommentFormProps {
   label: string;
   initialContent?: string;
   placeholder?: string;
-  /** Số giây còn phải chờ giữa 2 bình luận (BR-USR-04); > 0 thì khóa nút gửi. */
-  cooldownSeconds?: number;
   autoFocus?: boolean;
   rows?: number;
   onCancel?: () => void;
@@ -30,7 +28,6 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   label,
   initialContent = '',
   placeholder = 'Chia sẻ cảm nghĩ hoặc đặt câu hỏi…',
-  cooldownSeconds = 0,
   autoFocus,
   rows = 3,
   onCancel,
@@ -59,8 +56,6 @@ export const CommentForm: React.FC<CommentFormProps> = ({
     }
   };
 
-  const coolingDown = cooldownSeconds > 0;
-
   return (
     <form onSubmit={handleSubmit(submit)} noValidate className="flex w-full flex-col gap-space-xs">
       <label htmlFor={fieldId} className="sr-only">
@@ -86,12 +81,6 @@ export const CommentForm: React.FC<CommentFormProps> = ({
           <span className="font-label-sm text-label-sm text-on-surface-variant">
             {length}/{COMMENT_MAX} (tối thiểu {COMMENT_MIN} ký tự)
           </span>
-          {coolingDown && (
-            <span className="inline-flex items-center gap-1 rounded bg-secondary-fixed/50 px-2 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed-variant">
-              <Icon name="schedule" className="text-[14px]" />
-              Giãn cách spam: {cooldownSeconds}s
-            </span>
-          )}
         </div>
         <div className="ml-auto flex items-center gap-space-xs">
           {onCancel && (
@@ -103,17 +92,9 @@ export const CommentForm: React.FC<CommentFormProps> = ({
             type="submit"
             size="sm"
             loading={isSubmitting}
-            disabled={coolingDown}
             className="bg-primary hover:bg-primary-container"
           >
-            {coolingDown ? (
-              <span className="inline-flex items-center gap-1">
-                <Icon name="hourglass_top" className="text-[15px] animate-spin" />
-                Chờ {cooldownSeconds}s
-              </span>
-            ) : (
-              submitLabel
-            )}
+            {submitLabel}
           </Button>
         </div>
       </div>

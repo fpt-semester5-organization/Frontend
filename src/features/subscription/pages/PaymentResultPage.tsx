@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { PageError, PageSkeleton } from '../components/SubStates';
 import { useMySubscription, useNow, usePlans } from '../hooks/useSubscription';
 import { VIP_EXCLUSIVE_FEATURES, benefitRows } from '../lib/benefits';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { clearPendingOrder, displayStatus, formatCountdown, readPendingOrder, secondsLeft } from '../lib/pendingOrder';
 import { refreshVipSessionClaims } from '../lib/sessionClaims';
 import { GATEWAY_LABEL, statusInfo } from '../types/subscription.types';
@@ -103,7 +104,8 @@ export function PaymentResultPage() {
   // Giao dịch không trả tên gói; gói hiện tại của tài khoản chỉ đúng với đơn đã thành công.
   const planName = order?.planName ?? (status === 'SUCCESS' ? sub.data?.plan?.planName : undefined);
   const plans = usePlans();
-  const vipRows = benefitRows(plans.data?.benefits).vip;
+  const { data: publicSettings } = usePublicSettings();
+  const vipRows = benefitRows(plans.data?.benefits, publicSettings).vip;
 
   return (
     <main className="min-h-screen w-full bg-background">
