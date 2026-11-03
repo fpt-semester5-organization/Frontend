@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { VipLockCard, VipUpsellDialog } from '@/components/common/VipUpsell';
+import { VipUpsellDialog } from '@/components/common/VipUpsell';
 import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
@@ -58,6 +58,7 @@ const ShoppingList: React.FC = () => {
   const exportPdf = useExportPdf(planId ?? 0);
 
   const [hidePurchased, setHidePurchased] = useState(false);
+  const [showDayMeals, setShowDayMeals] = useState<boolean>(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [upsellMessage, setUpsellMessage] = useState<string | null>(null);
 
@@ -169,6 +170,7 @@ const ShoppingList: React.FC = () => {
         .map((s) => ({
           slotId: s.slotId,
           mealType: s.mealType,
+          recipeId: s.recipe?.recipeId,
           title: s.recipe?.title ?? '',
           imageUrl: s.recipe?.imageUrl,
         }));
@@ -509,14 +511,6 @@ const ShoppingList: React.FC = () => {
     notifySuccess(`Đã khôi phục Ngày ${activeTab + 1} theo khẩu phần cả tuần (${allDaysServings} người).`);
   };
 
-  // Tính toán số lượng và tiến độ mua
-  const totalDayRequirements = useMemo(() => {
-    return daysDetail.reduce((sum, d) => sum + d.totalCount, 0);
-  }, [daysDetail]);
-
-  const totalDayPurchasedCount = useMemo(() => {
-    return daysDetail.reduce((sum, d) => sum + d.purchasedCount, 0);
-  }, [daysDetail]);
 
   // Số món unique cả tuần đã mua đủ tất cả các ngày
   const fullyPurchasedWeekItemsCount = useMemo(() => {
@@ -530,7 +524,7 @@ const ShoppingList: React.FC = () => {
   }, [allItems, daysDetail, calendarDays, dayPurchases]);
 
   if (!validId || notFound) {
-    return (
+return (
       <EmptyState
         icon="search_off"
         title="Không tìm thấy danh sách đi chợ"
@@ -548,7 +542,7 @@ const ShoppingList: React.FC = () => {
   }
 
   if (list.isPending) {
-    return (
+return (
       <div className={PAGE} role="status" aria-busy="true" aria-label="Đang tải danh sách đi chợ">
         <Skeleton className="h-10 w-1/2" />
         <Skeleton className="h-16" />
@@ -592,6 +586,16 @@ const ShoppingList: React.FC = () => {
       },
     });
 
+  const getMealStats = (mealTitle: string) => {
+    if (!activeDayData) return { purchased: 0, total: 0 };
+    const titleLower = mealTitle.trim().toLowerCase();
+    const mealItems = activeDayData.items.filter((item) =>
+      item.matchingSources?.some((source) => source.trim().toLowerCase() === titleLower)
+    );
+    const purchased = mealItems.filter((i) => i.isPurchasedInThisDay).length;
+    return { purchased, total: mealItems.length };
+  };
+
   return (
     <div className={PAGE}>
       {/* Đường dẫn Breadcrumb */}
@@ -617,85 +621,25 @@ const ShoppingList: React.FC = () => {
       {/* Header chính */}
       <header className="flex flex-wrap items-start justify-between gap-space-md">
         <div className="flex flex-col gap-space-xs">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">
-              Danh sách đi chợ
-            </h1>
-            <span className="rounded-full bg-primary-fixed text-on-primary-fixed px-3 py-0.5 text-xs font-bold border border-primary/20">
-              Thực đơn {totalDays} ngày
-            </span>
-            <span className={cn('self-start rounded-full px-2.5 py-0.5 font-label-sm text-label-sm font-semibold', LIST_STATUS[status].className)}>
-              {LIST_STATUS[status].label}
-            </span>
-          </div>
+          <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">
+            Danh sách đi chợ
+          </h1>
           <p className="text-xs text-on-surface-variant">
             {planData?.planName ? `Theo kế hoạch ${planData.planName}` : 'Phân loại nguyên liệu theo quầy hàng giúp đi chợ nhanh chóng, không bỏ sót'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-space-sm">
-          {isVip && planId && (
-            <Button variant="outline" onClick={runExport} loading={exportPdf.isPending}>
-              <Icon name="picture_as_pdf" className="text-[18px]" />
-              Tải PDF
-            </Button>
-          )}
-          {pending && (
-            <>
-              <Button variant="ghost" onClick={() => setConfirmCancel(true)}>
-                Hủy danh sách
-              </Button>
-              <Button onClick={() => changeStatus('COMPLETED')} loading={setStatus.isPending && setStatus.variables === 'COMPLETED'}>
-                <Icon name="task_alt" className="text-[18px]" />
-                Hoàn tất
-              </Button>
-            </>
-          )}
-        </div>
       </header>
 
-      {/* Tiến độ mua sắm theo phạm vi xem hiện tại */}
-      <section aria-label="Tiến độ mua" className="flex flex-col gap-space-xs rounded-2xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-space-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-label-md text-label-md text-on-surface font-semibold">
-              {activeTab === 'ALL'
-                ? `Đã mua ${fullyPurchasedWeekItemsCount}/${allItems.length} món cả tuần (${totalDayPurchasedCount}/${totalDayRequirements} lượt mua theo ngày)`
-                : `Đã mua ${activePurchasedCount}/${activeTotalCount} món của ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}`}
-            </p>
-            {activeTab !== 'ALL' && (
-              <span className="rounded-md bg-primary-fixed/60 text-primary px-2 py-0.5 text-[11px] font-semibold">
-                Mua riêng ngày này
-              </span>
-            )}
-          </div>
-          <label className="flex cursor-pointer items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">
-            <input
-              type="checkbox"
-              checked={hidePurchased}
-              onChange={(event) => setHidePurchased(event.target.checked)}
-              className="accent-primary h-4 w-4 rounded cursor-pointer"
-            />
-            Ẩn món đã mua
-          </label>
-        </div>
-        <div
-          className="h-2.5 overflow-hidden rounded-full bg-surface-container"
-          role="progressbar"
-          aria-label="Tiến độ mua"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-        >
-          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${percent}%` }} />
-        </div>
-      </section>
+
 
       {/* THANH CHỌN PHẠM VI XEM: CẢ TUẦN HOẶC TỪNG NGÀY ĐỘC LẬP */}
       <section aria-label="Chọn ngày đi chợ" className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <div role="tablist" aria-label="Danh sách các ngày đi chợ" className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
           {/* Tab Cả tuần */}
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'ALL'}
             onClick={() => setActiveTab('ALL')}
             className={cn(
               'inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0',
@@ -725,10 +669,12 @@ const ShoppingList: React.FC = () => {
             const dayPurchased = dayData?.purchasedCount ?? 0;
             const isActive = activeTab === day.index;
 
-            return (
+        return (
               <button
                 key={day.index}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setActiveTab(day.index)}
                 className={cn(
                   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0',
@@ -758,61 +704,36 @@ const ShoppingList: React.FC = () => {
         </div>
       </section>
 
-      {/* KHỐI ĐIỀU CHỈNH KHẨU PHẦN ĂN: CỘNG DỒN ĐỊNH LƯỢNG CHO CẢ TUẦN */}
-      <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-surface-container bg-surface-container-lowest p-4 sm:p-5 shadow-card">
-        <div className="flex items-start sm:items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-primary shadow-2xs">
-            <Icon name={activeTab === 'ALL' ? 'groups' : 'person'} className="text-[24px]" />
+      {/* KHỐI ĐIỀU CHỈNH KHẨU PHẦN ĂN: TINH GỌN, RÕ RÀNG */}
+      <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-surface-container bg-surface-container-lowest p-3.5 sm:p-4 shadow-card">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-primary shadow-2xs">
+            <Icon name={activeTab === 'ALL' ? 'groups' : 'person'} className="text-[22px]" />
           </div>
-          <div className="flex flex-col gap-0.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-serif font-bold text-sm sm:text-base text-on-surface">
-                {activeTab === 'ALL'
-                  ? 'Khẩu phần cả tuần:'
-                  : `Khẩu phần ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}:`}
-              </span>
-              <span className="rounded-md bg-secondary-fixed text-on-secondary-fixed px-2 py-0.5 text-xs font-bold shadow-2xs">
-                x{currentServings} người ăn
-              </span>
-              {isCustomDayServing && (
-                <span className="rounded-md bg-warning-container text-warning px-2 py-0.5 text-[11px] font-bold">
-                  Khẩu phần riêng ngày này
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-on-surface-variant">
+          <div className="flex items-center gap-2">
+            <span className="font-serif font-bold text-sm sm:text-base text-on-surface">
               {activeTab === 'ALL'
-                ? `Định lượng cả tuần được tính bằng tổng cộng dồn của tất cả ${totalDays} ngày. Khi tăng khẩu phần ở ngày nào, cả tuần tự động tăng thêm.`
-                : isCustomDayServing
-                  ? `Đang áp dụng khẩu phần riêng cho ${activeDayData?.header}. Định lượng của ngày này sẽ được cộng dồn vào tổng cả tuần.`
-                  : `Đang theo khẩu phần chung cả tuần (${allDaysServings} người). Có thể tăng giảm riêng cho ngày này.`}
-            </p>
+                ? 'Khẩu phần cả tuần:'
+                : `Khẩu phần ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}:`}
+            </span>
+            <span className="rounded-md bg-secondary-fixed text-on-secondary-fixed px-2 py-0.5 text-xs font-bold shadow-2xs">
+              x{currentServings} người ăn
+            </span>
           </div>
         </div>
 
-        {/* Bộ điều khiển Stepper + Presets */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 self-start lg:self-auto">
+        {/* Bộ điều khiển */}
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
           {activeTab !== 'ALL' && isCustomDayServing && (
-            <div className="flex items-center gap-1.5 mr-1">
-              <button
-                type="button"
-                onClick={handleApplyToAllDays}
-                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary-fixed/40 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary-fixed transition-colors"
-                title="Áp dụng số người này cho tất cả các ngày trong tuần"
-              >
-                <Icon name="sync" className="text-[14px]" />
-                Áp dụng cho cả tuần
-              </button>
-              <button
-                type="button"
-                onClick={handleResetToAllDays}
-                className="inline-flex items-center gap-1 rounded-lg border border-surface-container bg-surface-container px-2 py-1.5 text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors"
-                title={`Khôi phục về khẩu phần chung (${allDaysServings} người)`}
-              >
-                <Icon name="undo" className="text-[14px]" />
-                Theo cả tuần ({allDaysServings})
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleApplyToAllDays}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary-fixed/40 hover:bg-primary-fixed/70 px-3 py-1.5 text-xs font-semibold text-primary transition-colors shadow-2xs"
+              title="Áp dụng số người này cho tất cả các ngày trong tuần"
+            >
+              <Icon name="sync" className="text-[14px]" />
+              Áp dụng cho cả tuần
+            </button>
           )}
 
           {/* Stepper */}
@@ -839,64 +760,8 @@ const ShoppingList: React.FC = () => {
               <Icon name="add" className="text-[18px]" />
             </button>
           </div>
-
-          {/* Presets nhanh */}
-          <div className="flex items-center gap-1">
-            {[1, 2, 4, 6].map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => handleUpdateServings(num)}
-                className={cn(
-                  'rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all',
-                  currentServings === num
-                    ? 'bg-primary-container text-on-primary shadow-2xs font-bold'
-                    : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
-                )}
-              >
-                {num} người
-              </button>
-            ))}
-          </div>
         </div>
       </section>
-
-      {/* THẺ TÓM TẮT BỮA ĂN TRONG NGÀY (CHỈ HIỂN THỊ KHI XEM THEO NGÀY CỤ THỂ) */}
-      {activeTab !== 'ALL' && activeDayData && activeDayData.meals.length > 0 && (
-        <section aria-label="Thực đơn trong ngày" className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary-fixed/20 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon name="restaurant" className="text-[18px] text-primary" />
-              <h2 className="font-serif font-bold text-sm text-on-surface">
-                Thực đơn nấu ăn trong {activeDayData.header}:
-              </h2>
-            </div>
-            <span className="text-xs text-on-surface-variant font-medium">
-              {activeDayData.purchasedCount}/{activeDayData.totalCount} nguyên liệu đã chuẩn bị
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {activeDayData.meals.map((meal) => (
-              <div
-                key={meal.slotId}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-label-sm text-xs font-medium shadow-2xs',
-                  MEAL_BADGE[meal.mealType as keyof typeof MEAL_BADGE] || 'bg-surface-container text-on-surface'
-                )}
-                title={meal.title}
-              >
-                <Icon
-                  name={MEAL_ICON[meal.mealType as keyof typeof MEAL_ICON] || 'restaurant'}
-                  className="text-[14px] opacity-80"
-                />
-                <span className="font-bold">{MEAL_LABEL[meal.mealType as keyof typeof MEAL_LABEL] || 'Bữa'}:</span>
-                <span className="font-semibold">{meal.title}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {status === 'COMPLETED' && (
         <FormAlert tone="success" title="Danh sách đã hoàn tất">
@@ -908,9 +773,132 @@ const ShoppingList: React.FC = () => {
           Danh sách này chỉ còn để xem, không đánh dấu được nữa.
         </FormAlert>
       )}
-      {!isVip && (
-        <VipLockCard title="Xuất PDF để in" description="Thành viên VIP tải thực đơn tuần và danh sách đi chợ dưới dạng PDF." />
-      )}
+
+      {/* KHỐI HỢP NHẤT: TIẾN ĐỘ MUA SẮM & THỰC ĐƠN BỮA ĂN TRONG NGÀY */}
+      <section
+        aria-label="Tiến độ mua và thực đơn trong ngày"
+        className="flex flex-col gap-space-sm rounded-2xl border border-surface-container bg-surface-container-lowest p-space-md shadow-card"
+      >
+        {/* Header tiến độ mua sắm */}
+        <div className="flex flex-wrap items-center justify-between gap-space-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Icon name="shopping_bag" className="text-[20px] text-primary" />
+              <p className="font-serif font-bold text-sm sm:text-base text-on-surface">
+                {activeTab === 'ALL'
+                  ? `Đã mua ${fullyPurchasedWeekItemsCount}/${allItems.length} món cả tuần`
+                  : `Đã mua ${activePurchasedCount}/${activeTotalCount} món của ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}`}
+              </p>
+            </div>
+
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">
+            <input
+              type="checkbox"
+              checked={hidePurchased}
+              onChange={(event) => setHidePurchased(event.target.checked)}
+              className="accent-primary h-4 w-4 rounded cursor-pointer"
+            />
+            Ẩn món đã mua
+          </label>
+        </div>
+
+        {/* Thanh tiến độ chung */}
+        <div
+          className="h-2.5 overflow-hidden rounded-full bg-surface-container"
+          role="progressbar"
+          aria-label="Tiến độ mua"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+        >
+          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${percent}%` }} />
+        </div>
+
+        {/* Thực đơn các bữa ăn trong ngày: Đồng bộ thiết kế chuẩn VeggieLife, mặc định ẩn để gọn UI */}
+        {activeTab !== 'ALL' && activeDayData && activeDayData.meals.length > 0 && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-surface-container">
+            <button
+              type="button"
+              onClick={() => setShowDayMeals((prev) => !prev)}
+              className="flex items-center justify-between w-full py-0.5 text-left font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer select-none group"
+              aria-expanded={showDayMeals}
+            >
+              <span className="font-semibold text-on-surface group-hover:text-primary transition-colors">
+                Thực đơn trong ngày ({activeDayData.meals.length} bữa)
+              </span>
+
+              <span className="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant group-hover:text-primary transition-colors">
+                <span>{showDayMeals ? 'Thu gọn' : 'Xem thực đơn'}</span>
+                <Icon
+                  name={showDayMeals ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
+                  className="text-[18px] transition-transform duration-200"
+                />
+              </span>
+            </button>
+
+            {showDayMeals && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-0.5">
+                {activeDayData.meals.map((meal) => {
+                  const mealTypeKey = meal.mealType as keyof typeof MEAL_LABEL;
+                  const stats = getMealStats(meal.title);
+                  const isComplete = stats.total > 0 && stats.purchased === stats.total;
+
+                  const recipeUrl = meal.recipeId
+                    ? PATHS.RECIPES.DETAIL(meal.recipeId)
+                    : `${PATHS.RECIPES.ROOT}?search=${encodeURIComponent(meal.title)}`;
+
+                  return (
+                    <Link
+                      key={meal.slotId}
+                      to={recipeUrl}
+                      className="group flex flex-col justify-between gap-1.5 rounded-xl border border-surface-container bg-surface-container-lowest hover:border-primary/50 hover:bg-surface-container-low p-3 transition-all no-underline"
+                      title={`Xem công thức nấu: ${meal.title}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
+                          <Icon name={MEAL_ICON[mealTypeKey] || 'restaurant'} className="text-[15px] text-primary" />
+                          <span className="font-semibold">{MEAL_LABEL[mealTypeKey] || 'Bữa ăn'}</span>
+                        </span>
+
+                        {stats.total > 0 ? (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-label-sm text-[11px] font-semibold tabular-nums',
+                              isComplete
+                                ? 'bg-primary-fixed text-on-primary-fixed font-bold'
+                                : 'bg-surface-container text-on-surface-variant'
+                            )}
+                          >
+                            {isComplete && <Icon name="check" className="text-[13px] text-primary" />}
+                            {isComplete ? `Đủ ${stats.total}/${stats.total}` : `Đã mua ${stats.purchased}/${stats.total}`}
+                          </span>
+                        ) : (
+                          <span className="font-label-sm text-[11px] text-outline">Theo thực đơn</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-1 mt-0.5">
+                        <p
+                          className="line-clamp-1 font-label-md text-label-md font-semibold text-on-surface group-hover:text-primary transition-colors"
+                          title={meal.title}
+                        >
+                          {meal.title}
+                        </p>
+                        <Icon
+                          name="arrow_forward"
+                          className="text-[15px] text-outline opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all shrink-0"
+                        />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* DANH SÁCH NGUYÊN LIỆU PHÂN THEO 4 QUẦY HÀNG (RAU CỦ, ĐẬM THỰC VẬT, ĐỒ KHÔ, GIA VỊ) */}
       <section aria-label="Các quầy hàng đi chợ" className="flex flex-col gap-space-md">
@@ -932,7 +920,7 @@ const ShoppingList: React.FC = () => {
           {aislesGrouped.map((aisle) => {
             const isCompletedAisle = aisle.totalCount > 0 && aisle.purchasedCount === aisle.totalCount;
 
-            return (
+        return (
               <section
                 key={aisle.code}
                 aria-labelledby={`aisle-heading-${aisle.code}`}
@@ -1003,39 +991,10 @@ const ShoppingList: React.FC = () => {
                               >
                                 {item.name}
                               </span>
-                              {/* Badge số ngày đã mua khi ở tab Cả tuần */}
-                              {activeTab === 'ALL' && item.daysUsingCount && item.daysUsingCount > 1 && (
-                                <span
-                                  className={cn(
-                                    'rounded-md px-1.5 py-0.2 text-[10px] font-bold tabular-nums',
-                                    item.isPurchased
-                                      ? 'bg-primary-fixed text-on-primary-fixed'
-                                      : item.daysBoughtCount && item.daysBoughtCount > 0
-                                      ? 'bg-secondary-fixed text-on-secondary-fixed'
-                                      : 'bg-surface-container text-on-surface-variant'
-                                  )}
-                                >
-                                  {item.isPurchased
-                                    ? `Đã mua đủ ${item.daysUsingCount} ngày`
-                                    : item.daysBoughtCount && item.daysBoughtCount > 0
-                                    ? `Đã mua ${item.daysBoughtCount}/${item.daysUsingCount} ngày`
-                                    : `Dùng cho ${item.daysUsingCount} ngày`}
-                                </span>
-                              )}
+
                             </div>
 
-                            {item.sources && item.sources.length > 0 && (
-                              <span className="text-[11px] text-on-surface-variant truncate">
-                                {item.isCommon ? 'Dùng chung' : `Dùng cho: ${item.sources.join(', ')}`}
-                              </span>
-                            )}
 
-                            {/* Chi tiết cộng dồn định lượng các ngày khi xem Cả tuần */}
-                            {activeTab === 'ALL' && item.breakdownText && (
-                              <span className="text-[10px] text-primary/80 font-medium">
-                                {item.breakdownText}
-                              </span>
-                            )}
                           </div>
 
                           <div className="flex flex-col items-end shrink-0 gap-0.5">
