@@ -1,6 +1,7 @@
 import { http, unwrap, unwrapPaged } from '@/api/http';
 import type { AddItemForm, EditItemForm } from '../schemas/fridge.schema';
 import type {
+  DetectedItem,
   DetectionResult,
   Freshness,
   FridgeItem,
@@ -43,6 +44,7 @@ export const createFridgeItem = (f: AddItemForm): Promise<FridgeItem> =>
       ingredientId: f.ingredientId,
       customItemName: f.customItemName?.trim() || undefined,
       freshnessStatus: f.freshnessStatus ?? 'FRESH',
+      thumbnailUrl: f.thumbnailUrl,
     }),
   );
 
@@ -55,6 +57,7 @@ export const updateFridgeItem = (id: number, f: EditItemForm): Promise<FridgeIte
     http.put(`/fridge/items/${id}`, {
       customItemName: f.customItemName?.trim() || undefined,
       freshnessStatus: f.freshnessStatus,
+      thumbnailUrl: f.thumbnailUrl,
     }),
   );
 
@@ -67,27 +70,44 @@ export const deleteFridgeItem = async (id: number): Promise<void> => {
 };
 
 /**
- * FN-VIS-03 — GET /fridge/recipe-suggestions
- * Gợi ý công thức dựa trên nguyên liệu trong tủ lạnh (độ tương đồng ≥ 70%).
+ * FN-VIS-03 — GET /fridge/recipes/suggestions
+ * Gợi ý công thức từ nguyên liệu tủ lạnh ảo theo độ tương đồng giảm dần.
  */
 export const listRecipeSuggestions = (
-  minSimilarity = 0.7,
-  limit = 10,
+  minSimilarity?: number,
+  limit?: number,
 ): Promise<RecipeSuggestion[]> =>
   unwrap<RecipeSuggestion[]>(
-    http.get('/fridge/recipe-suggestions', {
+    http.get('/fridge/recipes/suggestions', {
       params: { minSimilarity, limit },
     }),
   );
 
 /**
- * FN-PROF-08 — Tra cứu danh mục nguyên liệu để thêm thủ công vào tủ.
+ * GET /ingredients?query=...
+ * Tìm kiếm nhanh nguyên liệu chuẩn trong hệ thống để người dùng chọn khi thêm tủ.
  */
-export async function searchIngredients(keyword: string): Promise<IngredientOption[]> {
-  const paged = await unwrapPaged<IngredientOption>(
-    http.get('/ingredients', {
-      params: { keyword: keyword.trim() || undefined, page: 1, size: 20 },
-    }),
-  );
-  return paged.items;
+export const searchIngredients = (query: string): Promise<IngredientOption[]> =>
+  unwrapPaged<IngredientOption>(
+    http.get('/ingredients', { params: { search: query, pageSize: 20 } }),
+  ).then((r) => r.items);
+
+export interface LatestFridgeSession {
+  sessionId: number;
+  imageCdnUrl: string;
+  detectedItemsCount: number;
+  createdAt: string;
+  detected: DetectedItem[];
 }
+
+/**
+ * GET /fridge/sessions/latest
+ * Lấy phiên quét nhận diện tủ lạnh gần nhất của thành viên hiện tại.
+ */
+export const getLatestFridgeSession = async (): Promise<LatestFridgeSession | null> => {
+  try {
+    return await unwrap<LatestFridgeSession>(http.get('/fridge/sessions/latest'));
+  } catch {
+    return null;
+  }
+};
