@@ -25,7 +25,7 @@ export interface ExtractedRecipe {
 export type AiQuota = TranscriptData['quota'];
 
 /** VideoTranscripts.Status. */
-export type TranscriptStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
+export type TranscriptStatus = 'PENDING' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'FAILED';
 
 /**
  * GET /videos/{id}/transcript (FN-POST-09) như server trả.
@@ -37,6 +37,7 @@ export type TranscriptStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 export type VideoTranscriptResponse = Omit<TranscriptData, 'rawTranscript' | 'extractedRecipe' | 'quota'> & {
   rawTranscript: string | null;
   extractedRecipe: ExtractedRecipe | null;
+  aiSummary?: string | null;
   quota?: AiQuota | null;
   transcriptStatus?: TranscriptStatus;
   segments?: Array<{ start: number; end: number; text: string }>;

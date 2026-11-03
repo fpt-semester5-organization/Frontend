@@ -70,14 +70,21 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
 
   const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
   const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
+  const [aiLiveSummary, setAiLiveSummary] = useState<string | null>(null);
 
   // Chỉ gọi AI STT đúng 1 lần nếu CSDL Backend chưa có, sau đó tự động LƯU XUỐNG BACKEND luôn
   useEffect(() => {
-    if (videoUrl && !isTranscriptLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
+    const hasDbData = Boolean(
+      transcriptData?.transcript?.rawTranscript ||
+      transcriptData?.transcript?.extractedRecipe ||
+      transcriptData?.transcript?.aiSummary
+    );
+    if (videoUrl && !isTranscriptLoading && !hasDbData && !aiLiveTranscript) {
       extractAndSaveVideoRecipe(videoId, videoUrl)
         .then((res) => {
           if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
           if (res.recipe) setAiLiveRecipe(res.recipe);
+          if (res.aiSummary) setAiLiveSummary(res.aiSummary);
         })
         .catch((err) => {
           console.warn('AI STT direct call error in PostDetail:', err);
@@ -86,6 +93,7 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
   }, [videoUrl, isTranscriptLoading, transcriptData, aiLiveTranscript, videoId]);
 
   const activeRecipe = transcriptData?.transcript?.extractedRecipe || aiLiveRecipe;
+  const activeAiSummary = transcriptData?.transcript?.aiSummary || aiLiveSummary;
 
   const { activeSegments, transcriptSource } = useMemo(() => {
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
@@ -133,6 +141,7 @@ const PostDetailMedia: React.FC<PostDetailMediaProps> = ({ title, imageUrl, vide
           title={title}
           segments={activeSegments}
           recipe={activeRecipe}
+          aiSummary={activeAiSummary}
           rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
           autoPlay={true}
           onDurationChange={setDuration}

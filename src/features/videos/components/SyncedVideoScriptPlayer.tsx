@@ -10,6 +10,7 @@ export interface SyncedVideoScriptPlayerProps {
   title?: string;
   segments: TranscriptSegment[];
   recipe?: ExtractedRecipe | null;
+  aiSummary?: string | null;
   rawTranscript?: string | null;
   autoPlay?: boolean;
   className?: string;
@@ -215,6 +216,7 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
   title,
   segments,
   recipe,
+  aiSummary,
   rawTranscript,
   autoPlay = false,
   className,
@@ -230,7 +232,6 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [userAutoScroll, setUserAutoScroll] = useState(true);
   const [showScript, setShowScript] = useState(true);
   const [activeTab, setActiveTab] = useState<'recipe' | 'transcript'>('recipe');
 
@@ -243,14 +244,14 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
 
   // Tự động cuộn theo dòng thoại đang đọc
   useEffect(() => {
-    if (!userAutoScroll || activeIndex === -1) return;
+    if (activeIndex === -1) return;
     if (activeItemRef.current && scrollContainerRef.current) {
       activeItemRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
       });
     }
-  }, [activeIndex, userAutoScroll]);
+  }, [activeIndex]);
 
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
@@ -358,14 +359,7 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
               </button>
             )}
 
-            {/* Phụ đề tức thời hiển thị nổi dưới đáy video */}
-            {activeIndex !== -1 && (
-              <div className="pointer-events-none absolute bottom-12 inset-x-3 text-center z-10">
-                <span className="inline-block max-w-[90%] rounded-lg bg-inverse-surface/90 px-3.5 py-1.5 font-label-md text-label-md font-medium text-inverse-on-surface shadow-md backdrop-blur-sm border border-outline/20">
-                  {segments[activeIndex].text}
-                </span>
-              </div>
-            )}
+            {/* Phụ đề không đè lên video; phụ đề hiển thị đồng bộ trong tab 'Lời thoại' bên cạnh */}
           </div>
 
           {/* Thanh điều khiển video */}
@@ -479,28 +473,6 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
-                {activeTab === 'transcript' && (
-                  <button
-                    type="button"
-                    onClick={() => setUserAutoScroll(!userAutoScroll)}
-                    title={userAutoScroll ? 'Đang tự cuộn theo lời thoại' : 'Đã tắt tự cuộn'}
-                    className={cn(
-                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-label-sm text-label-sm font-semibold transition-colors cursor-pointer',
-                      userAutoScroll
-                        ? 'bg-primary-fixed text-on-primary-fixed'
-                        : 'bg-surface-container text-on-surface-variant'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'h-1.5 w-1.5 rounded-full',
-                        userAutoScroll ? 'bg-primary animate-pulse' : 'bg-outline'
-                      )}
-                    />
-                    Cuộn
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={() => setShowScript(false)}
@@ -521,6 +493,17 @@ export const SyncedVideoScriptPlayer: React.FC<SyncedVideoScriptPlayerProps> = (
                   scrollbarColor: 'var(--color-surface-container-highest) transparent',
                 }}
               >
+                {/* Dòng tóm tắt của AI */}
+                {aiSummary && (
+                  <div className="flex items-start gap-2 rounded-lg bg-surface-container-low px-3 py-2 border border-surface-container font-body-sm text-body-sm text-on-surface">
+                    <Icon name="auto_awesome" className="text-[16px] text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-primary">Tóm tắt AI: </span>
+                      <span className="text-on-surface-variant">{aiSummary}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Dòng Khẩu phần & Thời gian */}
                 <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low px-3 py-2 border border-surface-container font-label-sm text-label-sm">
                   <div className="flex items-center gap-1.5 text-on-surface-variant">
