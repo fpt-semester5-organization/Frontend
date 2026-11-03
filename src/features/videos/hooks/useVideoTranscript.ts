@@ -23,7 +23,7 @@ export function useVideoTranscript(videoId: number, options: { enabled: boolean;
     queryFn: () => getVideoTranscript(videoId),
     enabled: options.enabled && Number.isInteger(videoId) && videoId > 0,
     retry: false,
-    staleTime: Infinity,
+    staleTime: (query) => (query.state.data?.status === 'COMPLETED' ? Infinity : 0),
     gcTime: 30 * 60 * 1000,
     refetchInterval: (q) =>
       options.poll && q.state.data?.status === 'PENDING' && Date.now() < deadline ? TRANSCRIPT_POLL_MS : false,

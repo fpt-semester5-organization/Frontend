@@ -58,7 +58,9 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
       ? [
           item.cookTimeMinutes != null && `${item.cookTimeMinutes} phút`,
           item.caloriesKcal != null && `${Math.round(item.caloriesKcal)} kcal`,
-          item.dietarySchool,
+          typeof item.dietarySchool === 'string' && isNaN(Number(item.dietarySchool))
+            ? item.dietarySchool
+            : null,
         ].filter(Boolean) as string[]
       : [];
 
@@ -94,15 +96,21 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
 
     const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
     const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
+    const [aiLiveSummary, setAiLiveSummary] = useState<string | null>(null);
 
     // Kích hoạt gọi AI STT đúng 1 lần nếu CSDL chưa có, tự động LƯU XUỐNG BACKEND luôn
     useEffect(() => {
+      const hasDbData = Boolean(
+        transcriptData?.transcript?.rawTranscript ||
+        transcriptData?.transcript?.extractedRecipe ||
+        transcriptData?.transcript?.aiSummary
+      );
       if (
         isVideo &&
         showSyncedVideo &&
         activeVideoUrl &&
         !isTranscriptLoading &&
-        !transcriptData?.transcript?.rawTranscript &&
+        !hasDbData &&
         !aiLiveTranscript
       ) {
         extractAndSaveVideoRecipe(resolvedVideoId ?? 0, activeVideoUrl)
@@ -112,6 +120,9 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
             }
             if (res.recipe) {
               setAiLiveRecipe(res.recipe);
+            }
+            if (res.aiSummary) {
+              setAiLiveSummary(res.aiSummary);
             }
           })
           .catch((err) => {
@@ -218,6 +229,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
                   title={title}
                   segments={activeSegments}
                   recipe={transcriptData?.transcript?.extractedRecipe || aiLiveRecipe}
+                  aiSummary={transcriptData?.transcript?.aiSummary || aiLiveSummary}
                   rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
                   autoPlay={true}
                   onClose={() => setShowSyncedVideo(false)}
@@ -282,24 +294,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
                   </>
                 )}
 
-                {/* Chips công thức đè góc ảnh */}
-                {isRecipe && (chips.length > 0 || item?.isVerified) && (
-                  <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
-                    {chips.map((c) => (
-                      <span
-                        key={c}
-                        className="rounded-full bg-surface-container-lowest/90 px-2.5 py-0.5 font-label-sm text-label-sm font-semibold text-on-surface backdrop-blur-sm shadow-xs"
-                      >
-                        {c}
-                      </span>
-                    ))}
-                    {item?.isVerified && (
-                      <span className="rounded-full bg-primary-container px-2.5 py-0.5 font-label-sm text-label-sm font-semibold text-on-primary backdrop-blur-sm">
-                        Đã xác minh
-                      </span>
-                    )}
-                  </div>
-                )}
+
               </div>
             )}
           </>
@@ -343,7 +338,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
             to={to}
             className="text-on-surface-variant no-underline tabular-nums hover:underline hover:text-primary"
           >
-            {isRecipe ? 'Xem công thức' : `${formatNumber(commentCount)} bình luận`}
+            {formatNumber(commentCount)} bình luận
           </Link>
         </div>
 

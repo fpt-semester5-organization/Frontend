@@ -60,14 +60,21 @@ const InlineVideoScriptPlayer: React.FC<{
   });
   const [aiLiveTranscript, setAiLiveTranscript] = useState<string | null>(null);
   const [aiLiveRecipe, setAiLiveRecipe] = useState<ExtractedRecipe | null>(null);
+  const [aiLiveSummary, setAiLiveSummary] = useState<string | null>(null);
 
   // Kích hoạt AI STT 1 lần duy nhất và lưu ngay xuống Backend
   useEffect(() => {
-    if (video.videoUrl && !isLoading && !transcriptData?.transcript?.rawTranscript && !aiLiveTranscript) {
+    const hasDbData = Boolean(
+      transcriptData?.transcript?.rawTranscript ||
+      transcriptData?.transcript?.extractedRecipe ||
+      transcriptData?.transcript?.aiSummary
+    );
+    if (video.videoUrl && !isLoading && !hasDbData && !aiLiveTranscript) {
       extractAndSaveVideoRecipe(videoId, video.videoUrl)
         .then((res) => {
           if (res.rawTranscript) setAiLiveTranscript(res.rawTranscript);
           if (res.recipe) setAiLiveRecipe(res.recipe);
+          if (res.aiSummary) setAiLiveSummary(res.aiSummary);
         })
         .catch((err) => {
           console.warn('AI STT direct call error in InlinePlayer:', err);
@@ -76,6 +83,7 @@ const InlineVideoScriptPlayer: React.FC<{
   }, [video.videoUrl, isLoading, transcriptData, aiLiveTranscript, videoId]);
 
   const activeRecipe = transcriptData?.transcript?.extractedRecipe || aiLiveRecipe;
+  const activeAiSummary = transcriptData?.transcript?.aiSummary || aiLiveSummary;
 
   const { segments, source } = useMemo(() => {
     if (transcriptData?.status === 'COMPLETED' && transcriptData.transcript?.segments?.length) {
@@ -115,6 +123,7 @@ const InlineVideoScriptPlayer: React.FC<{
         title={video.title}
         segments={segments}
         recipe={activeRecipe}
+        aiSummary={activeAiSummary}
         rawTranscript={transcriptData?.transcript?.rawTranscript || aiLiveTranscript}
         autoPlay={true}
         onClose={onClose}

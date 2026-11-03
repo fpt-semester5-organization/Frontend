@@ -1,6 +1,8 @@
 import http from '@/api/http';
 import type { ApiEnvelope } from '@/api/types';
 import { toApiError } from '@/lib/apiError';
+import { queryClient } from '@/lib/queryClient';
+import { videoKeys } from '../hooks/videoKeys';
 import type { ExtractedRecipe, ExtractVideoResult, TranscriptResult, VideoTranscriptResponse } from '../types/video.types';
 
 /**
@@ -13,7 +15,9 @@ export async function getVideoTranscript(videoId: number): Promise<TranscriptRes
     const res = await http.get<ApiEnvelope<VideoTranscriptResponse>>(`/videos/${videoId}/transcript`);
     const transcript = res.data.data;
     const status = transcript.transcriptStatus ?? 'COMPLETED';
-    return status === 'COMPLETED' ? { status, transcript } : { status, transcript: null };
+    return (status === 'COMPLETED' || status === 'READY')
+      ? { status: 'COMPLETED', transcript }
+      : { status: 'PENDING', transcript: null };
   } catch (error) {
     if (toApiError(error).errorCode === 'ERR_TRANSCRIPT_NOT_READY') return { status: 'PENDING', transcript: null };
     throw error;
@@ -40,6 +44,8 @@ export interface DirectAiExtractResult {
   rawTranscript: string;
   durationSeconds: number;
   recipe?: DirectAiRecipe;
+  summary?: string;
+  aiSummary?: string;
 }
 
 /**
@@ -50,6 +56,7 @@ export async function saveVideoTranscript(
   videoId: number,
   data: {
     rawTranscript: string;
+    aiSummary?: string | null;
     recipe?: ExtractedRecipe | null;
     segments?: Array<{ start: number; end: number; text: string }>;
     sttModelVersion?: string;
@@ -74,17 +81,31 @@ export async function extractVideoDirectlyWithAi(videoUrl: string): Promise<Dire
 export async function extractAndSaveVideoRecipe(
   videoId: number,
   videoUrl: string
-): Promise<{ rawTranscript: string; recipe?: ExtractedRecipe; durationSeconds?: number }> {
+): Promise<{ rawTranscript: string; recipe?: ExtractedRecipe; aiSummary?: string; durationSeconds?: number }> {
   const aiResult = await extractVideoDirectlyWithAi(videoUrl);
+  let summary = aiResult.aiSummary || aiResult.summary;
+  if (!summary && aiResult.recipe?.title) {
+    const ingCount = aiResult.recipe.ingredients?.length ?? 0;
+    const stepCount = aiResult.recipe.steps?.length ?? 0;
+    summary = `${aiResult.recipe.title} (Khẩu phần: ${aiResult.recipe.servings ?? 2} người, ${ingCount} nguyên liệu, ${stepCount} bước chế biến)`;
+  }
+
   if (videoId > 0 && aiResult.rawTranscript) {
     try {
       await saveVideoTranscript(videoId, {
         rawTranscript: aiResult.rawTranscript,
+        aiSummary: summary,
         recipe: aiResult.recipe as ExtractedRecipe,
       });
+      void queryClient.invalidateQueries({ queryKey: videoKeys.transcript(videoId) });
     } catch (saveErr) {
       console.warn('Lỗi lưu transcript xuống Backend:', saveErr);
     }
   }
-  return aiResult as { rawTranscript: string; recipe?: ExtractedRecipe; durationSeconds?: number };
+  return {
+    rawTranscript: aiResult.rawTranscript,
+    recipe: aiResult.recipe as ExtractedRecipe,
+    aiSummary: summary,
+    durationSeconds: aiResult.durationSeconds,
+  };
 }

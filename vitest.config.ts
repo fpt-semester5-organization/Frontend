@@ -3,7 +3,7 @@ import viteConfig from './vite.config';
 
 // Unit test dùng chung cấu hình Vite (alias @, plugin React). Chạy: npm test
 export default mergeConfig(
-  viteConfig,
+  viteConfig as any,
   defineConfig({
     test: {
       environment: 'jsdom',
