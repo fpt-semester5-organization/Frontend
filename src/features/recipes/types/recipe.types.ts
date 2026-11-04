@@ -11,9 +11,14 @@ export interface Food {
   foodId: number;
   foodName: string;
   categoryId: number;
-  imageUrl?: string | null;
-  recipeCount?: number;
   categoryName?: string | null;
+  /** Ảnh món lấy từ công thức đã duyệt của món (ảnh sách); null nếu món chưa có công thức có ảnh. */
+  imageUrl?: string | null;
+  /** Số công thức đã duyệt của món và các cờ lọc nhanh, do API /foods tính trên toàn bộ công thức. */
+  recipeCount?: number;
+  hasHighCalorie?: boolean;
+  hasNoSpicy?: boolean;
+  hasAlliumFree?: boolean;
 }
 
 /** Trường món ăn trong công thức; công thức tạo trước khi có bảng Foods thì không có (null). */
