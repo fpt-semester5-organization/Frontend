@@ -92,12 +92,13 @@ export const listRecipeSuggestions = (
   );
 
 /**
- * GET /ingredients?query=...
+ * GET /ingredients?keyword=&page=&size=
  * Tìm kiếm nhanh nguyên liệu chuẩn trong hệ thống để người dùng chọn khi thêm tủ.
+ * Backend bỏ qua tham số sai tên và trả về cả danh mục, nên phải dùng đúng `keyword` và `size`.
  */
-export const searchIngredients = (query: string): Promise<IngredientOption[]> =>
+export const searchIngredients = (keyword: string): Promise<IngredientOption[]> =>
   unwrapPaged<IngredientOption>(
-    http.get('/ingredients', { params: { search: query, pageSize: 20 } }),
+    http.get('/ingredients', { params: { keyword, page: 1, size: 20 } }),
   ).then((r) => r.items);
 
 export interface LatestFridgeSession {
