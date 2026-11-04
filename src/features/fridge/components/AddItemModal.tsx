@@ -151,7 +151,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             role="listbox"
             aria-label="Kết quả tìm kiếm nguyên liệu"
           >
-            {search.isPending ? (
+            {/* Xét ô trống trước: query bị tắt khi chưa có từ khóa nên isPending luôn true. */}
+            {!keyword.trim() ? (
+              <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
+                Nhập từ khóa để tìm nguyên liệu chuẩn
+              </div>
+            ) : search.isPending ? (
               <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
                 Đang tìm nguyên liệu...
               </div>
@@ -159,7 +164,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
               <div className="p-3 font-body-sm text-body-sm text-red-600">
                 {apiErrorMessage(search.error, 'Lỗi tìm kiếm')}
               </div>
-            ) : keyword && (search.data ?? []).length === 0 ? (
+            ) : (search.data ?? []).length === 0 ? (
               <div className="p-3 font-body-sm text-body-sm text-on-surface-variant flex flex-col gap-1.5">
                 <span>Chưa có trong danh mục mẫu. Bạn có thể thêm trực tiếp:</span>
                 <button
@@ -174,10 +179,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
                   <Icon name="add" className="text-[16px]" />
                   <span>Dùng tên: “{keyword.trim()}”</span>
                 </button>
-              </div>
-            ) : !keyword && !selectedIngredient ? (
-              <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
-                Nhập từ khóa để tìm nguyên liệu chuẩn
               </div>
             ) : (
               (search.data ?? []).map((opt) => (
