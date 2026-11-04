@@ -1,4 +1,4 @@
-import { http, unwrap, unwrapPaged } from '@/api/http';
+﻿import { http, unwrap, unwrapPaged } from '@/api/http';
 import type { AddItemForm, EditItemForm } from '../schemas/fridge.schema';
 import type {
   DetectionQuota,
@@ -98,7 +98,7 @@ export const listRecipeSuggestions = (
  */
 export const searchIngredients = (keyword: string): Promise<IngredientOption[]> =>
   unwrapPaged<IngredientOption>(
-    http.get('/ingredients', { params: { keyword, page: 1, size: 20 } }),
+    http.get('/ingredients', { params: { keyword, search: keyword, page: 1, size: 20 } }),
   ).then((r) => r.items);
 
 export interface LatestFridgeSession {
@@ -120,3 +120,4 @@ export const getLatestFridgeSession = async (): Promise<LatestFridgeSession | nu
     return null;
   }
 };
+

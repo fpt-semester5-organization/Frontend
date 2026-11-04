@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -45,6 +45,17 @@ const orderAisles = (aisles: ShoppingAisle[]) =>
  * 4. Phân nhóm nguyên liệu theo 4 quầy hàng chuẩn ở mọi chế độ xem (Rau củ, Đạm thực vật, Đồ khô, Gia vị).
  */
 const ShoppingList: React.FC = () => {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else if (planId) {
+      navigate(PATHS.MEAL_PLANS.DETAIL(planId));
+    } else {
+      navigate(PATHS.MEAL_PLANS.ROOT);
+    }
+  };
   const { id } = useParams();
   const listId = Number(id);
   const validId = Number.isInteger(listId) && listId > 0;
@@ -224,11 +235,48 @@ const ShoppingList: React.FC = () => {
         .map((item) => {
           const rawSources = (item as unknown as { recipeSources?: string[] }).recipeSources ?? [];
           const matchingSources = rawSources.filter(isSourceOfThisDay);
-          if (matchingSources.length === 0) return null;
 
-          // Tỷ lệ lượng nguyên liệu cho ngày này dựa trên số món trong ngày / tổng số món dùng
-          const ratio = rawSources.length > 0 ? matchingSources.length / rawSources.length : 1;
-          const baseDayQuantity = Math.round(item.quantity * ratio * 100) / 100;
+          const dayQuantities = (item as unknown as { dayQuantities?: Record<string, number> }).dayQuantities;
+          let baseDayQuantity: number;
+
+          // 1. Ưu tiên số liệu chính xác 100% từng ngày do Backend tính từ RecipeIngredients
+          if (dayQuantities && dayQuantities[String(dItem.index)] !== undefined) {
+            baseDayQuantity = dayQuantities[String(dItem.index)];
+            if (baseDayQuantity <= 0) return null; // Ngày này không dùng nguyên liệu này
+          } else {
+            // 2. Fallback nếu chưa có dayQuantities
+            if (matchingSources.length === 0) return null;
+
+            // Đếm số món trong ngày này dùng nguyên liệu
+            const dayMatchesCount = meals.filter((m: { title: string; recipeTitle: string }) => {
+              const t1 = m.title.trim().toLowerCase();
+              const t2 = m.recipeTitle.trim().toLowerCase();
+              return rawSources.some((rs) => {
+                const r = rs.trim().toLowerCase();
+                return r === t1 || r === t2 || r.includes(t1) || t1.includes(r);
+              });
+            }).length;
+
+            // Đếm tổng số bữa ăn trong cả kế hoạch dùng nguyên liệu này
+            let totalSlotsMatching = 0;
+            calendarDays.forEach((cd) => {
+              const slots = (totalDays <= 7
+                ? planData?.slots?.filter((s) => s.dayOfWeek === cd.dayOfWeek)
+                : planData?.slots?.slice(cd.index * 3, cd.index * 3 + 3)) ?? [];
+              const countInDay = slots.filter((s) => {
+                const sTitle = ((s.recipe as any)?.foodName ?? s.recipe?.title ?? '').toLowerCase();
+                const sRecipeTitle = (s.recipe?.title ?? '').toLowerCase();
+                return rawSources.some((rs) => {
+                  const r = rs.trim().toLowerCase();
+                  return r === sTitle || r === sRecipeTitle || r.includes(sTitle) || sTitle.includes(r);
+                });
+              }).length;
+              totalSlotsMatching += countInDay;
+            });
+
+            const ratio = totalSlotsMatching > 0 ? dayMatchesCount / totalSlotsMatching : (rawSources.length > 0 ? matchingSources.length / rawSources.length : 1);
+            baseDayQuantity = Math.round(item.quantity * ratio * 100) / 100;
+          }
 
           // Kiểm tra xem món này đã mua riêng ở ngày này chưa (độc lập với ngày khác!)
           const isPurchasedInThisDay = dayPurchases.has(`${dItem.index}_${item.itemId}`);
@@ -657,25 +705,42 @@ return (
 
   return (
     <div className={PAGE}>
-      {/* Đường dẫn Breadcrumb */}
-      <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
-        <Link to={PATHS.MEAL_PLANS.ROOT} className="flex items-center gap-1 text-on-surface-variant no-underline hover:text-primary">
-          <Icon name="restaurant_menu" className="text-[16px]" />
-          Thực đơn tuần
-        </Link>
-        {planId && (
-          <>
-            <span className="text-outline-variant">/</span>
-            <Link to={PATHS.MEAL_PLANS.DETAIL(planId)} className="text-on-surface-variant no-underline hover:text-primary">
-              Thực đơn #{planId}
-            </Link>
-          </>
-        )}
-        <span className="text-outline-variant">/</span>
-        <span className="text-primary font-semibold" aria-current="page">
-          Danh sách đi chợ
-        </span>
-      </nav>
+      {/* Thanh điều hướng quay lại & Breadcrumb */}
+      <div className="flex items-center justify-between gap-space-sm pb-1 flex-wrap">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+        >
+          <Icon name="arrow_back" className="text-[18px]" />
+          <span>Quay lại</span>
+        </button>
+
+        <nav aria-label="Đường dẫn" className="flex min-w-0 max-w-full items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+          <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+            Trang chủ
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <Link to={PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+            Thực đơn tuần
+          </Link>
+          {planId && (
+            <>
+              <span className="text-outline-variant">/</span>
+              <Link
+                to={PATHS.MEAL_PLANS.DETAIL(planId)}
+                className="shrink-0 text-on-surface-variant no-underline hover:text-primary sm:max-w-[200px] truncate"
+              >
+                {planData?.planName || `Thực đơn #${planId}`}
+              </Link>
+            </>
+          )}
+          <span className="text-outline-variant">/</span>
+          <span aria-current="page" className="min-w-0 truncate text-primary font-semibold sm:max-w-[320px]">
+            Danh sách đi chợ
+          </span>
+        </nav>
+      </div>
 
       {/* Header chính */}
       <header className="flex flex-wrap items-start justify-between gap-space-md">
@@ -924,7 +989,7 @@ return (
                         'group relative flex flex-col justify-between gap-2.5 rounded-2xl border p-3.5 transition-all no-underline shadow-2xs',
                         isComplete
                           ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/20'
-                          : 'border-surface-container bg-surface-container-lowest hover:border-primary/50 hover:shadow-xs'
+                          : 'border-primary/25 bg-gradient-to-r from-primary-container/15 via-surface-container-lowest to-surface-container-lowest hover:border-primary/50 hover:shadow-xs'
                       )}
                       title={`Xem công thức nấu: ${meal.title}`}
                     >

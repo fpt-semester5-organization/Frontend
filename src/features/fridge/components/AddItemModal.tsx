@@ -149,14 +149,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
           <div
             className="max-h-40 overflow-y-auto rounded-lg border border-outline-variant/60 bg-surface-container-low"
             role="listbox"
-            aria-label="Kết quả tìm kiếm nguyên liệu"
-          >
-            {/* Xét ô trống trước: query bị tắt khi chưa có từ khóa nên isPending luôn true. */}
-            {!keyword.trim() ? (
+            aria-label="Kết quả tìm kiếm nguyên liệu">
+            {!keyword.trim() && !selectedIngredient ? (
               <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
                 Nhập từ khóa để tìm nguyên liệu chuẩn
               </div>
-            ) : search.isPending ? (
+            ) : search.isLoading || search.isPending || (keyword.trim() && search.isFetching && !search.data) ? (
               <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
                 Đang tìm nguyên liệu...
               </div>
@@ -164,7 +162,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
               <div className="p-3 font-body-sm text-body-sm text-red-600">
                 {apiErrorMessage(search.error, 'Lỗi tìm kiếm')}
               </div>
-            ) : (search.data ?? []).length === 0 ? (
+) : keyword.trim() && (search.data ?? []).length === 0 ? (
               <div className="p-3 font-body-sm text-body-sm text-on-surface-variant flex flex-col gap-1.5">
                 <span>Chưa có trong danh mục mẫu. Bạn có thể thêm trực tiếp:</span>
                 <button
@@ -181,28 +179,48 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
                 </button>
               </div>
             ) : (
-              (search.data ?? []).map((opt) => (
-                <button
-                  key={opt.ingredientId}
-                  type="button"
-                  role="option"
-                  aria-selected={selectedIngredient?.ingredientId === opt.ingredientId}
-                  onClick={() => {
-                    setSelectedIngredient(opt);
-                    setValue('ingredientId', opt.ingredientId, { shouldValidate: true });
-                  }}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left font-body-sm text-body-sm transition-colors hover:bg-surface-container ${
-                    selectedIngredient?.ingredientId === opt.ingredientId
-                      ? 'bg-primary-fixed/40 font-semibold text-primary'
-                      : 'text-on-surface'
-                  }`}
-                >
-                  <span>{opt.name}</span>
-                  {selectedIngredient?.ingredientId === opt.ingredientId && (
-                    <Icon name="check" className="text-[18px] text-primary" />
+              <>
+                {(search.data ?? []).map((opt) => (
+                  <button
+                    key={opt.ingredientId}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedIngredient?.ingredientId === opt.ingredientId}
+                    onClick={() => {
+                      setSelectedIngredient(opt);
+                      setKeyword(opt.name);
+                      setValue('ingredientId', opt.ingredientId, { shouldValidate: true });
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left font-body-sm text-body-sm transition-colors hover:bg-surface-container ${selectedIngredient?.ingredientId === opt.ingredientId
+                        ? 'bg-primary-fixed/40 font-semibold text-primary'
+                        : 'text-on-surface'
+                      }`}
+                  >
+                    <span>{opt.name}</span>
+                    {selectedIngredient?.ingredientId === opt.ingredientId && (
+                      <Icon name="check" className="text-[18px] text-primary" />
+                    )}
+                  </button>
+                ))}
+                {keyword.trim() &&
+                  selectedIngredient?.name !== keyword.trim() &&
+                  !(search.data ?? []).some(
+                    (opt) => opt.name.toLowerCase() === keyword.trim().toLowerCase(),
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const opt = { ingredientId: 0, name: keyword.trim() };
+                        setSelectedIngredient(opt);
+                        setValue('ingredientId', undefined);
+                      }}
+                      className="flex w-full items-center gap-1.5 border-t border-outline-variant/40 px-3 py-2 text-left font-body-sm text-xs font-medium text-primary hover:bg-surface-container transition-colors"
+                    >
+                      <Icon name="add" className="text-[16px]" />
+                      <span>Dùng tên tùy chỉnh: “{keyword.trim()}”</span>
+                    </button>
                   )}
-                </button>
-              ))
+              </>
             )}
           </div>
 
@@ -312,11 +330,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'FRESH')}
-              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
-                freshness === 'FRESH'
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${freshness === 'FRESH'
                   ? 'border-emerald-500 bg-[#eaf3ec] text-[#2d5a38] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-              }`}
+                }`}
             >
               <Icon name="eco" className="text-[17px] text-emerald-600 shrink-0" />
               <span className="truncate">FRESH · Còn tươi</span>
@@ -324,11 +341,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
             <button
               type="button"
               onClick={() => setValue('freshnessStatus', 'NON-FRESH')}
-              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${
-                freshness === 'NON-FRESH'
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-xs sm:text-sm font-semibold transition-all min-w-0 ${freshness === 'NON-FRESH'
                   ? 'border-amber-500 bg-[#fef6ea] text-[#935216] shadow-xs'
                   : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-              }`}
+                }`}
             >
               <Icon name="hourglass_bottom" className="text-[17px] text-amber-600 shrink-0" />
               <span className="truncate">NON-FRESH · Sắp hỏng</span>

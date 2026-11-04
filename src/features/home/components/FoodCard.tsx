@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import type { FoodDish } from '../data/mockFoodsData';
+import { getFallbackFoodImage } from '@/lib/foodImages';
 
 export interface FoodCardProps {
   dish: FoodDish;
@@ -13,7 +14,25 @@ export interface FoodCardProps {
 /** Thẻ món ăn đồng bộ với chuẩn thiết kế VeggieLife, dẫn thẳng sang giao diện đầy đủ /recipes?food= */
 export const FoodCard: React.FC<FoodCardProps> = ({ dish, className, onSelect }) => {
   const navigate = useNavigate();
-  const [imgError, setImgError] = React.useState(false);
+  const fallbackImg = React.useMemo(
+    () => getFallbackFoodImage(null, dish.foodName, dish.categoryName),
+    [dish.foodName, dish.categoryName]
+  );
+  const [imgSrc, setImgSrc] = React.useState<string>(dish.imageUrl || fallbackImg);
+  const [hasFallbackFailed, setHasFallbackFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgSrc(dish.imageUrl || fallbackImg);
+    setHasFallbackFailed(false);
+  }, [dish.imageUrl, fallbackImg]);
+
+  const handleImageError = () => {
+    if (imgSrc !== fallbackImg) {
+      setImgSrc(fallbackImg);
+    } else {
+      setHasFallbackFailed(true);
+    }
+  };
 
   const handleCardClick = () => {
     if (onSelect) {
@@ -32,13 +51,13 @@ export const FoodCard: React.FC<FoodCardProps> = ({ dish, className, onSelect })
     >
       {/* Ảnh món ăn chất lượng cao tỉ lệ 4:3 */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container">
-        {!imgError && dish.imageUrl ? (
+        {!hasFallbackFailed ? (
           <img referrerPolicy="no-referrer"
-            src={dish.imageUrl}
+            src={imgSrc}
             alt={dish.foodName}
             width={480}
             height={360}
-            onError={() => setImgError(true)}
+            onError={handleImageError}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             loading="lazy"
           />

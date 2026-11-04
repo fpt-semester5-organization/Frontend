@@ -897,21 +897,35 @@ export const MealPlanDetail: React.FC = () => {
     <main className="mx-auto min-h-[calc(100vh-140px)] w-full max-w-[1280px] bg-background">
       <div className="flex w-full flex-col gap-space-lg px-margin-mobile pt-6 pb-space-lg sm:px-margin sm:pt-8">
         {/* Navigation & Header Actions */}
-        <section className="flex flex-col justify-between gap-space-md lg:flex-row lg:items-end">
-          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-            <nav aria-label="Điều hướng" className="flex flex-wrap items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
-              <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+        <section className="flex flex-col gap-space-sm">
+          {/* Thanh điều hướng quay lại & Breadcrumb */}
+          <div className="flex items-center justify-between gap-space-sm pb-1 flex-wrap">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
+            >
+              <Icon name="arrow_back" className="text-[18px]" />
+              <span>Quay lại</span>
+            </button>
+
+            <nav aria-label="Đường dẫn" className="flex min-w-0 max-w-full items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+              <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
                 Trang chủ
               </Link>
-              <span>/</span>
-              <Link to={PATHS.MEAL_PLANS.ROOT} className="hover:text-primary transition-colors">
+              <span className="text-outline-variant">/</span>
+              <Link to={PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
                 Thực đơn tuần
               </Link>
-              <span>/</span>
-              <span className="font-semibold text-on-surface">
-                {totalDays < 7 ? `Thực đơn ${totalDays} ngày` : `${formatDate(data.startDate)} – ${data.endDate ? formatDate(data.endDate) : ''}`}
+              <span className="text-outline-variant">/</span>
+              <span aria-current="page" className="min-w-0 truncate text-primary font-semibold sm:max-w-[320px]">
+                {dynamicPlanTitle || data.planName}
               </span>
             </nav>
+          </div>
+
+          <div className="flex flex-col justify-between gap-space-md lg:flex-row lg:items-end">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
 
             {/* Tiêu đề chuẩn: < 7 ngày ghi Thực đơn dinh dưỡng (N ngày), >= 7 ngày ghi từ Thứ [X] đến Thứ [Y] */}
             <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -979,7 +993,8 @@ export const MealPlanDetail: React.FC = () => {
               <span className="hidden sm:inline">Tạo mới</span>
             </Link>
           </div>
-        </section>
+        </div>
+      </section>
 
         {/* Khối Thông báo Đã Hủy (SWP391-232) */}
         {isCancelled && (

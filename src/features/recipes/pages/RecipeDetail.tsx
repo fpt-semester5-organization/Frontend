@@ -3,7 +3,7 @@
  * FN: FN-POST-02, FN-POST-11, FN-COMM-01 · Huỳnh Việt Phát · Sprint 5
  * Chi tiết công thức hiển thị đầy đủ cho cả Khách; thả tim, bình luận, báo cáo dùng chung với Cộng đồng (FN-COMM-01..05).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -19,6 +19,7 @@ import { useRequireMember } from '@/hooks/useRequireMember';
 import { toApiError } from '@/lib/apiError';
 import { formatNumber } from '@/lib/format';
 import { PATHS } from '@/routes/paths';
+import { getFallbackFoodImage } from '@/lib/foodImages';
 import { useAuthStore } from '@/stores/auth.store';
 import { RelatedRecipes } from '../components/RelatedRecipes';
 import { RECIPE_STATUS_META, canEditRecipe } from '../lib/recipeStatus';
@@ -71,7 +72,30 @@ const RecipeDetail: React.FC = () => {
   const recipe = useRecipe(recipeId);
   const target = useMemo<ContentRef>(() => ({ resource: 'recipes', id: recipeId }), [recipeId]);
   const [reportOpen, setReportOpen] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  const fallbackImg = useMemo(
+    () => (recipe.data ? getFallbackFoodImage(recipe.data.title, null, recipe.data.foodName) : '/videos/clay-pot.jpg'),
+    [recipe.data]
+  );
+  const [imgSrc, setImgSrc] = useState<string>('');
+  const [hasFallbackFailed, setHasFallbackFailed] = useState(false);
+
+  useEffect(() => {
+    if (recipe.data?.imageUrl) {
+      setImgSrc(recipe.data.imageUrl);
+      setHasFallbackFailed(false);
+    } else if (fallbackImg) {
+      setImgSrc(fallbackImg);
+      setHasFallbackFailed(false);
+    }
+  }, [recipe.data?.imageUrl, fallbackImg]);
+
+  const handleImageError = () => {
+    if (imgSrc !== fallbackImg) {
+      setImgSrc(fallbackImg);
+    } else {
+      setHasFallbackFailed(true);
+    }
+  };
 
   if (!validId) return <NotFound />;
 
@@ -144,11 +168,48 @@ const RecipeDetail: React.FC = () => {
             Trang chủ
           </Link>
           <span className="text-outline-variant">/</span>
-          <Link to={PATHS.RECIPES.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
-            Kho công thức
-          </Link>
+          {(() => {
+            const state = location.state as { fromPlanId?: number; fromDay?: string; returnUrl?: string } | null;
+            const isFromShopping = Boolean(state?.returnUrl?.includes('/shopping-lists/'));
+            const isFromMealPlan = Boolean(!isFromShopping && (state?.fromPlanId || state?.returnUrl?.includes('/meal-plans/')));
+
+            if (isFromShopping) {
+              return (
+                <>
+                  <Link to={PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+                    Thực đơn tuần
+                  </Link>
+                  <span className="text-outline-variant">/</span>
+                  <Link to={state?.returnUrl || PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+                    Đi chợ
+                  </Link>
+                </>
+              );
+            }
+            if (isFromMealPlan) {
+              return (
+                <>
+                  <Link to={PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+                    Thực đơn tuần
+                  </Link>
+                  <span className="text-outline-variant">/</span>
+                  <Link
+                    to={state?.returnUrl || (state?.fromPlanId ? PATHS.MEAL_PLANS.DETAIL(state.fromPlanId) : PATHS.MEAL_PLANS.ROOT)}
+                    className="shrink-0 text-on-surface-variant no-underline hover:text-primary sm:max-w-[180px] truncate"
+                  >
+                    Chi tiết thực đơn
+                  </Link>
+                </>
+              );
+            }
+            return (
+              <Link to={PATHS.RECIPES.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+                Kho công thức
+              </Link>
+            );
+          })()}
           <span className="text-outline-variant">/</span>
-          <span aria-current="page" className="min-w-0 truncate text-primary sm:max-w-[320px]">
+          <span aria-current="page" className="min-w-0 truncate text-primary font-semibold sm:max-w-[320px]">
             {data.title}
           </span>
         </nav>
@@ -189,16 +250,16 @@ const RecipeDetail: React.FC = () => {
                 );
               }
 
-              if (data.imageUrl && !imgError) {
+              if (imgSrc && !hasFallbackFailed) {
                 return (
                   <img
-                    src={data.imageUrl}
+                    src={imgSrc}
                     referrerPolicy="no-referrer"
                     alt={`Ảnh công thức ${data.title}`}
                     width={960}
                     height={720}
                     {...{ fetchpriority: 'high' }}
-                    onError={() => setImgError(true)}
+                    onError={handleImageError}
                     className="aspect-[4/3] h-auto w-full object-cover"
                   />
                 );
