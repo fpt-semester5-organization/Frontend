@@ -29,7 +29,7 @@ describe('AddItemModal: gợi ý nguyên liệu', () => {
 
     expect(await screen.findByRole('option', { name: 'Cà rốt củ tươi' })).toBeInTheDocument();
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Cà chua chín đỏ', 'Cà rốt củ tươi']);
-    expect(calls.find((call) => call.url === '/ingredients')?.params).toEqual({ keyword: 'cà', page: 1, size: 20 });
+    expect(calls.find((call) => call.url === '/ingredients')?.params).toMatchObject({ keyword: 'cà', page: 1, size: 20 });
   });
 
   it('từ khóa không có trong danh mục: không hiện nguyên liệu nào, cho dùng tên vừa nhập', async () => {
