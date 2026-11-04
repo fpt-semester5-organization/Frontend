@@ -68,12 +68,12 @@ function signInAsMember() {
   useUiStore.setState({ toasts: [] });
 }
 
-describe('MealPlanDetail - Banner Đối Chiếu Ghi Chú AI & Nút Hủy Thực Đơn (SWP391-232)', () => {
+describe('MealPlanDetail - Ghi Chú AI Áp Dụng Tại Món Ăn & Nút Hủy Thực Đơn (SWP391-232)', () => {
   beforeEach(() => {
     signInAsMember();
   });
 
-  it('hiển thị Banner đối chiếu ghi chú AI với nguyên văn ghi chú và nhãn đã áp dụng', async () => {
+  it('xóa bỏ banner to phía trên và hiển thị ghi chú trực tiếp tại món ăn được AI áp dụng', async () => {
     mockApi((req) => {
       if (req.url === '/meal-plans/41' && req.method === 'GET') {
         return { data: mockActivePlan };
@@ -91,17 +91,19 @@ describe('MealPlanDetail - Banner Đối Chiếu Ghi Chú AI & Nút Hủy Thực
       { route: '/meal-plans/41' }
     );
 
-    // 1. Chờ tải xong và kiểm tra Banner đối chiếu ghi chú AI
-    expect(await screen.findByRole('region', { name: /Đối chiếu ghi chú dinh dưỡng AI/i })).toBeInTheDocument();
+    // 1. Chờ trang tải xong (thấy nút đi chợ)
+    expect(await screen.findByRole('button', { name: /đi chợ/i })).toBeInTheDocument();
 
-    // 2. Kiểm tra nhãn xác nhận AI đã áp dụng
-    expect(screen.getByText(/AI đã áp dụng ghi chú này/i)).toBeInTheDocument();
+    // 2. Banner lớn phía trên ĐÃ ĐƯỢC XÓA BỎ HOÀN TOÀN
+    expect(screen.queryByRole('region', { name: /Đối chiếu ghi chú dinh dưỡng AI/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ghi chú dinh dưỡng cá nhân đã gửi AI/i)).not.toBeInTheDocument();
 
-    // 3. Kiểm tra nguyên văn yêu cầu của người dùng được hiển thị
-    expect(screen.getByText(/"ít dầu, không cay"/i)).toBeInTheDocument();
+    // 3. Yêu cầu của người dùng được dời về hiển thị tại đúng món ăn với tiền tố "AI đã áp dụng yêu cầu của bạn:"
+    expect(await screen.findByText(/AI đã áp dụng yêu cầu của bạn:/i)).toBeInTheDocument();
+    expect(screen.getByText(/ít dầu, không cay/i)).toBeInTheDocument();
   });
 
-  it('KHÔNG hiển thị Banner đối chiếu khi thực đơn không kèm ghi chú dinh dưỡng tự do', async () => {
+  it('KHÔNG hiển thị note AI áp dụng khi thực đơn không kèm ghi chú dinh dưỡng tự do', async () => {
     mockApi((req) => {
       if (req.url === '/meal-plans/42' && req.method === 'GET') {
         return { data: { ...mockActivePlan, planId: 42, customInstructions: null } };
@@ -122,10 +124,10 @@ describe('MealPlanDetail - Banner Đối Chiếu Ghi Chú AI & Nút Hủy Thực
     // Chờ trang tải xong (thấy nút đi chợ)
     expect(await screen.findByRole('button', { name: /đi chợ/i })).toBeInTheDocument();
 
-    // Kiểm tra Banner đối chiếu ghi chú AI HOÀN TOÀN KHÔNG HIỆN DIỆN
+    // Kiểm tra Banner to và note AI áp dụng HOÀN TOÀN KHÔNG HIỆN DIỆN
     expect(screen.queryByRole('region', { name: /Đối chiếu ghi chú dinh dưỡng AI/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Ghi chú dinh dưỡng cá nhân đã gửi AI/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/AI đã áp dụng ghi chú này/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI đã áp dụng yêu cầu của bạn:/i)).not.toBeInTheDocument();
   });
 
   it('hiển thị nút Hủy thực đơn và mở Modal xác nhận kèm cảnh báo không hoàn lại Quota tuần', async () => {
@@ -157,7 +159,7 @@ describe('MealPlanDetail - Banner Đối Chiếu Ghi Chú AI & Nút Hủy Thực
     );
 
     // Chờ trang tải xong
-    expect(await screen.findByRole('region', { name: /Đối chiếu ghi chú dinh dưỡng AI/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Hủy thực đơn/i })).toBeInTheDocument();
 
     // 1. Kiểm tra sự hiện diện của nút "Hủy thực đơn"
     const cancelBtn = screen.getByRole('button', { name: /Hủy thực đơn/i });

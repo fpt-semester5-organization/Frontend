@@ -100,29 +100,13 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
 
   const text = rawNote.trim();
   const chips: AiParsedChip[] = [];
-  const addedConcepts = new Set<string>();
   const addedLower = new Set<string>();
-
-  const getConceptGroup = (label: string): string => {
-    const l = label.toLowerCase().trim();
-    if (l.includes('dầu mỡ') || l.includes('thanh đạm')) return 'GROUP_LOW_OIL_THANH_DAM';
-    if (l.includes('ngũ vị tân')) return 'GROUP_ALLIUM';
-    if (l.includes('không ăn cay') || l.includes('ít cay') || l.includes('hạn chế cay')) return 'GROUP_SPICY';
-    if (l.includes('chiên') || l.includes('rán')) return 'GROUP_FRIED';
-    if (l.includes('canh')) return 'GROUP_SOUP';
-    if (l.includes('nấm')) return 'GROUP_MUSHROOM';
-    if (l.includes('rau củ luộc')) return 'GROUP_BOILED_VEG';
-    if (l.includes('đạm') || l.includes('protein')) return 'GROUP_PROTEIN';
-    return l;
-  };
 
   const addChip = (label: string, category: ContextCategory) => {
     const cleanLabel = label.trim();
-    if (!cleanLabel) return;
-    const groupKey = getConceptGroup(cleanLabel);
-    if (addedConcepts.has(groupKey)) return;
-    addedConcepts.add(groupKey);
-    addedLower.add(cleanLabel.toLowerCase());
+    const key = cleanLabel.toLowerCase();
+    if (!key || addedLower.has(key)) return;
+    addedLower.add(key);
     chips.push({
       id: `chip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       category,
@@ -182,7 +166,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
     { regex: /ít\s*(?:dầu\s*)?mỡ/i, label: 'Ít dầu mỡ, thanh đạm' },
     { regex: /thích\s*(?:món\s*)?canh|thèm\s*canh/i, label: 'Thích món canh ấm nóng' },
     { regex: /món\s*nước/i, label: 'Ưu tiên món nước (bún, phở, cháo)' },
-    { regex: /(?<!dầu\s*mỡ[,\s]*)thanh\s*đạm/i, label: 'Ít dầu mỡ, thanh đạm' },
+    { regex: /thanh\s*đạm/i, label: 'Khẩu vị thanh đạm' },
     { regex: /đậm\s*đà/i, label: 'Khẩu vị đậm đà' },
     { regex: /ít\s*ngọt/i, label: 'Ít ngọt' },
     { regex: /ít\s*muối|ít\s*mặn/i, label: 'Ít mặn' },
@@ -218,7 +202,7 @@ export function parseRawNoteToChips(rawNote: string): AiParsedChip[] {
   const dietPatterns: Array<{ regex: RegExp; label: string }> = [
     { regex: /thuần\s*chay|vegan/i, label: 'Thuần chay (Vegan)' },
     { regex: /chay\s*kỳ/i, label: 'Ăn chay kỳ' },
-    { regex: /(?:không|kiêng)\s*(?:ăn\s*)?ngũ\s*vị\s*tân/i, label: 'Không ngũ vị tân' },
+    { regex: /không\s*ngũ\s*vị\s*tân/i, label: 'Kiêng ngũ vị tân (hành, tỏi, hẹ)' },
     { regex: /chay\s*có\s*trứng|ovo/i, label: 'Ăn chay có trứng' },
     { regex: /chay\s*có\s*sữa|lacto/i, label: 'Ăn chay có sữa' },
   ];
@@ -276,4 +260,139 @@ export function compileChipsToInstructions(chips: AiParsedChip[], customNote?: s
   }
 
   return chipTexts;
+}
+
+/**
+ * Ánh xạ yêu cầu/ghi chú của người dùng (customInstructions) vào đúng món ăn mà AI đã chọn trong danh sách slots.
+ * Trả về bản đồ { [slotId]: "chuỗi ghi chú/yêu cầu đã được AI áp dụng" }.
+ */
+export function matchCustomInstructionsToSlots<
+  T extends { slotId: number; mealType?: string; recipe?: { title?: string } | null; notes?: string | null }
+>(
+  slots: T[],
+  customInstructions?: string | null
+): Record<number, string> {
+  if (!customInstructions || !customInstructions.trim() || !slots || slots.length === 0) {
+    return {};
+  }
+
+  const rawText = customInstructions.trim();
+  const result: Record<number, string> = {};
+
+  // 1. Tách chuỗi yêu cầu thành các phân đoạn/tiêu chí riêng biệt
+  const rawSegments = rawText
+    .split(/[,;.\n]+/)
+    .map((s) => s.trim().replace(/^[-*•]\s*/, ''))
+    .filter((s) => s.length > 0);
+
+  // Stop words tiếng Việt cần loại trừ khi bóc từ khóa đơn
+  const stopWords = new Set([
+    'món', 'của', 'bạn', 'người', 'cho', 'với', 'và', 'nhưng', 'có', 'này', 'đó',
+    'được', 'tôi', 'mình', 'yêu', 'cầu', 'hãy', 'giúp', 'nhé', 'muốn', 'thích',
+    'thèm', 'cần', 'ăn', 'nấu', 'làm', 'thêm', 'bớt', 'phải', 'không', 'như',
+    'các', 'những', 'nữa', 'lại', 'thì', 'là', 'ở', 'đây', 'kia', 'nào', 'chút'
+  ]);
+
+  const normalizeUnaccented = (str: string) =>
+    str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+  const normalizeRaw = (str: string) => str.toLowerCase().trim();
+
+  const extractKeywords = (seg: string) => {
+    return seg
+      .toLowerCase()
+      .split(/[\s+-_/:"]+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length >= 2 && !stopWords.has(w));
+  };
+
+  const matchedSlotIds = new Set<number>();
+
+  // 2. Với từng phân đoạn yêu cầu của người dùng, tìm slot khớp nhất
+  for (const seg of rawSegments) {
+    const isNegativeOrDietPreference = /^(?:không|kiêng|hạn chế|ít|tránh|dị ứng)\b/i.test(seg);
+    if (isNegativeOrDietPreference) {
+      // Bỏ qua việc tìm món chứa từ khóa bị kiêng/hạn chế (ví dụ "không cay" không được bắt vào món "cay")
+      continue;
+    }
+
+    const segLower = normalizeRaw(seg);
+    const segUnaccented = normalizeUnaccented(seg);
+    const keywords = extractKeywords(seg);
+
+    let bestSlot: T | null = null;
+    let bestScore = 0;
+
+    for (const slot of slots) {
+      if (matchedSlotIds.has(slot.slotId)) continue;
+      const rawTitle = slot.recipe?.title || '';
+      if (!rawTitle) continue;
+
+      const titleLower = normalizeRaw(rawTitle);
+      const titleUnaccented = normalizeUnaccented(rawTitle);
+
+      let score = 0;
+
+      // Khớp trực tiếp cả cụm segment (có dấu hoặc không dấu)
+      if (titleLower.includes(segLower) || segLower.includes(titleLower)) {
+        score += 35;
+      } else if (titleUnaccented.includes(segUnaccented) || segUnaccented.includes(titleUnaccented)) {
+        score += 25;
+      }
+
+      // Khớp cụm từ khóa 2 chữ liên tiếp (bigram) ví dụ: "bí đỏ", "củ sen", "nấm rơm", "đậu hũ", "cơm chiên"
+      for (let i = 0; i < keywords.length - 1; i++) {
+        const bigram = `${keywords[i]} ${keywords[i + 1]}`;
+        if (titleLower.includes(bigram)) score += 20;
+        else if (titleUnaccented.includes(normalizeUnaccented(bigram))) score += 15;
+      }
+
+      // Khớp từng từ khóa riêng lẻ
+      for (const kw of keywords) {
+        if (titleLower.includes(kw)) score += 5;
+        else if (titleUnaccented.includes(normalizeUnaccented(kw))) score += 4;
+      }
+
+      // Khớp theo bữa ăn nếu có chỉ định (sáng/trưa/tối)
+      if (slot.mealType) {
+        if ((segLower.includes('sáng') || segLower.includes('breakfast')) && slot.mealType === 'BREAKFAST') {
+          score += 10;
+        }
+        if ((segLower.includes('trưa') || segLower.includes('lunch')) && slot.mealType === 'LUNCH') {
+          score += 10;
+        }
+        if ((segLower.includes('tối') || segLower.includes('dinner')) && slot.mealType === 'DINNER') {
+          score += 10;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestSlot = slot;
+      }
+    }
+
+    if (bestSlot && bestScore >= 5) {
+      result[bestSlot.slotId] = seg;
+      matchedSlotIds.add(bestSlot.slotId);
+    }
+  }
+
+  // 3. Nếu chưa slot nào khớp riêng lẻ (ví dụ yêu cầu dạng tổng quát: "ít dầu, không cay", "thanh đạm")
+  if (matchedSlotIds.size === 0) {
+    if (slots[0]) {
+      // Yêu cầu khẩu vị chung cho toàn thực đơn: gán vào món đầu tiên để người dùng thấy rõ
+      result[slots[0].slotId] = rawText;
+    }
+  } else if (matchedSlotIds.size === 1) {
+    // Nếu chỉ có đúng 1 món khớp toàn bộ yêu cầu, hiển thị đầy đủ nguyên văn câu yêu cầu
+    const singleSlotId = Array.from(matchedSlotIds)[0];
+    result[singleSlotId] = rawText;
+  }
+
+  return result;
 }
