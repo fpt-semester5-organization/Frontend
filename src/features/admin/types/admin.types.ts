@@ -30,6 +30,7 @@ export type ContentType = NonNullable<AdminUserContentsFilters['type']>;
 
 /** Một dòng của GET /admin/users; Backend trả thêm trường phái, hạn khóa và số vi phạm đã xác nhận. */
 export type AdminUser = DeepRequired<Row<Schemas['ListAdminUsersResponse']['data']>> & {
+  avatarUrl?: string | null;
   dietarySchoolId?: number | null;
   dietarySchoolName?: string | null;
   lockedUntil?: string | null;
@@ -78,11 +79,23 @@ export type ENumberUpdateBody = UpdateENumberBody;
 
 export type StallType = Schemas['CreateAdminIngredientRequest']['defaultStallType'];
 export type FoodGroup = NonNullable<Row<Schemas['ListAdminIngredientsResponse']['data']>['foodGroup']>;
-export type AdminIngredient = DeepRequired<Row<Schemas['ListAdminIngredientsResponse']['data']>>;
-export type IngredientFilters = Query<'listAdminIngredients'>;
+export type AdminIngredient = DeepRequired<Row<Schemas['ListAdminIngredientsResponse']['data']>> & {
+  imageUrl?: string | null;
+  isLocked?: boolean;
+};
+export type IngredientFilters = Query<'listAdminIngredients'> & {
+  foodGroup?: string;
+  stallType?: string;
+  isLocked?: boolean;
+  hasImage?: boolean;
+};
 export type CreateIngredientBody = Schemas['CreateAdminIngredientRequest'];
 /** PUT /admin/ingredients/{id}: Backend có (AdminIngredientsController) nhưng OpenAPI chưa có; chỉ gửi trường đổi. */
-export type UpdateIngredientBody = Partial<Omit<CreateIngredientBody, 'foodGroup'>> & { foodGroup?: FoodGroup };
+export type UpdateIngredientBody = Partial<Omit<CreateIngredientBody, 'foodGroup'>> & {
+  foodGroup?: FoodGroup;
+  imageUrl?: string | null;
+  isLocked?: boolean;
+};
 export type CreateAllergenBody = Schemas['CreateAdminAllergenRequest'];
 /** GET /allergens (danh mục dùng chung): Backend trả { allergenId, code, allergenName }. */
 export interface Allergen {

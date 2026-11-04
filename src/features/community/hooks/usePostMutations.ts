@@ -37,7 +37,7 @@ export function useCreatePost() {
       const status = res.data.moderationStatus;
 
       // Chỉ hiển thị ngay trên bảng tin công khai khi bài viết đã được duyệt hợp lệ (APPROVED_ACTIVE)
-      if (status === 'APPROVED_ACTIVE') {
+      if (status === 'APPROVED_ACTIVE' && body.visibility !== 'PRIVATE') {
         addRecentCreatedItem({
           key: `POST-${res.data.postId}`,
           kind: 'POST',
@@ -67,8 +67,10 @@ export function useUpdatePost(postId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: UpdatePostBody) => updatePost(postId, body),
-    onSuccess: (res) => {
-      if (res.data?.moderationStatus && res.data.moderationStatus !== 'APPROVED_ACTIVE') {
+    onSuccess: (res, body) => {
+      // Bài chuyển sang riêng tư hoặc không còn APPROVED_ACTIVE thì gỡ khỏi bảng tin ngay
+      const toPrivate = body.visibility === 'PRIVATE' || res.data?.visibility === 'PRIVATE';
+      if (toPrivate || (res.data?.moderationStatus && res.data.moderationStatus !== 'APPROVED_ACTIVE')) {
         removeRecentCreatedItem((item) => item.kind === 'POST' && item.id === postId);
       }
       queryClient.invalidateQueries({ queryKey: communityKeys.post(postId) });

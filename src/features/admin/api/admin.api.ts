@@ -120,6 +120,21 @@ export const updateAdminIngredient = (id: number, body: UpdateIngredientBody) =>
 export const replaceAdminIngredientAllergens = (id: number, allergenIds: number[]) =>
   write<{ ingredientId: number; allergenIds: number[] }>(http.put(`/admin/ingredients/${id}/allergens`, { allergenIds }));
 
+/** PATCH /admin/ingredients/{id}/lock — BR-ADM-ING-01: Khóa / Mở khóa nguyên liệu bảo vệ dữ liệu chuẩn. */
+export const toggleAdminIngredientLock = (id: number, isLocked: boolean) =>
+  write<{ ingredientId: number; isLocked: boolean }>(http.patch(`/admin/ingredients/${id}/lock`, { isLocked }));
+
+/** POST /admin/ingredients/{id}/image — Tải ảnh trực tiếp lên Cloudinary và lưu URL cho nguyên liệu. */
+export const uploadAdminIngredientImage = (id: number, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return write<{ ingredientId: number; imageUrl: string }>(
+    http.post(`/admin/ingredients/${id}/image`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  );
+};
+
 /** POST /admin/allergens — FN-ADM-12. */
 export const createAdminAllergen = (body: CreateAllergenBody) =>
   write<{ allergenId: number }>(http.post('/admin/allergens', body));

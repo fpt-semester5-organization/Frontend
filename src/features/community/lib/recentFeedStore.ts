@@ -117,3 +117,25 @@ export function updateRecentCreatedItem(
     // Bỏ qua lỗi storage
   }
 }
+
+/**
+ * Gỡ các bài viết đã lưu tạm mà máy chủ không còn trả về ở trang đầu bảng tin (chuyển riêng tư, ẩn, xóa ở nơi khác).
+ * Bỏ qua bài mới tạo dưới 60 giây để tránh gỡ nhầm khi danh sách chưa kịp cập nhật.
+ */
+export function pruneRecentPosts(serverPostIds: Set<number>) {
+  try {
+    const current = getRecentCreatedItems();
+    const now = Date.now();
+    const kept = current.filter((item) => {
+      if (item.kind !== 'POST' || serverPostIds.has(item.id)) return true;
+      const t = item.createdAt ? new Date(item.createdAt).getTime() : NaN;
+      return !Number.isNaN(t) && now - t < 60_000;
+    });
+    if (kept.length !== current.length) {
+      sessionStorage.setItem(RECENT_KEY, JSON.stringify(kept));
+      window.dispatchEvent(new Event('vl_recent_item_added'));
+    }
+  } catch {
+    // Bỏ qua lỗi storage
+  }
+}

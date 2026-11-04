@@ -11,6 +11,8 @@ interface VoteButtonProps {
   /** Bài viết hoặc công thức được thả tim. */
   target: ContentRef;
   voteCount: number;
+  /** Trạng thái đã thả tim do máy chủ trả về; dùng làm giá trị ban đầu và đồng bộ lại sau khi tải lại. */
+  hasVoted?: boolean;
   /** memberActions.canVote của trang chi tiết; danh sách không có trường này nên mặc định cho phép. */
   canVote?: boolean;
   className?: string;
@@ -19,18 +21,21 @@ interface VoteButtonProps {
 
 /**
  * Thả tim / bỏ tim (FN-COMM-04, BR-INT-LIKE-01). Khách bấm thì mở SignupPromptModal.
- * UNSPECIFIED: API không trả "đã thả tim chưa", nên trạng thái tim chỉ biết sau lần bấm đầu.
+ * Trạng thái "đã thả tim" lấy từ hasVoted của API nên vẫn giữ màu đỏ sau khi tải lại trang.
  */
-export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, canVote = true, className, onVoteChange }) => {
+export const VoteButton: React.FC<VoteButtonProps> = ({ target, voteCount, hasVoted, canVote = true, className, onVoteChange }) => {
   const [state, setState] = useState<{ voted: boolean; count: number } | null>(null);
   const [animating, setAnimating] = useState(false);
   const { isMember, requireMember } = useRequireMember();
   const vote = useVote(target);
 
-  // Số tim mới từ server (sau khi danh sách tải lại) thay cho số đã lưu tạm.
-  useEffect(() => setState((current) => (current ? { ...current, count: voteCount } : current)), [voteCount]);
+  // Số tim và trạng thái đã thả từ server (sau khi danh sách tải lại) thay cho giá trị lưu tạm.
+  useEffect(
+    () => setState((current) => (current ? { voted: hasVoted ?? current.voted, count: voteCount } : current)),
+    [voteCount, hasVoted]
+  );
 
-  const voted = state?.voted ?? false;
+  const voted = state?.voted ?? hasVoted ?? false;
   const count = state?.count ?? voteCount;
   const disabled = isMember && !canVote;
 

@@ -178,7 +178,7 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     mockApi(handler());
     renderWithProviders(<AiOverviewPage />, '/admin/ai');
 
-    expect(await screen.findByText('Chi phí hôm nay')).toBeInTheDocument();
+    expect(await screen.findByText(/Chi phí hôm nay/)).toBeInTheDocument();
     expect(screen.getByText('Chi phí 30 ngày qua')).toBeInTheDocument();
     expect(screen.getByText('Tiêu thụ theo Người dùng')).toBeInTheDocument();
     expect(screen.getByText('Phân bổ theo Hạng Hội viên')).toBeInTheDocument();
