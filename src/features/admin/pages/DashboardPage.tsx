@@ -87,35 +87,40 @@ function TrendSparkline({
   let milestoneLabels: string[] = [];
 
   if (preset === 'TODAY') {
-    title = 'Chi phí AI theo giờ (Hôm nay)';
-    milestoneLabels = ['3h', '6h', '9h', '12h', '15h', '18h', '21h', '24h'];
+    title = 'Chi phí AI theo giờ (Hôm nay · GMT+7)';
+    milestoneLabels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '23:00'];
 
-    // Lấy chính xác dữ liệu thực tế 24 giờ từ Backend
+    // Lấy chính xác dữ liệu thực tế 24 giờ theo múi giờ Việt Nam (UTC+7)
     points = Array.from({ length: 24 }, (_, i) => {
       const item = llmops?.hourlyCosts?.find((c) => c.hour === i);
+      const hourStr = String(i).padStart(2, '0');
       return {
         label: `${i}h`,
-        tooltip: `${String(i).padStart(2, '0')}:00`,
+        tooltip: `${hourStr}:00 - ${hourStr}:59 (GMT+7)`,
         cost: item?.costUsd ?? 0,
         tokens: item?.tokens ?? 0,
       };
     });
   } else if (preset === 'WEEK') {
-    title = 'Chi phí AI theo ngày (7 ngày qua)';
+    title = 'Chi phí AI theo ngày (7 ngày qua · GMT+7)';
 
-    const fromDate = new Date(range.from);
-    const toDate = new Date(range.to);
+    const [fromY, fromM, fromD] = range.from.split('-').map(Number);
+    const [toY, toM, toD] = range.to.split('-').map(Number);
     const dayPoints: TrendPoint[] = [];
 
-    const curr = new Date(fromDate);
-    while (curr <= toDate) {
-      const dateKey = toIsoDate(curr);
+    const curr = new Date(fromY, fromM - 1, fromD);
+    const end = new Date(toY, toM - 1, toD);
+    while (curr <= end) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
       const dayCell = llmops?.dayTotals?.[dateKey];
-      const dayLabel = `${String(curr.getDate()).padStart(2, '0')}/${String(curr.getMonth() + 1).padStart(2, '0')}`;
+      const dayLabel = `${d}/${m}`;
 
       dayPoints.push({
         label: dayLabel,
-        tooltip: dateKey,
+        tooltip: `${dateKey} (GMT+7)`,
         cost: dayCell?.costUsd ?? 0,
         tokens: dayCell?.tokens ?? 0,
       });
@@ -126,21 +131,25 @@ function TrendSparkline({
     points = dayPoints;
     milestoneLabels = dayPoints.map((p) => p.label);
   } else {
-    title = 'Chi phí AI theo ngày (Tháng này)';
+    title = 'Chi phí AI theo ngày (Tháng này · GMT+7)';
 
-    const fromDate = new Date(range.from);
-    const toDate = new Date(range.to);
+    const [fromY, fromM, fromD] = range.from.split('-').map(Number);
+    const [toY, toM, toD] = range.to.split('-').map(Number);
     const dayPoints: TrendPoint[] = [];
 
-    const curr = new Date(fromDate);
-    while (curr <= toDate) {
-      const dateKey = toIsoDate(curr);
+    const curr = new Date(fromY, fromM - 1, fromD);
+    const end = new Date(toY, toM - 1, toD);
+    while (curr <= end) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
       const dayCell = llmops?.dayTotals?.[dateKey];
-      const dayLabel = `${String(curr.getDate()).padStart(2, '0')}/${String(curr.getMonth() + 1).padStart(2, '0')}`;
+      const dayLabel = `${d}/${m}`;
 
       dayPoints.push({
         label: dayLabel,
-        tooltip: dateKey,
+        tooltip: `${dateKey} (GMT+7)`,
         cost: dayCell?.costUsd ?? 0,
         tokens: dayCell?.tokens ?? 0,
       });
@@ -330,26 +339,32 @@ export function DashboardPage() {
     <AdminPage
       title="Tổng quan nền tảng & vận hành"
       actions={
-        <div
-          className="inline-flex items-center rounded-xl bg-surface-container-high p-1 font-label-md text-label-md shadow-inner"
-          role="group"
-          aria-label="Khoảng thời gian"
-        >
-          {PRESETS.map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={preset === k}
-              onClick={() => setPreset(k)}
-              className={`rounded-lg px-3.5 py-1.5 transition-colors ${
-                preset === k
-                  ? 'bg-surface-container-lowest font-semibold text-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="inline-flex items-center gap-1.5 rounded-xl bg-surface-container-low px-3 py-1.5 font-label-sm text-label-sm font-medium text-on-surface-variant ring-1 ring-surface-container">
+            <Icon name="schedule" className="text-[16px] text-primary" />
+            <span>Múi giờ: GMT+7 (Asia/Ho_Chi_Minh)</span>
+          </div>
+          <div
+            className="inline-flex items-center rounded-xl bg-surface-container-high p-1 font-label-md text-label-md shadow-inner"
+            role="group"
+            aria-label="Khoảng thời gian"
+          >
+            {PRESETS.map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={preset === k}
+                onClick={() => setPreset(k)}
+                className={`rounded-lg px-3.5 py-1.5 transition-colors ${
+                  preset === k
+                    ? 'bg-surface-container-lowest font-semibold text-primary shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       }
     >
@@ -427,7 +442,7 @@ export function DashboardPage() {
           title={
             <div className="flex items-center gap-2">
               <Icon name="smart_toy" className="text-[20px] text-primary" />
-              <span>Vận hành AI &amp; Kiểm soát Ngân sách hôm nay (LLMOps)</span>
+              <span>Vận hành AI &amp; Kiểm soát Ngân sách hôm nay (LLMOps · GMT+7)</span>
             </div>
           }
           actions={
@@ -446,7 +461,7 @@ export function DashboardPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="font-label-md text-label-md text-on-surface-variant">
-                    Hạn mức ngân sách ngày
+                    Hạn mức ngân sách hôm nay (GMT+7)
                   </span>
                   <span
                     className={`rounded-full px-2 py-0.5 font-label-sm text-label-sm font-semibold ${

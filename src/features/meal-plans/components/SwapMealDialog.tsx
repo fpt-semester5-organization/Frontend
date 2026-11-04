@@ -194,7 +194,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
   return (
     <Modal show={slot !== null} onHide={onCancel} title="Đổi món ăn" locked={submitting} size="lg">
       {slot && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
           {/* Món ăn hiện tại */}
           <div className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3.5 border border-surface-container">
             <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-container shadow-2xs">

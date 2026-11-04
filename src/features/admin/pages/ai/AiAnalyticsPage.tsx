@@ -98,6 +98,10 @@ export const AiAnalyticsPage: React.FC = () => {
             ))}
           </select>
         </label>
+        <div className="ml-auto flex items-center gap-1.5 self-center rounded-lg bg-surface-container-low px-2.5 py-1 text-[12px] font-medium text-on-surface-variant ring-1 ring-surface-container">
+          <Icon name="schedule" className="text-[15px] text-primary" />
+          <span>Múi giờ: GMT+7 (Asia/Ho_Chi_Minh)</span>
+        </div>
       </div>
 
       {rangeError && <FormAlert tone="warning">{rangeError}</FormAlert>}
@@ -120,7 +124,7 @@ export const AiAnalyticsPage: React.FC = () => {
             <div className="grid gap-space-md sm:grid-cols-3">
               {/* Thẻ 1: Chi phí hôm nay */}
               <div className={cn(CARD, 'flex flex-col gap-2 p-space-md')}>
-                <p className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay</p>
+                <p className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay (GMT+7)</p>
                 <p className="font-headline-md text-headline-md text-on-surface">{formatUsd(data.todayCostUsd)}</p>
                 <div
                   role="meter"

@@ -40,6 +40,14 @@ export const AiOverviewPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-space-lg">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-body-sm text-body-sm text-on-surface-variant">Số liệu vận hành mô hình AI và ngân sách thời gian thực</span>
+        <div className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-2.5 py-1 text-[12px] font-medium text-on-surface-variant ring-1 ring-surface-container">
+          <Icon name="schedule" className="text-[15px] text-primary" />
+          <span>Múi giờ: GMT+7 (Asia/Ho_Chi_Minh)</span>
+        </div>
+      </div>
+
       {/* Cảnh báo ngân sách nếu vượt ngưỡng */}
       {level !== 'ok' && (
         <FormAlert
@@ -66,7 +74,7 @@ export const AiOverviewPage: React.FC = () => {
           {/* Card 1: Chi phí hôm nay */}
           <div className={cn(CARD, 'flex flex-col justify-between p-space-md')}>
             <div className="flex items-center justify-between">
-              <span className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay</span>
+              <span className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay (GMT+7)</span>
               <Icon name="today" className="text-[20px] text-primary" />
             </div>
             <div className="my-1">

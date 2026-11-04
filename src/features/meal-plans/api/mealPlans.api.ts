@@ -92,7 +92,7 @@ async function blobToApiError(status: number, body: unknown): Promise<ApiError> 
     const parsed: unknown = JSON.parse(body instanceof Blob ? await body.text() : String(body));
     const { errorCode, message, details } = parsed as Partial<ApiErrorBody>;
     if (typeof errorCode === 'string') {
-      return new ApiError({ status, errorCode, message: message ?? '', details: details ?? [] });
+      return new ApiError({ status, errorCode, message: message ?? '', details: Array.isArray(details) ? details : [] });
     }
   } catch {
     // Body không phải JSON: dùng lỗi chung theo mã HTTP.
