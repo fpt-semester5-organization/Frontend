@@ -19,7 +19,7 @@ import { selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { useCancelPending, useCheckout, useMySubscription, useNow, usePlans } from '../hooks/useSubscription';
-import { clearPendingOrder, formatCountdown, isQrImageUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
+import { clearPendingOrder, formatCountdown, isQrImageUrl, payosCheckoutUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { checkoutSchema, parsePlanId, type CheckoutForm } from '../schemas/checkout.schemas';
 import type { Gateway } from '../types/subscription.types';
 
@@ -167,6 +167,8 @@ function PayPanel({ order }: { order: PendingOrder }) {
   const tx = useMemo(() => sub.data?.transactions.find((t) => t.transactionId === order.transactionId), [sub.data, order.transactionId]);
   const url = safePayUrl(order.payUrl);
   const qrImg = order.gateway === 'VIETQR' && isQrImageUrl(order.payUrl);
+  const payosFrame = order.gateway === 'VIETQR' ? payosCheckoutUrl(order.payUrl) : null;
+  const frameLoads = useRef(0);
   const result = `${PATHS.SUBSCRIPTION.RESULT}?transactionId=${order.transactionId}`;
 
   // Cổng đã báo (IPN) hoặc đơn hết hạn: chuyển sang trang kết quả đọc trạng thái từ server.
@@ -218,6 +220,19 @@ function PayPanel({ order }: { order: PendingOrder }) {
         </div>
       </dl>
       {qrImg && <img src={order.payUrl} alt="Mã QR VietQR" className="mx-auto h-56 w-56 rounded-lg bg-white object-contain p-2" />}
+      {payosFrame && (
+        <iframe
+          title="Mã QR thanh toán PayOS"
+          src={payosFrame}
+          allow="clipboard-write"
+          // Lần tải đầu là trang PayOS; tải thêm lần nữa là PayOS đã chuyển hướng sau khi thanh toán hoặc hủy trong khung này.
+          onLoad={() => {
+            frameLoads.current += 1;
+            if (frameLoads.current > 1 && !leaving.current) navigate(result, { replace: true });
+          }}
+          className="h-[820px] w-full rounded-lg border-0 bg-white"
+        />
+      )}
       {qrImg ? (
         // Backend chỉ trả ảnh QR khi không tạo được đơn trên cổng (chưa cấu hình hoặc cổng lỗi): sẽ không có webhook xác nhận.
         <FormAlert tone="warning" title="Mã QR này không có xác nhận tự động">

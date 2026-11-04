@@ -75,6 +75,20 @@ export function safePayUrl(url: string | undefined | null): string | null {
   }
 }
 
+const PAYOS_CHECKOUT_HOSTS = ['pay.payos.vn', 'next.pay.payos.vn', 'dev.pay.payos.vn', 'next.dev.pay.payos.vn'];
+
+/**
+ * payUrl là trang thanh toán PayOS (https://pay.payos.vn/web/{id}) thì nhúng được vào iframe để hiện mã QR ngay trong trang.
+ * Chỉ nhúng đúng các host của PayOS, không nhúng URL lạ. Không dùng chế độ /embedded/ vì PayOS bắt `redirect_uri` phải trùng
+ * ReturnUrl của đơn do Backend đặt, sai là báo "Thông tin truyền lên không hợp lệ".
+ */
+export function payosCheckoutUrl(url: string | undefined | null): string | null {
+  const safe = safePayUrl(url);
+  if (!safe) return null;
+  const u = new URL(safe);
+  return u.protocol === 'https:' && PAYOS_CHECKOUT_HOSTS.includes(u.hostname) && /^\/web\/[^/]+\/?$/.test(u.pathname) ? safe : null;
+}
+
 /** payUrl của VietQR có thể là ảnh QR (spec chưa nói rõ): chỉ coi là ảnh khi có đuôi ảnh hoặc là data:image. */
 export function isQrImageUrl(url: string | undefined | null): boolean {
   if (!url) return false;

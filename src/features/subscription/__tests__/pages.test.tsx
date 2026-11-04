@@ -1,5 +1,5 @@
 import { AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -122,6 +122,41 @@ describe('CheckoutPage (SCR-31)', () => {
     expect(await screen.findByRole('link', { name: 'Mở trang thanh toán VietQR' })).toHaveAttribute('href', 'https://pay.payos.vn/web/abc');
     expect(screen.queryByText('Mã QR này không có xác nhận tự động')).not.toBeInTheDocument();
     expect(screen.getByText(/thường dưới 30 giây/)).toBeInTheDocument();
+  });
+
+  const createOrderWith = async (payUrl: string) => {
+    vi.mocked(api.checkout).mockResolvedValue({ transactionId: 3001, orderCode: 'VL_1', amountVnd: 49000, payUrl, expiresAt: new Date(Date.now() + 300_000).toISOString() });
+    vi.mocked(api.getMySubscription).mockResolvedValue(pending);
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: 'Tạo mã VietQR' }));
+    await screen.findByText('VL_1');
+  };
+
+  it('Backend trả trang PayOS: hiện mã QR ngay trong trang, vẫn giữ link mở trang riêng', async () => {
+    await createOrderWith('https://pay.payos.vn/web/abc');
+    expect(screen.getByTitle('Mã QR thanh toán PayOS')).toHaveAttribute('src', 'https://pay.payos.vn/web/abc');
+    expect(screen.getByRole('link', { name: 'Mở trang thanh toán VietQR' })).toHaveAttribute('href', 'https://pay.payos.vn/web/abc');
+  });
+
+  it('link không phải của PayOS thì không nhúng vào trang', async () => {
+    await createOrderWith('https://pay.example/web/abc');
+    expect(screen.queryByTitle('Mã QR thanh toán PayOS')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mở trang thanh toán VietQR' })).toBeInTheDocument();
+  });
+
+  it('Backend trả ảnh QR: chỉ hiện ảnh, không nhúng khung PayOS', async () => {
+    await openPayPanel();
+    expect(screen.getByAltText('Mã QR VietQR')).toBeInTheDocument();
+    expect(screen.queryByTitle('Mã QR thanh toán PayOS')).not.toBeInTheDocument();
+  });
+
+  it('PayOS chuyển hướng trong khung sau khi thanh toán hoặc hủy: sang trang kết quả đọc trạng thái thật', async () => {
+    await createOrderWith('https://pay.payos.vn/web/abc');
+    const frame = screen.getByTitle('Mã QR thanh toán PayOS');
+    fireEvent.load(frame);
+    expect(screen.queryByText('RESULT')).not.toBeInTheDocument();
+    fireEvent.load(frame);
+    expect(await screen.findByText('RESULT')).toBeInTheDocument();
   });
 
   it('đồng hồ đếm ngược không bị đọc lại mỗi giây: chỉ dòng trạng thái là vùng thông báo', async () => {

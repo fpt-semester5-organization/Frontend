@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { benefitRows, perThirtyDays } from '../lib/benefits';
-import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
+import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, payosCheckoutUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { decodeJwtClaims } from '../lib/sessionClaims';
 import { checkoutSchema, parsePlanId } from '../schemas/checkout.schemas';
 
@@ -67,6 +67,17 @@ describe('pendingOrder', () => {
     expect(isQrImageUrl('https://x.vn/qr.png')).toBe(true);
     expect(isQrImageUrl('data:image/png;base64,AAA')).toBe(true);
     expect(isQrImageUrl('https://x.vn/pay')).toBe(false);
+  });
+  it('chỉ nhúng trang thanh toán đúng host PayOS', () => {
+    expect(payosCheckoutUrl('https://pay.payos.vn/web/33d6c5fb')).toBe('https://pay.payos.vn/web/33d6c5fb');
+    expect(payosCheckoutUrl('https://pay.payos.vn/web/33d6c5fb/')).toBe('https://pay.payos.vn/web/33d6c5fb/');
+    expect(payosCheckoutUrl('https://next.pay.payos.vn/web/33d6c5fb')).toBe('https://next.pay.payos.vn/web/33d6c5fb');
+    expect(payosCheckoutUrl('http://pay.payos.vn/web/33d6c5fb')).toBeNull();
+    expect(payosCheckoutUrl('https://pay.payos.vn.evil.test/web/33d6c5fb')).toBeNull();
+    expect(payosCheckoutUrl('https://pay.payos.vn/other/33d6c5fb')).toBeNull();
+    expect(payosCheckoutUrl('https://img.vietqr.io/image/MB-1-compact2.png')).toBeNull();
+    expect(payosCheckoutUrl('javascript:alert(1)')).toBeNull();
+    expect(payosCheckoutUrl(null)).toBeNull();
   });
 });
 
