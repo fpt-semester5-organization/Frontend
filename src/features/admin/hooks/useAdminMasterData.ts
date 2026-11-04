@@ -8,9 +8,11 @@ import {
   listAdminIngredients,
   listAllergens,
   replaceAdminIngredientAllergens,
+  toggleAdminIngredientLock,
   updateAdminDietarySchool,
   updateAdminENumber,
   updateAdminIngredient,
+  uploadAdminIngredientImage,
 } from '../api/admin.api';
 import { masterKeys } from '@/features/recipes/hooks/recipeKeys';
 import { retryServerErrorsOnce } from '../lib/endpoint';
@@ -124,5 +126,23 @@ export function useCreateAllergen() {
   return useMutation({
     mutationFn: (body: CreateAllergenBody) => createAdminAllergen(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: masterDataKeys.allergens }),
+  });
+}
+
+/** BR-ADM-ING-01: Chuyển đổi trạng thái Khóa / Mở khóa nguyên liệu. */
+export function useToggleIngredientLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isLocked }: { id: number; isLocked: boolean }) => toggleAdminIngredientLock(id, isLocked),
+    onSuccess: () => qc.invalidateQueries({ queryKey: masterDataKeys.ingredients }),
+  });
+}
+
+/** Tải tệp hình ảnh lên Cloudinary và lưu URL đại diện cho nguyên liệu. */
+export function useUploadIngredientImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => uploadAdminIngredientImage(id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: masterDataKeys.ingredients }),
   });
 }

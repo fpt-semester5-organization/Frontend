@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,6 +21,7 @@ import {
   useCreateIngredient,
   useReplaceIngredientAllergens,
   useUpdateIngredient,
+  useUploadIngredientImage,
 } from '../hooks/useAdminMasterData';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { FOOD_GROUP_LABEL, FOOD_GROUPS_MVP, STALL_TYPES, STALL_TYPE_LABEL } from '../lib/labels';
@@ -38,6 +39,10 @@ const ingredientSchema = z.object({
   caloriesPer100g: z.number({ invalid_type_error: 'Nhập số calo' }).min(0, 'Calo không được âm'),
   isAllium: z.boolean(),
 });
+
+/** Ảnh nguyên liệu tải từ máy (POST /admin/ingredients/{id}/image); Backend nhận JPG/PNG/WEBP. */
+const IMAGE_TYPES = 'image/jpeg,image/png,image/webp';
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 type IngredientValues = z.infer<typeof ingredientSchema>;
 
 const allergenSchema = z.object({
@@ -52,8 +57,18 @@ const allergenSchema = z.object({
  */
 const AdminIngredientsPage: React.FC = () => {
   const { get, set, page, hasFilters, clear } = useUrlFilters();
+  const keyword = get('keyword') || undefined;
   const allergenId = Number(get('allergenId')) || undefined;
-  const list = useAdminIngredients({ keyword: get('keyword') || undefined, allergenId, page, size: PAGE_SIZE });
+  const foodGroup = get('foodGroup') || undefined;
+  const stallType = get('stallType') || undefined;
+  const list = useAdminIngredients({
+    keyword,
+    allergenId,
+    foodGroup,
+    stallType,
+    page,
+    size: PAGE_SIZE,
+  });
   const allergens = useAllergens();
   const [form, setForm] = useState<{ mode: 'create' } | { mode: 'edit'; item: AdminIngredient } | null>(null);
   const [allergenTarget, setAllergenTarget] = useState<AdminIngredient | null>(null);
@@ -81,16 +96,78 @@ const AdminIngredientsPage: React.FC = () => {
       />
       <MasterDataTabs />
 
-      <div className={cn(CARD, 'grid gap-space-sm p-space-md sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
-        <SearchBox value={get('keyword')} onSearch={(keyword) => set({ keyword })} label="Tìm nguyên liệu" placeholder="Tên nguyên liệu" maxLength={100} />
-        <select aria-label="Lọc theo nhóm dị ứng" value={allergenId ?? ''} onChange={(e) => set({ allergenId: e.target.value })} className={CONTROL}>
-          <option value="">Mọi nhóm dị ứng</option>
-          {(allergens.data ?? []).map((allergen) => (
-            <option key={allergen.allergenId} value={allergen.allergenId}>
-              {allergen.allergenName}
-            </option>
-          ))}
-        </select>
+      {/* Thanh bộ lọc đa chiều & hiển thị tổng số lượng nguyên liệu */}
+      <div className={cn(CARD, 'flex flex-col gap-space-sm p-space-md')}>
+        {/* Hàng 1: Tìm kiếm theo tên + Badge hiển thị tổng số lượng */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-space-sm">
+          <div className="flex-1">
+            <SearchBox value={get('keyword')} onSearch={(val) => set({ keyword: val })} label="Tìm nguyên liệu" placeholder="Tìm kiếm theo tên nguyên liệu..." maxLength={100} />
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-container/80 px-3.5 py-1.5 font-label-md text-label-md font-semibold text-on-primary-container shadow-2xs">
+              <Icon name="nutrition" className="text-[18px]" />
+              Tổng: {total} nguyên liệu
+            </span>
+          </div>
+        </div>
+
+        {/* Hàng 2: Các bộ lọc (Nhóm thực phẩm, Quầy hàng, Dị ứng) */}
+        <div className="grid gap-2 grid-cols-1 sm:grid-cols-3 pt-2 border-t border-outline-variant/30">
+          <select
+            aria-label="Lọc theo nhóm thực phẩm"
+            value={foodGroup ?? ''}
+            onChange={(e) => set({ foodGroup: e.target.value })}
+            className={CONTROL}
+          >
+            <option value="">Mọi nhóm thực phẩm</option>
+            {Object.entries(FOOD_GROUP_LABEL).map(([val, label]) => (
+              <option key={val} value={val}>{label}</option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Lọc theo quầy hàng"
+            value={stallType ?? ''}
+            onChange={(e) => set({ stallType: e.target.value })}
+            className={CONTROL}
+          >
+            <option value="">Mọi quầy hàng</option>
+            {STALL_TYPES.map((val) => (
+              <option key={val} value={val}>{STALL_TYPE_LABEL[val]}</option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Lọc theo nhóm dị ứng"
+            value={allergenId ?? ''}
+            onChange={(e) => set({ allergenId: e.target.value })}
+            className={CONTROL}
+          >
+            <option value="">Mọi nhóm dị ứng</option>
+            {(allergens.data ?? []).map((allergen) => (
+              <option key={allergen.allergenId} value={allergen.allergenId}>
+                {allergen.allergenName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Hàng 3: Tóm tắt kết quả lọc & Nút reset */}
+        {hasFilters && (
+          <div className="flex items-center justify-between text-body-xs text-on-surface-variant pt-2 border-t border-outline-variant/30">
+            <span>
+              Tìm thấy <strong>{total}</strong> nguyên liệu phù hợp với bộ lọc hiện tại.
+            </span>
+            <button
+              type="button"
+              onClick={clear}
+              className="text-primary hover:underline font-medium inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Icon name="close" className="text-[14px]" />
+              Xóa tất cả bộ lọc
+            </button>
+          </div>
+        )}
       </div>
 
       {list.isPending ? (
@@ -114,6 +191,11 @@ const AdminIngredientsPage: React.FC = () => {
         </div>
       ) : (
         <>
+          <div className="flex items-center justify-between px-1 text-body-sm text-on-surface-variant">
+            <span>
+              Đang hiển thị <strong>{items.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0}</strong> – <strong>{Math.min(page * PAGE_SIZE, total)}</strong> trong tổng số <strong>{total}</strong> nguyên liệu.
+            </span>
+          </div>
           <TableShell label="Danh sách nguyên liệu" busy={list.isPlaceholderData} minWidth="min-w-[900px]">
             <thead>
               <tr>
@@ -127,14 +209,42 @@ const AdminIngredientsPage: React.FC = () => {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.ingredientId} className="hover:bg-surface-container-low">
+                <tr key={item.ingredientId} className="hover:bg-surface-container-low transition">
                   <td className={TD}>
-                    <span className="font-label-md text-label-md">{item.name}</span>
-                    {item.isAllium && (
-                      <StatusBadge tone="warning" className="ml-2">
-                        Ngũ vị tân
-                      </StatusBadge>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {/* Thumbnail nhỏ 40x40px cho mỗi dòng nguyên liệu; đổi ảnh trong form Sửa */}
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-outline-variant/40 bg-surface-container-high">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fb = e.currentTarget.nextElementSibling as HTMLElement;
+                              if (fb) fb.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          style={{ display: item.imageUrl ? 'none' : 'flex' }}
+                          className="h-full w-full items-center justify-center text-on-surface-variant"
+                        >
+                          <Icon name="nutrition" className="text-[20px]" />
+                        </div>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-label-md text-label-md font-medium text-on-surface">{item.name}</span>
+                          {item.isAllium && (
+                            <StatusBadge tone="warning">
+                              Ngũ vị tân
+                            </StatusBadge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td className={TD}>{FOOD_GROUP_LABEL[item.foodGroup] ?? 'Khác'}</td>
                   <td className={TD}>{STALL_TYPE_LABEL[item.defaultStallType] ?? 'Khác'}</td>
@@ -181,9 +291,13 @@ const IngredientDialog: React.FC<{
 }> = ({ state, onClose }) => {
   const create = useCreateIngredient();
   const update = useUpdateIngredient();
-  const pending = create.isPending || update.isPending;
+  const uploadImage = useUploadIngredientImage();
+  const pending = create.isPending || update.isPending || uploadImage.isPending;
   const [conflict, setConflict] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const editing = state?.mode === 'edit' ? state.item : null;
   const {
     register,
@@ -196,6 +310,8 @@ const IngredientDialog: React.FC<{
   useEffect(() => {
     if (!state) return;
     setFormError(null);
+    setImageFile(null);
+    setPreviewUrl(null);
     reset(
       editing
         ? {
@@ -209,6 +325,32 @@ const IngredientDialog: React.FC<{
         : { name: '', standardUnit: 'g', defaultStallType: undefined, foodGroup: 'PLANT', caloriesPer100g: undefined, isAllium: false }
     );
   }, [state, editing, reset]);
+
+  // Thu hồi URL xem trước cũ để không rò bộ nhớ
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!IMAGE_TYPES.split(',').includes(file.type)) {
+      notifyInfo('Chỉ nhận ảnh JPG, PNG hoặc WEBP.');
+      return;
+    }
+    if (file.size > IMAGE_MAX_BYTES) {
+      notifyInfo('Ảnh vượt quá dung lượng tối đa 5 MB.');
+      return;
+    }
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setPreviewUrl(null);
+  };
 
   // MVP chỉ nhập PLANT/EGG/DAIRY (D109); nguyên liệu cũ thuộc nhóm khác vẫn hiện đúng nhóm của nó.
   const foodGroups: FoodGroup[] =
@@ -225,13 +367,32 @@ const IngredientDialog: React.FC<{
     onClose();
   };
 
+  // Lưu thông tin trước, sau đó tải ảnh (nếu có chọn) lên Cloudinary cho nguyên liệu đó.
+  const finish = (id: number | undefined, message: string) => {
+    if (!imageFile || !id) {
+      onSuccess(message);
+      return;
+    }
+    uploadImage.mutate(
+      { id, file: imageFile },
+      {
+        onSuccess: () => onSuccess(`${message} Đã cập nhật ảnh.`),
+        onError: (error) => {
+          // Thông tin đã lưu; chỉ ảnh lỗi nên giữ form mở để chọn lại ảnh
+          setFormError(`${message} Nhưng tải ảnh thất bại, hãy chọn lại ảnh.`);
+          handleWriteError(error);
+        },
+      }
+    );
+  };
+
   const submit = handleSubmit((values) => {
     setFormError(null);
     if (!editing) {
       // Ô chọn khi thêm mới chỉ có nhóm MVP (PLANT/EGG/DAIRY), khớp enum POST của OpenAPI.
       create.mutate(
         { ...values, foodGroup: values.foodGroup as CreateIngredientBody['foodGroup'], standardUnit: values.standardUnit || 'g' },
-        { onSuccess: (res) => onSuccess(res.message || `Đã thêm ${values.name}.`), onError }
+        { onSuccess: (res) => finish(res.data?.ingredientId, res.message || `Đã thêm ${values.name}.`), onError }
       );
       return;
     }
@@ -245,11 +406,17 @@ const IngredientDialog: React.FC<{
       ...(values.isAllium !== editing.isAllium ? { isAllium: values.isAllium } : {}),
     };
     if (Object.keys(body).length === 0) {
-      notifyInfo('Chưa có thay đổi nào để lưu.');
+      if (imageFile) finish(editing.ingredientId, 'Đã lưu.');
+      else notifyInfo('Chưa có thay đổi nào để lưu.');
       return;
     }
-    update.mutate({ id: editing.ingredientId, body }, { onSuccess: (res) => onSuccess(res.message || 'Đã cập nhật nguyên liệu.'), onError });
+    update.mutate(
+      { id: editing.ingredientId, body },
+      { onSuccess: (res) => finish(editing.ingredientId, res.message || 'Đã cập nhật nguyên liệu.'), onError }
+    );
   });
+
+  const shownImage = previewUrl ?? editing?.imageUrl ?? null;
 
   return (
     <>
@@ -265,6 +432,36 @@ const IngredientDialog: React.FC<{
         {formError && <FormAlert tone="error">{formError}</FormAlert>}
         <FormRow id="ing-name" label="Tên nguyên liệu" required error={errors.name?.message}>
           <input id="ing-name" maxLength={100} aria-invalid={!!errors.name} className={CONTROL} {...register('name')} />
+        </FormRow>
+        <FormRow id="ing-image" label="Ảnh đại diện" hint="JPG, PNG hoặc WEBP, tối đa 5 MB. Ảnh được tải lên khi bấm lưu.">
+          <div className="flex items-center gap-space-md">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/60 bg-surface-container">
+              {shownImage ? (
+                <img src={shownImage} alt={previewUrl ? 'Ảnh vừa chọn' : `Ảnh ${editing?.name ?? ''}`} className="h-full w-full object-cover" />
+              ) : (
+                <Icon name="nutrition" className="text-[32px] text-outline" />
+              )}
+            </div>
+            <div className="flex flex-col items-start gap-1.5">
+              <input id="ing-image" ref={fileInputRef} type="file" accept={IMAGE_TYPES} className="hidden" onChange={handleFileChange} />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => fileInputRef.current?.click()}>
+                  <Icon name="upload" className="text-[18px]" />
+                  {shownImage ? 'Đổi ảnh' : 'Tải ảnh lên'}
+                </Button>
+                {imageFile && (
+                  <button type="button" className="text-body-sm text-error hover:underline" disabled={pending} onClick={clearImage}>
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
+              {imageFile && (
+                <p className="text-body-sm text-on-surface-variant">
+                  {imageFile.name} · {(imageFile.size / 1024).toFixed(0)} KB
+                </p>
+              )}
+            </div>
+          </div>
         </FormRow>
         <div className="grid gap-space-md sm:grid-cols-2">
           <FormRow id="ing-stall" label="Quầy hàng" required error={errors.defaultStallType?.message} hint="Dùng để nhóm danh sách đi chợ.">
