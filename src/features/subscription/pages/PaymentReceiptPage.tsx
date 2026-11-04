@@ -1,15 +1,17 @@
 /**
  * Biên lai thanh toán · `/vip/receipt/:transactionId`   (FN-SUB-04: GET /subscriptions/transactions/{id}/receipt, guard RequireAuth)
- * Backend trả dữ liệu JSON, không tạo file PDF: trang dựng tờ biên lai, nút lưu mở hộp thoại in của trình duyệt (Lưu dưới dạng PDF).
+ * Trang dựng tờ biên lai từ JSON; nút "Tải biên lai PDF" lấy tệp do Backend dựng (receipt.pdf), nút "In" mở hộp thoại in của trình duyệt.
  * Global print CSS ẩn mọi thẻ header/footer/nav/aside/button, nên tờ biên lai dùng div cho phần đầu.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiErrorMessage, apiErrorStatus } from '@/api/http';
 import { Icon } from '@/components/ui/Icon';
 import { formatVnd } from '@/lib/format';
 import { formatServerDateTime } from '@/lib/serverDate';
 import { PATHS } from '@/routes/paths';
+import { notifyApiError } from '@/lib/notify';
+import { downloadReceiptPdf } from '../api/subscription.api';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { usePaymentReceipt } from '../hooks/useSubscription';
 import { GATEWAY_LABEL, statusInfo, type PaymentReceipt } from '../types/subscription.types';
@@ -104,6 +106,18 @@ export function PaymentReceiptPage() {
   const { transactionId } = useParams();
   const id = /^\d+$/.test(transactionId ?? '') ? Number(transactionId) : null;
   const q = usePaymentReceipt(id);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async (txId: number, receiptNumber: string) => {
+    setDownloading(true);
+    try {
+      await downloadReceiptPdf(txId, `VeggieLife-${receiptNumber}.pdf`);
+    } catch (error) {
+      notifyApiError(error);
+    } finally {
+      setDownloading(false);
+    }
+  };
   const fixedErrorTitle = id === null ? FIXED_ERROR_TITLE[404] : FIXED_ERROR_TITLE[apiErrorStatus(q.error) ?? 0];
 
   return (
@@ -121,14 +135,20 @@ export function PaymentReceiptPage() {
           <>
             <div className="flex flex-wrap items-center justify-between gap-space-sm print:hidden">
               <BackLink />
-              <button type="button" onClick={() => printReceipt(q.data.receiptNumber)} className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary">
-                <Icon name="picture_as_pdf" className="text-[20px]" />
-                In / Lưu PDF
-              </button>
+              <div className="flex flex-wrap items-center gap-space-sm">
+                <button type="button" disabled={downloading} onClick={() => void handleDownload(q.data.transactionId, q.data.receiptNumber)} className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary disabled:opacity-60">
+                  <Icon name="picture_as_pdf" className="text-[20px]" />
+                  {downloading ? 'Đang tải…' : 'Tải biên lai PDF'}
+                </button>
+                <button type="button" onClick={() => printReceipt(q.data.receiptNumber)} className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface hover:bg-surface-container-high">
+                  <Icon name="print" className="text-[20px]" />
+                  In
+                </button>
+              </div>
             </div>
             <ReceiptSheet receipt={q.data} />
             <p className="font-body-sm text-body-sm text-on-surface-variant print:hidden">
-              Trong hộp thoại in, chọn “Lưu dưới dạng PDF” để tải biên lai về máy.
+              Biên lai PDF cũng được gửi kèm email thanh toán của bạn. Nút “In” mở hộp thoại in của trình duyệt.
             </p>
           </>
         )}

@@ -26,6 +26,19 @@ export async function getMySubscription(): Promise<MySubscription> {
   return { ...d, transactions: Array.isArray(d?.transactions) ? d.transactions : [] };
 }
 
+/** FN-SUB-04 — GET /subscriptions/transactions/{transactionId}/receipt.pdf: tệp PDF do Backend dựng (cần Bearer nên tải bằng blob). */
+export async function downloadReceiptPdf(transactionId: number, fileName: string): Promise<void> {
+  const res = await http.get<Blob>(`/subscriptions/transactions/${transactionId}/receipt.pdf`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** FN-SUB-04 — GET /subscriptions/transactions/{transactionId}/receipt (JSON, chỉ giao dịch SUCCESS của chính người dùng). */
 export const getPaymentReceipt = (transactionId: number) =>
   unwrap<PaymentReceipt>(http.get(`/subscriptions/transactions/${transactionId}/receipt`));

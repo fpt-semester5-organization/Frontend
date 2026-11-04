@@ -424,18 +424,26 @@ describe('PaymentReceiptPage (FN-SUB-04)', () => {
     expect(within(sheet).getByText('04/12/2026 06:59')).toBeInTheDocument();
   });
 
-  it('In / Lưu PDF: mở hộp thoại in với tên file theo số biên lai rồi trả lại tiêu đề trang', async () => {
+  it('In: mở hộp thoại in với tên file theo số biên lai rồi trả lại tiêu đề trang', async () => {
     vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
     let titleWhenPrinting = '';
     const print = vi.spyOn(window, 'print').mockImplementation(() => { titleWhenPrinting = document.title; });
     document.title = 'VeggieLife';
     renderReceipt();
-    await userEvent.click(await screen.findByRole('button', { name: /In \/ Lưu PDF/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^In$/ }));
     expect(print).toHaveBeenCalledTimes(1);
     expect(titleWhenPrinting).toBe('Bien-lai-REC-20261103-003001');
     window.dispatchEvent(new Event('afterprint'));
     expect(document.title).toBe('VeggieLife');
     print.mockRestore();
+  });
+
+  it('Tải biên lai PDF: gọi Backend lấy tệp theo mã giao dịch với tên file là số biên lai', async () => {
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
+    vi.mocked(api.downloadReceiptPdf).mockResolvedValue(undefined);
+    renderReceipt();
+    await userEvent.click(await screen.findByRole('button', { name: /Tải biên lai PDF/ }));
+    expect(api.downloadReceiptPdf).toHaveBeenCalledWith(receipt.transactionId, 'VeggieLife-REC-20261103-003001.pdf');
   });
 
   it.each([
