@@ -403,3 +403,37 @@ button:not(:disabled):active {
   }
 }
 
+
+
+/* Ẩn thanh cuộn mặc định của trình duyệt nhưng vẫn cho phép kéo / cuộn ngang mượt mà */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Thanh cuộn ngang hiển thị rõ ràng cho danh mục (dễ kéo qua lại trên PC & Mobile) */
+.category-scrollbar {
+  overflow-x: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #6b8f75 #e6ede8 !important;
+}
+.category-scrollbar::-webkit-scrollbar {
+  height: 6px !important;
+}
+.category-scrollbar::-webkit-scrollbar-track {
+  background: #eef3ef !important;
+  border-radius: 9999px !important;
+}
+.category-scrollbar::-webkit-scrollbar-thumb {
+  background: #5a7d65 !important;
+  border-radius: 9999px !important;
+  cursor: grab !important;
+}
+.category-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3d5c47 !important;
+}

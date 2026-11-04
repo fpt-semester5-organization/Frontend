@@ -121,6 +121,7 @@ const MealPlanSlotCard: React.FC<{
   onOpenHistory?: () => void;
   planId: number;
   currentDay: DayOfWeek;
+  dayIndex?: number;
 }> = ({
   slot: s,
   swapInfo,
@@ -133,12 +134,18 @@ const MealPlanSlotCard: React.FC<{
   onOpenHistory,
   planId,
   currentDay,
+  dayIndex,
 }) => {
   const recipeQuery = useRecipe(s.recipe?.recipeId ?? 0);
   const detail = recipeQuery.data;
 
-  const title = detail?.title ?? s.recipe?.title ?? 'Chưa có món';
-  const imageUrl = detail?.imageUrl ?? s.recipe?.imageUrl;
+  // Ưu tiên hiển thị tên món ăn và hình ảnh món ăn từ bảng Foods trong cơ sở dữ liệu
+  const detailObj = detail as any;
+  const dishName = s.recipe?.foodName ?? detailObj?.foodName ?? detail?.title ?? s.recipe?.title ?? 'Chưa có món';
+  const dishImage = s.recipe?.foodImageUrl ?? detailObj?.foodImageUrl ?? detail?.imageUrl ?? s.recipe?.imageUrl;
+  const recipeVariantTitle = (detail?.title ?? s.recipe?.title) !== dishName ? (detail?.title ?? s.recipe?.title) : undefined;
+  const title = dishName;
+  const imageUrl = dishImage;
   const caloriesKcal = detail?.caloriesKcal ?? s.recipe?.caloriesKcal ?? 0;
   const cookTimeMinutes = detail?.cookTimeMinutes ?? s.recipe?.cookTimeMinutes ?? 0;
   const voteCount = detail?.voteCount ?? s.recipe?.voteCount ?? 0;
@@ -251,8 +258,13 @@ const MealPlanSlotCard: React.FC<{
             </div>
 
             <h2 className="font-headline-sm font-serif text-headline-sm font-bold text-on-surface">
-              {title}
+              {dishName}
             </h2>
+            {recipeVariantTitle && (
+              <p className="font-label-sm text-xs text-primary/80 -mt-0.5 font-medium line-clamp-1">
+                Công thức: {recipeVariantTitle}
+              </p>
+            )}
 
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-label-md text-label-md text-on-surface-variant">
               <span className="flex items-center gap-1 tabular-nums font-semibold text-secondary">
@@ -307,7 +319,7 @@ const MealPlanSlotCard: React.FC<{
           {s.recipe && (
             <Link
               to={PATHS.RECIPES.DETAIL(s.recipe.recipeId)}
-              state={{ fromPlanId: planId, fromDay: currentDay }}
+              state={{ fromPlanId: planId, fromDay: currentDay, returnUrl: `${location.pathname}?day=${dayIndex ?? currentDay}` }}
               className="rounded-lg bg-surface-container px-3.5 py-2 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container-high"
             >
               Công thức
@@ -521,7 +533,40 @@ export const MealPlanDetail: React.FC = () => {
     return sliced.length > 0 ? sliced : data.slots.filter((s) => s.dayOfWeek === selectedDayCode);
   }, [data?.slots, selectedDayIndex, selectedDayCode, totalDays]);
 
-  // Đồng bộ chọn ngày
+  // Khôi phục ngày đã chọn từ URL query 'day' hoặc sessionStorage
+  useEffect(() => {
+    if (calendarDays.length === 0) return;
+
+    if (paramDay) {
+      const idxByCode = calendarDays.findIndex((d) => d.dayOfWeek === paramDay);
+      if (idxByCode >= 0) {
+        setSelectedDayIndex(idxByCode);
+        setSelectedDayCode(calendarDays[idxByCode].dayOfWeek);
+        return;
+      }
+      const numDay = Number(paramDay);
+      if (Number.isInteger(numDay) && numDay >= 0 && numDay < calendarDays.length) {
+        setSelectedDayIndex(numDay);
+        setSelectedDayCode(calendarDays[numDay].dayOfWeek);
+        return;
+      }
+    }
+
+    try {
+      const savedIndex = sessionStorage.getItem(sessionDayKey);
+      if (savedIndex !== null) {
+        const idx = Number(savedIndex);
+        if (Number.isInteger(idx) && idx >= 0 && idx < calendarDays.length) {
+          setSelectedDayIndex(idx);
+          setSelectedDayCode(calendarDays[idx].dayOfWeek);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [calendarDays, paramDay, sessionDayKey]);
+
+  // Đồng bộ chọn ngày & lưu vào searchParams + sessionStorage
   const handleSelectCalendarDay = (dayIndex: number) => {
     setSelectedDayIndex(dayIndex);
     const dayItem = calendarDays[dayIndex];
@@ -532,6 +577,14 @@ export const MealPlanDetail: React.FC = () => {
       } catch {
         // ignore
       }
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('day', dayItem.dayOfWeek);
+          return next;
+        },
+        { replace: true }
+      );
     }
   };
 
@@ -604,20 +657,6 @@ export const MealPlanDetail: React.FC = () => {
   };
 
   const handleOpenActivate = () => {
-    if (isFuturePlan) {
-      setNotice({
-        title: 'Chưa đến thời gian áp dụng',
-        message: `Thực đơn này bắt đầu từ ${getWeekdayFull(data.startDate)}, ${formatDate(data.startDate)}. Bạn có thể đổi món tùy ý ngay bây giờ để chuẩn bị, và bấm Kích hoạt khi đến ngày bắt đầu.`,
-      });
-      return;
-    }
-    if (isExpiredPlan) {
-      setNotice({
-        title: 'Thực đơn đã hết hạn áp dụng',
-        message: `Thực đơn này áp dụng cho thời gian đã qua (${formatDate(data.startDate)} – ${formatDate(data.endDate)}) nên không thể kích hoạt. Bạn vui lòng tạo thực đơn mới.`,
-      });
-      return;
-    }
     setConfirmActivate(true);
   };
 
@@ -701,95 +740,114 @@ export const MealPlanDetail: React.FC = () => {
       }));
     }
 
-    swap.mutate(
-      {
-        slotId,
-        body: {
-          ...(reason ? { swapReason: reason } : {}),
-          ...(customNote ? { customNote } : {}),
-          ...(newRecipeId ? { newRecipeId } : {}),
+    const onSwapSuccess = (res: any) => {
+      setSwappedAway((current) => ({ ...current, [slotId]: excluded }));
+      setSwapSlot(null);
+      const newRecipe = res.data.slot.recipe;
+      const newCalories = Math.round(newRecipe?.caloriesKcal ?? 0);
+      const diffKcal = newCalories - oldCalories;
+
+      const slotFromRes = res.data.slot as unknown as {
+        swapCount?: number;
+        previousRecipe?: SlotSwapInfo['previousRecipe'];
+        originalRecipe?: SlotSwapInfo['originalRecipe'];
+        swapHistories?: Array<{
+          oldRecipeId?: number;
+          oldRecipeTitle?: string;
+          oldRecipeCalories?: number;
+          oldRecipeImageUrl?: string;
+        }>;
+      };
+      setSwapHistories((current) => {
+        const existing = current[slotId] || { swapCount: 0, history: [] };
+        const newCount = slotFromRes?.swapCount || (existing.swapCount ?? 0) + 1;
+        const updatedHistory = [
+          {
+            recipeId: oldRecipe.recipeId,
+            title: oldRecipe.title,
+            caloriesKcal: oldRecipe.caloriesKcal,
+            imageUrl: oldRecipe.imageUrl,
+          },
+          ...(existing.history ?? []),
+        ];
+        return {
+          ...current,
+          [slotId]: {
+            swapCount: newCount,
+            history: updatedHistory,
+            previousRecipe: {
+              recipeId: oldRecipe.recipeId,
+              title: oldRecipe.title,
+              caloriesKcal: oldRecipe.caloriesKcal,
+              imageUrl: oldRecipe.imageUrl,
+            },
+            originalRecipe: existing.originalRecipe ?? {
+              recipeId: oldRecipe.recipeId,
+              title: oldRecipe.title,
+              caloriesKcal: oldRecipe.caloriesKcal,
+              imageUrl: oldRecipe.imageUrl,
+            },
+          },
+        };
+      });
+
+      let diffMsg = '';
+      if (diffKcal < 0) {
+        diffMsg = `Món mới ít hơn ${Math.abs(diffKcal)} kcal so với món trước (${newCalories} vs ${oldCalories} kcal).`;
+      } else if (diffKcal > 0) {
+        diffMsg = `Món mới nhiều hơn ${diffKcal} kcal so với món trước (${newCalories} vs ${oldCalories} kcal).`;
+      } else {
+        diffMsg = `Món mới có cùng lượng calo với món trước (${newCalories} kcal).`;
+      }
+
+      notifySuccess(`${res.message || 'Đã đổi món thành công.'} Món mới: ${newRecipe.title}. ${diffMsg}`);
+    };
+
+    const onSwapError = (error: any) => {
+      const apiError = toApiError(error);
+      if (apiError.errorCode === 'ERR_QUOTA_MEAL_SWAP_EXCEEDED') {
+        if (isVip) setSwapError(getErrorMessage(apiError));
+        else setUpsell({ title: 'Hết lượt đổi món', message: getErrorMessage(apiError) });
+      } else if (apiError.errorCode === 'ERR_MEAL_NO_SUBSTITUTE' || apiError.status === 422) {
+        setSwapError(getErrorMessage(apiError));
+      } else if (apiError.status === 409) {
+        setSwapSlot(null);
+        setNotice({ title: 'Không đổi được món', message: getErrorMessage(apiError) });
+      } else {
+        notifyApiError(apiError);
+      }
+    };
+
+    // Đổi theo lưu ý riêng nếu chỉ có customNote (không có reason cố định và không chọn trực tiếp recipeId)
+    if (!reason && !newRecipeId && customNote) {
+      swapByNote.mutate(
+        {
+          slotId,
+          note: customNote,
           excludedRecipeIds: excluded,
         },
-      },
-      {
-        onSuccess: (res) => {
-          setSwappedAway((current) => ({ ...current, [slotId]: excluded }));
-          setSwapSlot(null);
-          const newRecipe = res.data.slot.recipe;
-          const newCalories = Math.round(newRecipe?.caloriesKcal ?? 0);
-          const diffKcal = newCalories - oldCalories;
-
-          const slotFromRes = res.data.slot as unknown as {
-            swapCount?: number;
-            previousRecipe?: SlotSwapInfo['previousRecipe'];
-            originalRecipe?: SlotSwapInfo['originalRecipe'];
-            swapHistories?: Array<{
-              oldRecipeId?: number;
-              oldRecipeTitle?: string;
-              oldRecipeCalories?: number;
-              oldRecipeImageUrl?: string;
-            }>;
-          };
-          setSwapHistories((current) => {
-            const existing = current[slotId] || { swapCount: 0, history: [] };
-            const newCount = slotFromRes?.swapCount || (existing.swapCount ?? 0) + 1;
-            const updatedHistory = [
-              {
-                recipeId: oldRecipe.recipeId,
-                title: oldRecipe.title,
-                caloriesKcal: oldRecipe.caloriesKcal,
-                imageUrl: oldRecipe.imageUrl,
-              },
-              ...(existing.history ?? []),
-            ];
-            return {
-              ...current,
-              [slotId]: {
-                swapCount: newCount,
-                history: updatedHistory,
-                previousRecipe: {
-                  recipeId: oldRecipe.recipeId,
-                  title: oldRecipe.title,
-                  caloriesKcal: oldRecipe.caloriesKcal,
-                  imageUrl: oldRecipe.imageUrl,
-                },
-                originalRecipe: existing.originalRecipe ?? {
-                  recipeId: oldRecipe.recipeId,
-                  title: oldRecipe.title,
-                  caloriesKcal: oldRecipe.caloriesKcal,
-                  imageUrl: oldRecipe.imageUrl,
-                },
-              },
-            };
-          });
-
-          let diffMsg = '';
-          if (diffKcal < 0) {
-            diffMsg = `Món mới ít hơn ${Math.abs(diffKcal)} kcal so với món trước (${newCalories} vs ${oldCalories} kcal).`;
-          } else if (diffKcal > 0) {
-            diffMsg = `Món mới nhiều hơn ${diffKcal} kcal so với món trước (${newCalories} vs ${oldCalories} kcal).`;
-          } else {
-            diffMsg = `Món mới có cùng lượng calo với món trước (${newCalories} kcal).`;
-          }
-
-          notifySuccess(`${res.message || 'Đã đổi món thành công.'} Món mới: ${newRecipe.title}. ${diffMsg}`);
+        {
+          onSuccess: onSwapSuccess,
+          onError: onSwapError,
+        }
+      );
+    } else {
+      swap.mutate(
+        {
+          slotId,
+          body: {
+            ...(reason ? { swapReason: reason } : {}),
+            ...(customNote ? { customNote } : {}),
+            ...(newRecipeId ? { newRecipeId } : {}),
+            excludedRecipeIds: excluded,
+          },
         },
-        onError: (error) => {
-          const apiError = toApiError(error);
-          if (apiError.errorCode === 'ERR_QUOTA_MEAL_SWAP_EXCEEDED') {
-            if (isVip) setSwapError(getErrorMessage(apiError));
-            else setUpsell({ title: 'Hết lượt đổi món', message: getErrorMessage(apiError) });
-          } else if (apiError.errorCode === 'ERR_MEAL_NO_SUBSTITUTE' || apiError.status === 422) {
-            setSwapError(getErrorMessage(apiError));
-          } else if (apiError.status === 409) {
-            setSwapSlot(null);
-            setNotice({ title: 'Không đổi được món', message: getErrorMessage(apiError) });
-          } else {
-            notifyApiError(apiError);
-          }
-        },
-      }
-    );
+        {
+          onSuccess: onSwapSuccess,
+          onError: onSwapError,
+        }
+      );
+    }
   };
 
   // Thay thế slot bằng món chọn trực tiếp từ Search Widget / Modal
@@ -878,16 +936,11 @@ export const MealPlanDetail: React.FC = () => {
               <button
                 type="button"
                 onClick={handleOpenActivate}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 font-label-md text-label-md font-semibold shadow-xs transition-all',
-                  isFuturePlan
-                    ? 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
-                    : 'bg-primary-container text-on-primary hover:bg-primary'
-                )}
-                title={isFuturePlan ? `Sẵn sàng kích hoạt từ ${getWeekdayFull(data.startDate)}, ${formatDate(data.startDate)}` : undefined}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 font-label-md text-label-md font-semibold text-on-primary shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                title="Kích hoạt thực đơn để bắt đầu theo dõi bữa ăn và đi chợ"
               >
-                <Icon name={isFuturePlan ? 'schedule' : 'rocket_launch'} className="text-[18px]" />
-                {isFuturePlan ? `Kích hoạt (từ ${formatDate(data.startDate)})` : 'Kích hoạt'}
+                <Icon name="rocket_launch" className="text-[18px]" />
+                <span>Kích hoạt</span>
               </button>
             )}
 
@@ -902,15 +955,7 @@ export const MealPlanDetail: React.FC = () => {
               <span>Đi chợ</span>
             </button>
 
-            <button
-              type="button"
-              onClick={runExport}
-              disabled={exportPdf.isPending}
-              className={BTN_ACTION}
-            >
-              <Icon name="picture_as_pdf" className="text-[18px] text-on-surface-variant" />
-              <span className="hidden sm:inline">{exportPdf.isPending ? 'Đang tạo…' : isVip ? 'Xuất PDF' : 'Xuất PDF (VIP)'}</span>
-            </button>
+
 
             {/* Nút Hủy thực đơn này: hiển thị khi thực đơn chưa bị hủy (TASK-T1 / SWP391-232) */}
             {!isCancelled && (
@@ -1183,6 +1228,7 @@ export const MealPlanDetail: React.FC = () => {
                 onOpenHistory={() => setHistorySlot(s)}
                 planId={planId}
                 currentDay={selectedDayCode}
+                dayIndex={selectedDayIndex}
               />
             ))
           )}

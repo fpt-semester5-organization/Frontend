@@ -30,6 +30,33 @@ export async function listRecipes(params: RecipeListParams): Promise<Paged<Recip
   return toPaged(res.data, params);
 }
 
+export function normalizeInstructions(raw: unknown): string[] {
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : [raw];
+  const steps: string[] = [];
+
+  for (const item of list) {
+    if (!item) continue;
+    const str = String(item)
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+
+    const lines = str.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const parts = trimmed.split(/(?=Bước\s+\d+[:.])/i);
+      for (const p of parts) {
+        const clean = p.trim();
+        if (clean) steps.push(clean);
+      }
+    }
+  }
+  return steps;
+}
+
 /** GET /recipes/{id} — FN-POST-02 Xem chi tiết công thức (đầy đủ cho cả Khách). */
 export async function getRecipe(id: number): Promise<RecipeDetail> {
   const res = await http.get<ApiEnvelope<RecipeDetail>>(`/recipes/${id}`);
@@ -40,7 +67,7 @@ export async function getRecipe(id: number): Promise<RecipeDetail> {
     description: data.description || null,
     servings: data.servings ?? null,
     prepTimeMinutes: data.prepTimeMinutes ?? null,
-    instructions: Array.isArray(data.instructions) ? data.instructions : [],
+    instructions: normalizeInstructions(data.instructions),
     ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
     memberActions: data.memberActions ?? { canVote: false, canComment: false, canReport: false },
   };

@@ -49,14 +49,21 @@ export interface FoodCategoryFilter {
 
 export const FOOD_CATEGORIES: FoodCategoryFilter[] = [
   { categoryId: 'ALL', categoryName: 'Tất cả món', iconName: 'restaurant' },
-  { categoryId: 1, categoryName: 'Mì, Bún & Phở', iconName: 'ramen_dining' },
-  { categoryId: 2, categoryName: 'Cơm & Xôi', iconName: 'rice_bowl' },
-  { categoryId: 3, categoryName: 'Món Kho & Xào', iconName: 'soup_kitchen' },
-  { categoryId: 4, categoryName: 'Canh & Súp', iconName: 'nest_heat_link_gen_3' },
-  { categoryId: 5, categoryName: 'Món Chiên & Rán', iconName: 'cooking' },
-  { categoryId: 6, categoryName: 'Món Cuốn', iconName: 'egg_alt' },
-  { categoryId: 7, categoryName: 'Món Lẩu', iconName: 'skillet' },
-  { categoryId: 8, categoryName: 'Gỏi & Salad', iconName: 'eco' },
+  { categoryId: 1, categoryName: 'Bánh Mặn & Bánh Ngọt Chay', iconName: 'bakery_dining' },
+  { categoryId: 2, categoryName: 'Đồ Uống & Trà Dinh Dưỡng', iconName: 'local_cafe' },
+  { categoryId: 3, categoryName: 'Món Canh & Súp Bổ Dưỡng', iconName: 'soup_kitchen' },
+  { categoryId: 4, categoryName: 'Món Chiên & Rán Giòn Rụm', iconName: 'cooking' },
+  { categoryId: 5, categoryName: 'Món Cơm & Xôi Chay', iconName: 'rice_bowl' },
+  { categoryId: 6, categoryName: 'Món Cuốn Chay', iconName: 'egg_alt' },
+  { categoryId: 7, categoryName: 'Món Gỏi & Salad Tươi Mát', iconName: 'eco' },
+  { categoryId: 8, categoryName: 'Món Hấp & Luộc Dưỡng Sinh', iconName: 'steamer' },
+  { categoryId: 9, categoryName: 'Món Kho Chay Đậm Đà', iconName: 'skillet' },
+  { categoryId: 10, categoryName: 'Món Lẩu Chay Gia Đình', iconName: 'hot_tub' },
+  { categoryId: 11, categoryName: 'Món Mì, Bún & Phở Chay', iconName: 'ramen_dining' },
+  { categoryId: 12, categoryName: 'Món Nướng Chay', iconName: 'outdoor_grill' },
+  { categoryId: 13, categoryName: 'Món Tráng Miệng & Chè', iconName: 'icecream' },
+  { categoryId: 14, categoryName: 'Món Xào Chay Thanh Vị', iconName: 'skillet' },
+  { categoryId: 15, categoryName: 'Nước Chấm & Sốt Gia Vị Chay', iconName: 'science' },
 ];
 
 export const MOCK_FOOD_DISHES: FoodDish[] = [

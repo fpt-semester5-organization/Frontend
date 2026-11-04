@@ -17,6 +17,7 @@ interface RecipeCardProps {
 
 /** Thẻ công thức/video (trang chủ, kho công thức, gợi ý liên quan): chỉ dùng các trường GET /recipes trả về. */
 export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item, eager = false, className }, ref) => {
+  const [imgError, setImgError] = React.useState(false);
   const isVideo = item.type === 'VIDEO';
   const school = dietarySchoolLabel(item.dietarySchool);
   const kcal = Number.isFinite(item.caloriesKcal) ? Math.round(item.caloriesKcal) : null;
@@ -30,21 +31,27 @@ export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-container">
-        {item.imageUrl ? (
+        {item.imageUrl && !imgError ? (
           <img
             src={item.imageUrl}
-            alt=""
+            alt={item.title}
             width={480}
             height={360}
             loading={eager ? 'eager' : 'lazy'}
             // React 18 chưa nhận prop fetchPriority nên ghi thẳng thuộc tính HTML.
             {...(eager ? { fetchpriority: 'high' } : {})}
             decoding="async"
+            onError={() => setImgError(true)}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60">
-            <Icon name="restaurant" className="text-[40px] text-on-primary-fixed-variant" />
+          <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary-fixed/70 to-secondary-fixed/60 p-4">
+            <div className="flex flex-col items-center gap-1.5 text-primary">
+              <Icon name="restaurant" className="text-[36px]" />
+              <span className="text-[11px] font-medium text-on-surface-variant line-clamp-1 text-center">
+                {item.foodName || 'Món chay VeggieLife'}
+              </span>
+            </div>
           </div>
         )}
         {school && (

@@ -11,12 +11,18 @@ export interface Food {
   foodId: number;
   foodName: string;
   categoryId: number;
+  imageUrl?: string | null;
+  recipeCount?: number;
+  categoryName?: string | null;
 }
 
 /** Trường món ăn trong công thức; công thức tạo trước khi có bảng Foods thì không có (null). */
 export interface RecipeFoodFields {
   foodId?: number | null;
   foodName?: string | null;
+  foodImageUrl?: string | null;
+  categoryId?: number | null;
+  categoryName?: string | null;
 }
 
 /** Một mục của GET /recipes (FN-POST-01): công thức hoặc video công khai. */

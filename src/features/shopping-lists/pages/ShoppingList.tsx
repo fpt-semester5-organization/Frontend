@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -62,11 +62,35 @@ const ShoppingList: React.FC = () => {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [upsellMessage, setUpsellMessage] = useState<string | null>(null);
 
-  // Tab chọn phạm vi xem: 'ALL' (Cả tuần) hoặc index ngày cụ thể (0, 1, 2...)
-  const [activeTab, setActiveTab] = useState<'ALL' | number>('ALL');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const urlServings = Number(searchParams.get('servings'));
+  const initialServings = Number.isFinite(urlServings) && urlServings >= 1 ? urlServings : 1;
 
-  // Khẩu phần ăn chung cho cả tuần (mặc định 1 người)
-  const [allDaysServings, setAllDaysServings] = useState<number>(1);
+  // Tab chọn phạm vi xem: 'ALL' (Cả tuần) hoặc index ngày cụ thể (0, 1, 2...)
+  const urlTab = searchParams.get('tab');
+  const initialTab: 'ALL' | number =
+    urlTab === 'ALL' || urlTab === null
+      ? 'ALL'
+      : Number.isInteger(Number(urlTab)) && Number(urlTab) >= 0
+      ? Number(urlTab)
+      : 'ALL';
+  const [activeTab, setActiveTab] = useState<'ALL' | number>(initialTab);
+
+  const handleTabChange = (nextTab: 'ALL' | number) => {
+    setActiveTab(nextTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', String(nextTab));
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  // Khẩu phần ăn chung cho cả tuần (khởi tạo từ URL hoặc mặc định 1 người)
+  const [allDaysServings, setAllDaysServings] = useState<number>(initialServings);
   // Khẩu phần ăn riêng cho từng ngày: { [dayIndex]: servings }
   const [dayServings, setDayServings] = useState<Record<number, number>>({});
 
@@ -160,10 +184,14 @@ const ShoppingList: React.FC = () => {
     if (!planData?.slots || calendarDays.length === 0) return [];
 
     return calendarDays.map((dItem) => {
-      const daySlots =
+      let daySlots =
         totalDays <= 7
           ? planData.slots.filter((s) => s.dayOfWeek === dItem.dayOfWeek)
           : planData.slots.slice(dItem.index * 3, dItem.index * 3 + 3);
+
+      if (daySlots.length === 0) {
+        daySlots = planData.slots.slice(dItem.index * 3, dItem.index * 3 + 3);
+      }
 
       const meals = daySlots
         .filter((s) => s.recipe)
@@ -171,19 +199,31 @@ const ShoppingList: React.FC = () => {
           slotId: s.slotId,
           mealType: s.mealType,
           recipeId: s.recipe?.recipeId,
-          title: s.recipe?.title ?? '',
-          imageUrl: s.recipe?.imageUrl,
+          title: (s.recipe as any)?.foodName ?? s.recipe?.title ?? '',
+          recipeTitle: s.recipe?.title ?? '',
+          imageUrl: (s.recipe as any)?.foodImageUrl ?? s.recipe?.imageUrl,
         }));
 
-      const dayRecipeTitles = meals.map((m) => m.title.trim().toLowerCase());
+      // Tập hợp các tiêu đề và tên món để đối soát nguyên liệu (chống lệch giữa FoodName và RecipeTitle)
+      const dayRecipeTitles = meals.flatMap((m) => [
+        m.title.trim().toLowerCase(),
+        m.recipeTitle.trim().toLowerCase(),
+      ]).filter(Boolean);
+
+      const isSourceOfThisDay = (rs: string) => {
+        const rsLower = rs.trim().toLowerCase();
+        if (!rsLower) return false;
+        return dayRecipeTitles.some((drt) => {
+          if (!drt) return false;
+          return drt === rsLower || rsLower.includes(drt) || drt.includes(rsLower);
+        });
+      };
 
       // Lọc nguyên liệu cần cho các món của ngày này
       const dayItems = allItems
         .map((item) => {
           const rawSources = (item as unknown as { recipeSources?: string[] }).recipeSources ?? [];
-          const matchingSources = rawSources.filter((rs) =>
-            dayRecipeTitles.some((drt) => drt === rs.trim().toLowerCase())
-          );
+          const matchingSources = rawSources.filter(isSourceOfThisDay);
           if (matchingSources.length === 0) return null;
 
           // Tỷ lệ lượng nguyên liệu cho ngày này dựa trên số món trong ngày / tổng số món dùng
@@ -523,6 +563,33 @@ const ShoppingList: React.FC = () => {
     }).length;
   }, [allItems, daysDetail, calendarDays, dayPurchases]);
 
+  const getMealStats = (meal: { title: string; recipeTitle?: string }) => {
+    if (!activeDayData) return { purchased: 0, total: 0 };
+    const tLower = meal.title.trim().toLowerCase();
+    const rtLower = (meal.recipeTitle ?? '').trim().toLowerCase();
+
+    const mealItems = activeDayData.items.filter((item) =>
+      item.matchingSources?.some((source) => {
+        const sLower = source.trim().toLowerCase();
+        if (!sLower) return false;
+        if (tLower && (sLower === tLower || sLower.includes(tLower) || tLower.includes(sLower))) return true;
+        if (rtLower && (sLower === rtLower || sLower.includes(rtLower) || rtLower.includes(sLower))) return true;
+        return false;
+      })
+    );
+    const purchased = mealItems.filter((i) => i.isPurchasedInThisDay).length;
+    return { purchased, total: mealItems.length };
+  };
+
+  // Đếm số món ăn trong ngày đã hoàn thành mua đủ 100% nguyên liệu
+  const activeCompletedMealsCount = useMemo(() => {
+    if (!activeDayData?.meals || activeDayData.meals.length === 0) return 0;
+    return activeDayData.meals.filter((m) => {
+      const stats = getMealStats(m);
+      return stats.total > 0 && stats.purchased === stats.total;
+    }).length;
+  }, [activeDayData, dayPurchases]);
+
   if (!validId || notFound) {
 return (
       <EmptyState
@@ -586,15 +653,7 @@ return (
       },
     });
 
-  const getMealStats = (mealTitle: string) => {
-    if (!activeDayData) return { purchased: 0, total: 0 };
-    const titleLower = mealTitle.trim().toLowerCase();
-    const mealItems = activeDayData.items.filter((item) =>
-      item.matchingSources?.some((source) => source.trim().toLowerCase() === titleLower)
-    );
-    const purchased = mealItems.filter((i) => i.isPurchasedInThisDay).length;
-    return { purchased, total: mealItems.length };
-  };
+
 
   return (
     <div className={PAGE}>
@@ -640,7 +699,7 @@ return (
             type="button"
             role="tab"
             aria-selected={activeTab === 'ALL'}
-            onClick={() => setActiveTab('ALL')}
+            onClick={() => handleTabChange('ALL')}
             className={cn(
               'inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0',
               activeTab === 'ALL'
@@ -675,7 +734,7 @@ return (
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => setActiveTab(day.index)}
+                onClick={() => handleTabChange(day.index)}
                 className={cn(
                   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0',
                   isActive
@@ -784,11 +843,18 @@ return (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <Icon name="shopping_bag" className="text-[20px] text-primary" />
-              <p className="font-serif font-bold text-sm sm:text-base text-on-surface">
-                {activeTab === 'ALL'
-                  ? `Đã mua ${fullyPurchasedWeekItemsCount}/${allItems.length} món cả tuần`
-                  : `Đã mua ${activePurchasedCount}/${activeTotalCount} món của ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}`}
-              </p>
+              <div className="flex flex-col gap-0.5">
+                <p className="font-sans font-bold text-sm sm:text-base text-on-surface">
+                  {activeTab === 'ALL'
+                    ? `Đã mua ${fullyPurchasedWeekItemsCount}/${allItems.length} nguyên liệu cả tuần`
+                    : `Đã mua ${activePurchasedCount}/${activeTotalCount} nguyên liệu của ${activeDayData?.header ?? `Ngày ${activeTab + 1}`}`}
+                </p>
+                {activeTab !== 'ALL' && activeDayData && activeDayData.meals.length > 0 && (
+                  <p className="font-body-xs text-xs text-on-surface-variant">
+                    Hoàn tất <strong>{activeCompletedMealsCount}/{activeDayData.meals.length} món ăn</strong> theo thực đơn trong ngày
+                  </p>
+                )}
+              </div>
             </div>
 
           </div>
@@ -842,7 +908,7 @@ return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-0.5">
                 {activeDayData.meals.map((meal) => {
                   const mealTypeKey = meal.mealType as keyof typeof MEAL_LABEL;
-                  const stats = getMealStats(meal.title);
+                  const stats = getMealStats(meal);
                   const isComplete = stats.total > 0 && stats.purchased === stats.total;
 
                   const recipeUrl = meal.recipeId
@@ -853,42 +919,95 @@ return (
                     <Link
                       key={meal.slotId}
                       to={recipeUrl}
-                      className="group flex flex-col justify-between gap-1.5 rounded-xl border border-surface-container bg-surface-container-lowest hover:border-primary/50 hover:bg-surface-container-low p-3 transition-all no-underline"
+                      state={{ returnUrl: `${location.pathname}?tab=${activeTab}&servings=${allDaysServings}` }}
+                      className={cn(
+                        'group relative flex flex-col justify-between gap-2.5 rounded-2xl border p-3.5 transition-all no-underline shadow-2xs',
+                        isComplete
+                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/20'
+                          : 'border-primary/20 bg-surface-container-lowest hover:border-primary hover:shadow-xs'
+                      )}
                       title={`Xem công thức nấu: ${meal.title}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
-                          <Icon name={MEAL_ICON[mealTypeKey] || 'restaurant'} className="text-[15px] text-primary" />
-                          <span className="font-semibold">{MEAL_LABEL[mealTypeKey] || 'Bữa ăn'}</span>
+                        <span className={cn(
+                          'font-sans font-semibold text-sm sm:text-base tracking-normal',
+                          isComplete ? 'text-primary' : 'text-on-surface'
+                        )}>
+                          {MEAL_LABEL[mealTypeKey] || 'Bữa ăn'}
                         </span>
 
                         {stats.total > 0 ? (
                           <span
                             className={cn(
-                              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-label-sm text-[11px] font-semibold tabular-nums',
+                              'inline-flex items-center gap-1 rounded-full px-3 py-1 font-sans text-xs font-semibold tabular-nums shadow-2xs transition-all',
                               isComplete
-                                ? 'bg-primary-fixed text-on-primary-fixed font-bold'
+                                ? 'bg-primary text-on-primary font-bold shadow-xs'
+                                : stats.purchased > 0
+                                ? 'bg-primary-fixed text-on-primary-fixed'
                                 : 'bg-surface-container text-on-surface-variant'
                             )}
                           >
-                            {isComplete && <Icon name="check" className="text-[13px] text-primary" />}
-                            {isComplete ? `Đủ ${stats.total}/${stats.total}` : `Đã mua ${stats.purchased}/${stats.total}`}
+                            <Icon
+                              name={isComplete ? "check_circle" : stats.purchased > 0 ? "check" : "shopping_bag"}
+                              className={cn("text-[13px]", isComplete ? "text-on-primary" : stats.purchased > 0 ? "text-on-primary-fixed" : "text-on-surface-variant")}
+                            />
+                            <span>
+                              {isComplete
+                                ? "Đã mua đủ món"
+                                : stats.purchased > 0
+                                ? `Đã mua ${stats.purchased}/${stats.total}`
+                                : `Chưa mua (${stats.purchased}/${stats.total})`}
+                            </span>
                           </span>
                         ) : (
-                          <span className="font-label-sm text-[11px] text-outline">Theo thực đơn</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed/60 text-on-primary-fixed px-3 py-1 font-sans text-xs font-semibold shadow-2xs">
+                            <Icon name="check_circle" className="text-[13px] text-on-primary-fixed" />
+                            Theo thực đơn
+                          </span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between gap-1 mt-0.5">
-                        <p
-                          className="line-clamp-1 font-label-md text-label-md font-semibold text-on-surface group-hover:text-primary transition-colors"
-                          title={meal.title}
-                        >
-                          {meal.title}
-                        </p>
+                      <div
+                        className={cn(
+                        "flex items-center justify-between gap-3 rounded-xl border-l-4 border-t-0 border-r-0 border-b-0 border-primary bg-surface-container-low/70 px-4 py-3 transition-all",
+                        isComplete
+                          ? "bg-primary/10 text-primary"
+                          : "text-on-surface hover:bg-surface-container-low"
+                      )}
+                      style={{
+                        borderLeft: "4px solid var(--color-primary, #3d5c47)",
+                        borderTop: "none",
+                        borderRight: "none",
+                        borderBottom: "none",
+                      }}
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                          <span className="text-xs text-on-surface-variant font-medium">
+                            Món ăn theo thực đơn:
+                          </span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isComplete && (
+                              <Icon name="check_circle" className="text-[15px] text-primary shrink-0" />
+                            )}
+                            <p
+                              className={cn(
+                                "line-clamp-1 font-sans font-semibold text-sm transition-colors",
+                                isComplete ? "text-primary" : "text-on-surface group-hover:text-primary"
+                              )}
+                              title={meal.title}
+                            >
+                              {meal.title}
+                            </p>
+                          </div>
+                        </div>
                         <Icon
                           name="arrow_forward"
-                          className="text-[15px] text-outline opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all shrink-0"
+                          className={cn(
+                            "text-[18px] transition-all shrink-0",
+                            isComplete
+                              ? "text-primary opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5"
+                              : "text-primary/70 group-hover:text-primary group-hover:translate-x-0.5"
+                          )}
                         />
                       </div>
                     </Link>

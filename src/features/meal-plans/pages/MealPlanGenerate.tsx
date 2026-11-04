@@ -121,42 +121,71 @@ export const MealPlanGenerate: React.FC = () => {
     return () => clearTimeout(timer);
   }, [note]);
 
-  // Xóa chip: đồng thời gỡ cụm từ khỏi ô text ghi chú
+  // Xóa chip: đồng thời gỡ cụm từ khỏi ô text ghi chú (chống sót biến thể)
   const handleRemoveChip = (chipToRemove: AiParsedChip) => {
     const current = getValues('customInstructions') || '';
+    const chipLower = chipToRemove.label.toLowerCase();
+    const isAllium = chipLower.includes('ngũ vị tân');
+    const isLowOil = chipLower.includes('dầu mỡ') || chipLower.includes('thanh đạm');
+
     const parts = current.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
-    const remaining = parts.filter(
-      (p) =>
-        p.toLowerCase() !== chipToRemove.label.toLowerCase() &&
-        !p.toLowerCase().includes(chipToRemove.label.toLowerCase()) &&
-        !chipToRemove.label.toLowerCase().includes(p.toLowerCase())
-    );
+    const remaining = parts.filter((p) => {
+      const pLower = p.toLowerCase();
+      if (pLower === chipLower) return false;
+      if (isAllium && pLower.includes('ngũ vị tân')) return false;
+      if (isLowOil && (pLower.includes('dầu mỡ') || pLower.includes('thanh đạm'))) return false;
+      if (pLower.includes(chipLower) || chipLower.includes(pLower)) return false;
+      return true;
+    });
     setValue('customInstructions', remaining.join(', '), { shouldValidate: true });
     setAiChips((prev) => prev.filter((c) => c.id !== chipToRemove.id));
   };
 
-  // Bật/tắt gợi ý nhanh: bấm lần đầu thì thêm, bấm lại thì gỡ bỏ (toggle chuẩn, không bị trùng)
+  // Bật/tắt gợi ý nhanh: bấm lần đầu thì thêm, bấm lại thì gỡ bỏ (chuẩn xác 100%, chống duplicate)
   const handleToggleSuggestion = (item: { label: string; category: ContextCategory }) => {
     const current = getValues('customInstructions') || '';
+    const itemLower = item.label.toLowerCase();
+    const isAllium = itemLower.includes('ngũ vị tân');
+    const isLowOil = itemLower.includes('dầu mỡ') || itemLower.includes('thanh đạm');
+
     const isAlreadySelected =
-      current.toLowerCase().includes(item.label.toLowerCase()) ||
-      aiChips.some((c) => c.label.toLowerCase() === item.label.toLowerCase());
+      current.toLowerCase().includes(itemLower) ||
+      (isAllium && current.toLowerCase().includes('ngũ vị tân')) ||
+      (isLowOil && (current.toLowerCase().includes('dầu mỡ') || current.toLowerCase().includes('thanh đạm'))) ||
+      aiChips.some((c) => {
+        const cLower = c.label.toLowerCase();
+        if (cLower === itemLower) return true;
+        if (isAllium && cLower.includes('ngũ vị tân')) return true;
+        if (isLowOil && (cLower.includes('dầu mỡ') || cLower.includes('thanh đạm'))) return true;
+        return false;
+      });
+
+    // Lọc sạch các cụm từ tương ứng để tránh bị nhân đôi chuỗi
+    const parts = current.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
+    const filteredParts = parts.filter((p) => {
+      const pLower = p.toLowerCase();
+      if (pLower === itemLower) return false;
+      if (isAllium && pLower.includes('ngũ vị tân')) return false;
+      if (isLowOil && (pLower.includes('dầu mỡ') || pLower.includes('thanh đạm'))) return false;
+      if (pLower.includes(itemLower) || itemLower.includes(pLower)) return false;
+      return true;
+    });
 
     if (isAlreadySelected) {
-      // Gỡ bỏ
-      const parts = current.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
-      const remaining = parts.filter(
-        (p) =>
-          p.toLowerCase() !== item.label.toLowerCase() &&
-          !p.toLowerCase().includes(item.label.toLowerCase()) &&
-          !item.label.toLowerCase().includes(p.toLowerCase())
+      // Gỡ bỏ hoàn toàn
+      setValue('customInstructions', filteredParts.join(', '), { shouldValidate: true });
+      setAiChips((prev) =>
+        prev.filter((c) => {
+          const cLower = c.label.toLowerCase();
+          if (cLower === itemLower) return false;
+          if (isAllium && cLower.includes('ngũ vị tân')) return false;
+          if (isLowOil && (cLower.includes('dầu mỡ') || cLower.includes('thanh đạm'))) return false;
+          return true;
+        })
       );
-      setValue('customInstructions', remaining.join(', '), { shouldValidate: true });
-      setAiChips((prev) => prev.filter((c) => c.label.toLowerCase() !== item.label.toLowerCase()));
     } else {
-      // Thêm mới
-      const trimmed = current.trim();
-      const newText = trimmed ? `${trimmed}, ${item.label}` : item.label;
+      // Thêm mới một lần duy nhất
+      const newText = filteredParts.length > 0 ? `${filteredParts.join(', ')}, ${item.label}` : item.label;
       setValue('customInstructions', newText, { shouldValidate: true });
       const newChip: AiParsedChip = {
         id: `chip_sug_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -165,8 +194,14 @@ export const MealPlanGenerate: React.FC = () => {
         icon: CONTEXT_CATEGORIES[item.category].icon,
       };
       setAiChips((prev) => {
-        if (prev.some((c) => c.label.toLowerCase() === item.label.toLowerCase())) return prev;
-        return [...prev, newChip];
+        const cleanPrev = prev.filter((c) => {
+          const cLower = c.label.toLowerCase();
+          if (cLower === itemLower) return false;
+          if (isAllium && cLower.includes('ngũ vị tân')) return false;
+          if (isLowOil && (cLower.includes('dầu mỡ') || cLower.includes('thanh đạm'))) return false;
+          return true;
+        });
+        return [...cleanPrev, newChip];
       });
     }
   };
