@@ -46,7 +46,7 @@ export const AvatarUploader: React.FC<{ name: string; avatarUrl: string | null }
     <div className="flex flex-col items-center gap-2">
       <div className="relative">
         {avatarUrl ? (
-          <img src={avatarUrl} alt={`Ảnh đại diện của ${name}`} width={112} height={112} className="h-28 w-28 rounded-full object-cover" />
+          <img src={avatarUrl} alt={`Ảnh đại diện của ${name}`} width={112} height={112} referrerPolicy="no-referrer" className="h-28 w-28 rounded-full object-cover" />
         ) : (
           <Avatar name={name} className="h-28 w-28 text-headline-md" />
         )}

@@ -73,6 +73,8 @@ export const Avatar: React.FC<AvatarProps> = ({
           src={optimizedSrc}
           alt={alt || `Ảnh đại diện của ${name}`}
           onError={() => setImageError(true)}
+          // Ảnh Google (lh3.googleusercontent.com) từ chối yêu cầu có Referer localhost/domain lạ
+          referrerPolicy="no-referrer"
           loading="eager"
           decoding="sync"
           className="h-full w-full object-cover"
