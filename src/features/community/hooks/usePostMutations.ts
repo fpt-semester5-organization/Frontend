@@ -69,7 +69,7 @@ export function useUpdatePost(postId: number) {
     mutationFn: (body: UpdatePostBody) => updatePost(postId, body),
     onSuccess: (res, body) => {
       // Bài chuyển sang riêng tư hoặc không còn APPROVED_ACTIVE thì gỡ khỏi bảng tin ngay
-      const toPrivate = body.visibility === 'PRIVATE' || res.data?.visibility === 'PRIVATE';
+      const toPrivate = body.visibility === 'PRIVATE';
       if (toPrivate || (res.data?.moderationStatus && res.data.moderationStatus !== 'APPROVED_ACTIVE')) {
         removeRecentCreatedItem((item) => item.kind === 'POST' && item.id === postId);
       }
