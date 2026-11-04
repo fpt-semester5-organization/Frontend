@@ -38,6 +38,7 @@ interface BentoPrompt {
   title: string;
   prompt: string;
   tagColor: string;
+  featured?: boolean;
 }
 
 const BENTO_PROMPTS: BentoPrompt[] = [
@@ -48,6 +49,7 @@ const BENTO_PROMPTS: BentoPrompt[] = [
     title: 'Ăn chay kết hợp đạm thế nào?',
     prompt: 'Tôi ăn thuần chay thì nên phối hợp thực phẩm thế nào để đủ đạm và axit amin thiết yếu?',
     tagColor: 'text-primary bg-primary/10 border-primary/20',
+    featured: true,
   },
   {
     id: 'dinner',
@@ -891,51 +893,58 @@ export const ChatPage: React.FC = () => {
 
                 {/* Bento Prompt Matrix: 4 khối tri thức thực dưỡng */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {BENTO_PROMPTS.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group relative flex flex-col justify-between gap-3 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-xs transition-all duration-200 hover:border-primary/50 hover:shadow-sm"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-label-sm text-[11px] font-semibold ${item.tagColor}`}
-                          >
-                            <span aria-hidden="true" className="material-symbols-outlined text-[13px]">{item.icon}</span>
-                            {item.category}
-                          </span>
-                          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-outline-variant transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
-                            north_east
-                          </span>
+                  {BENTO_PROMPTS.map((item, index) => {
+                    const isFeatured = item.featured || index === 0;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`group relative flex flex-col justify-between gap-3 overflow-hidden rounded-2xl p-4 shadow-xs transition-all duration-200 hover:shadow-sm ${
+                          isFeatured
+                            ? 'border border-primary/25 bg-gradient-to-r from-primary-container/15 via-surface-container-lowest to-surface-container-lowest hover:border-primary/50'
+                            : 'border border-outline-variant/30 bg-surface-container-lowest hover:border-primary/50'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-label-sm text-[11px] font-semibold ${item.tagColor}`}
+                            >
+                              <span aria-hidden="true" className="material-symbols-outlined text-[13px]">{item.icon}</span>
+                              {item.category}
+                            </span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-outline-variant transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
+                              north_east
+                            </span>
+                          </div>
+                          <h3 className="mt-2.5 font-headline-sm text-sm font-bold text-on-surface">
+                            {item.title}
+                          </h3>
+                          <p className="mt-1 font-body-sm text-xs leading-relaxed text-on-surface-variant">
+                            {item.prompt}
+                          </p>
                         </div>
-                        <h3 className="mt-2.5 font-headline-sm text-sm font-bold text-on-surface">
-                          {item.title}
-                        </h3>
-                        <p className="mt-1 font-body-sm text-xs leading-relaxed text-on-surface-variant">
-                          {item.prompt}
-                        </p>
-                      </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20">
-                        <button
-                          type="button"
-                          onClick={() => setInput(item.prompt)}
-                          className="font-label-sm text-[11px] text-on-surface-variant hover:text-primary transition"
-                        >
-                          Điền câu hỏi
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void send(item.prompt)}
-                          disabled={sending}
-                          className="inline-flex items-center gap-1 rounded-lg bg-primary/10 hover:bg-primary px-2.5 py-1 font-label-sm text-xs font-semibold text-primary hover:text-on-primary transition active:scale-[0.98] disabled:opacity-40"
-                        >
-                          <span>Hỏi ngay</span>
-                          <span aria-hidden="true" className="material-symbols-outlined text-[13px]">send</span>
-                        </button>
+                        <div className={`flex items-center justify-between pt-2 border-t ${isFeatured ? 'border-primary/15' : 'border-outline-variant/20'}`}>
+                          <button
+                            type="button"
+                            onClick={() => setInput(item.prompt)}
+                            className="font-label-sm text-[11px] text-on-surface-variant hover:text-primary transition"
+                          >
+                            Điền câu hỏi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void send(item.prompt)}
+                            disabled={sending}
+                            className="inline-flex items-center gap-1 rounded-lg bg-primary/10 hover:bg-primary px-2.5 py-1 font-label-sm text-xs font-semibold text-primary hover:text-on-primary transition active:scale-[0.98] disabled:opacity-40"
+                          >
+                            <span>Hỏi ngay</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[13px]">send</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (
