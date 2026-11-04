@@ -172,7 +172,9 @@ export function apiErrorData(err: unknown): Record<string, unknown> {
 }
 
 export function apiFieldErrors(err: unknown): Record<string, string> {
-  const details = (err as AxiosError<ApiErrorBody> | null | undefined)?.response?.data?.details ?? [];
+  const details = (err as AxiosError<ApiErrorBody> | null | undefined)?.response?.data?.details;
+  // Chỉ dạng mảng mới là lỗi theo trường; dạng object là gói dữ liệu kèm lỗi, ví dụ { remainingAttempts }.
+  if (!Array.isArray(details)) return {};
   return Object.fromEntries(details.map((d) => [d.field, cleanUserMessage(d.message)]));
 }
 

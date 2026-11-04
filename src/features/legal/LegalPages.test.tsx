@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import { RegisterPage } from '@/features/auth/pages/RegisterPage';
+import { MainFooter } from '@/components/common/MainFooter';
+import { AuthLayout } from '@/layouts/AuthLayout';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const createTestQueryClient = () =>
@@ -139,5 +141,64 @@ describe('Legal Pages and Links', () => {
     expect(screen.getAllByText(/Quy Định Trí Tuệ Nhân Tạo & Miễn Trừ/i).length).toBeGreaterThan(0);
     const disclaimerImg = screen.getByRole('img', { name: /Quy Định Trí Tuệ Nhân Tạo & Miễn Trừ/i });
     expect(disclaimerImg).toHaveAttribute('src', expect.stringContaining('142_2026_ND-CP_696080.jpg'));
+  });
+
+  it('opens LegalDocumentsModal with Terms when clicking Điều khoản sử dụng in MainFooter', async () => {
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter>
+          <MainFooter />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const termsLink = screen.getByRole('link', { name: /Điều khoản sử dụng/i });
+    expect(termsLink).toBeInTheDocument();
+    fireEvent.click(termsLink);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText(/Điều Khoản Dịch Vụ \(Luật 19\/2023\/QH15\)/i).length).toBeGreaterThan(0);
+
+    const docImage = screen.getByRole('img', { name: /Điều Khoản Dịch Vụ/i });
+    expect(docImage).toBeInTheDocument();
+    expect(docImage).toHaveAttribute('src', expect.stringContaining('19_2023_QH15_500102.jpg'));
+  });
+
+  it('opens LegalDocumentsModal with Privacy when clicking Chính sách bảo mật in MainFooter', async () => {
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter>
+          <MainFooter />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const privacyLink = screen.getByRole('link', { name: /Chính sách bảo mật/i });
+    expect(privacyLink).toBeInTheDocument();
+    fireEvent.click(privacyLink);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText(/Chính Sách Bảo Mật Dữ Liệu \(Nghị định 13\/2023\/NĐ-CP\)/i).length).toBeGreaterThan(0);
+
+    const docImage = screen.getByRole('img', { name: /Chính Sách Bảo Mật Dữ Liệu/i });
+    expect(docImage).toBeInTheDocument();
+    expect(docImage).toHaveAttribute('src', expect.stringContaining('13_2023_ND-CP_465185.jpg'));
+  });
+
+  it('opens LegalDocumentsModal when clicking Điều khoản in AuthLayout footer', async () => {
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/auth/login']}>
+          <AuthLayout />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const footerTermsLink = screen.getByRole('link', { name: /^Điều khoản$/i });
+    expect(footerTermsLink).toBeInTheDocument();
+    fireEvent.click(footerTermsLink);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText(/Điều Khoản Dịch Vụ \(Luật 19\/2023\/QH15\)/i).length).toBeGreaterThan(0);
   });
 });

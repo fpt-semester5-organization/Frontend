@@ -2,36 +2,46 @@
  * @handwritten
  * SCR-05 · auth/ResetPassword · `/auth/reset-password`
  * FN: FN-AUTH-12 · Nguyễn Văn Minh Tâm · Sprint 5
- * Người dùng sau khi xác thực OTP thành công ở SCR-03 sẽ vào trang này để thiết lập mật khẩu mới.
+ * Nhận email và mã OTP từ SCR-03. Backend chỉ kiểm tra mã khi gọi API của trang này, nên người dùng sửa được mã ngay tại đây.
  */
+import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FormAlert, PasswordField, StrengthBar, SubmitButton } from '@/components/ui/forms';
+import { apiErrorCode, apiErrorData, apiErrorMessage } from '@/api/http';
+import { Field, FormAlert, PasswordField, StrengthBar, SubmitButton } from '@/components/ui/forms';
+import { OTP_LOCK_MS } from '@/constants/quota';
 import { PATHS } from '@/routes/paths';
 import { toast } from '@/stores/ui.store';
 import { AuthCard } from '../components/AuthCard';
 import { useApiFormErrors } from '../components/useApiFormErrors';
 import { useResetPassword } from '../hooks/useAuth';
+import { formatMmSs, useCountdown } from '../hooks/useCountdown';
 import { passwordStrength, resetPasswordSchema, type ResetPasswordForm } from '../schemas/auth.schemas';
 
 export function ResetPasswordPage() {
   const reset = useResetPassword();
   const navigate = useNavigate();
-  const state = (useLocation().state ?? {}) as { email?: string; otp?: string };
+  const state = (useLocation().state ?? {}) as { email?: string; otp?: string; otpExpiresAt?: number; attemptsLeft?: number | null };
   const email = state.email ?? '';
   const otp = state.otp ?? '';
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [attemptsLeft, setAttemptsLeft] = useState(state.attemptsLeft ?? null);
+  const [otpExpired, setOtpExpired] = useState(false);
+  const lockLeft = useCountdown(lockedUntil);
+  const locked = lockLeft > 0;
 
   const form = useForm<ResetPasswordForm>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: { email, otp, newPassword: '', confirmPassword: '' },
   });
 
-  const { formError, handle, clear } = useApiFormErrors(form.setError);
+  const { formError, setFormError, handle, clear } = useApiFormErrors(form.setError);
   const newPassword = form.watch('newPassword') ?? '';
+  const otpComplete = /^\d{6}$/.test(form.watch('otp') ?? '');
   const strength = passwordStrength(newPassword);
 
-  // Nếu người dùng vào thẳng trang mà chưa qua bước nhập email & xác thực OTP ở VerifyOtpPage
+  // Nếu người dùng vào thẳng trang mà chưa qua bước nhập email và mã OTP ở VerifyOtpPage
   if (!email || !otp) {
     return <Navigate to={PATHS.AUTH.FORGOT_PASSWORD} replace />;
   }
@@ -43,7 +53,24 @@ export function ResetPasswordPage() {
         toast.success('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.');
         navigate(PATHS.AUTH.LOGIN, { replace: true });
       },
-      onError: handle,
+      onError: (err) => {
+        const code = apiErrorCode(err);
+        if (code === 'ERR_AUTH_OTP_LOCKED') {
+          setLockedUntil(Date.now() + OTP_LOCK_MS);
+          setFormError(apiErrorMessage(err));
+          return;
+        }
+        if (code === 'ERR_AUTH_OTP_INCORRECT' || code === 'ERR_AUTH_OTP_EXPIRED') {
+          // Xóa mã đã bị từ chối để bấm lại không gửi mã cũ và không mất thêm lượt thử; mật khẩu vừa nhập được giữ nguyên.
+          const left = Number(apiErrorData(err).remainingAttempts);
+          if (Number.isFinite(left)) setAttemptsLeft(left);
+          if (code === 'ERR_AUTH_OTP_EXPIRED') setOtpExpired(true);
+          form.setValue('otp', '');
+          form.setError('otp', { type: 'server', message: apiErrorMessage(err) }, { shouldFocus: true });
+          return;
+        }
+        handle(err);
+      },
     });
   });
 
@@ -70,28 +97,31 @@ export function ResetPasswordPage() {
           </Link>
           <Link
             to={PATHS.AUTH.VERIFY_OTP}
-            state={{ email, purpose: 'PASSWORD_RESET' }}
+            state={{ email, purpose: 'PASSWORD_RESET', otpExpiresAt: otpExpired ? 0 : state.otpExpiresAt, attemptsLeft, lockedUntil }}
             className="font-label-sm text-label-sm text-secondary hover:underline"
           >
-            Nhập lại mã OTP khác
+            Gửi lại mã OTP
           </Link>
         </div>
       }
     >
       <form onSubmit={submit} noValidate className="flex flex-col gap-space-md">
-        {formError && <FormAlert>{formError}</FormAlert>}
-
-        {/* Thông tin email đã xác minh qua OTP ở bước trước */}
-        <div className="flex items-center justify-between rounded-lg border border-surface-container-high bg-surface-container-low px-space-md py-space-sm">
-          <div className="flex min-w-0 items-center gap-space-sm">
-            <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
-            <span className="truncate font-label-md text-label-md font-medium text-on-surface">{email}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 font-label-sm text-label-sm text-primary">
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>
-            <span>Đã xác thực OTP</span>
-          </div>
+        {/* Email nhận mã OTP ở bước trước */}
+        <div className="flex min-w-0 items-center gap-space-sm rounded-lg border border-surface-container-high bg-surface-container-low px-space-md py-space-sm">
+          <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-on-surface-variant">alternate_email</span>
+          <span className="truncate font-label-md text-label-md font-medium text-on-surface">{email}</span>
         </div>
+
+        <Field
+          label="Mã OTP"
+          required
+          inputMode="numeric"
+          maxLength={6}
+          autoComplete="one-time-code"
+          hint={<p className="font-label-sm text-label-sm text-on-surface-variant">Mã được kiểm tra khi bạn bấm Cập nhật mật khẩu mới.</p>}
+          error={form.formState.errors.otp?.message}
+          {...form.register('otp')}
+        />
 
         {/* Ô mật khẩu mới */}
         <PasswordField
@@ -147,8 +177,11 @@ export function ResetPasswordPage() {
           {...form.register('confirmPassword')}
         />
 
-        <SubmitButton loading={reset.isPending} icon="check">
-          Cập nhật mật khẩu mới
+        {/* Đặt ngay trên nút bấm để lỗi luôn nằm trong tầm nhìn, kể cả trên màn hình thấp. */}
+        {formError && <FormAlert>{formError}</FormAlert>}
+
+        <SubmitButton loading={reset.isPending} disabled={locked || !otpComplete} icon={locked ? 'schedule' : 'check'}>
+          {locked ? `Thử lại sau ${formatMmSs(lockLeft)}` : reset.isPending ? 'Đang cập nhật...' : 'Cập nhật mật khẩu mới'}
         </SubmitButton>
       </form>
     </AuthCard>
