@@ -62,6 +62,14 @@ export const MealPlanGenerate: React.FC = () => {
   const profile = useCurrentUser();
   const createPlan = useCreateMealPlan();
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(PATHS.MEAL_PLANS.ROOT);
+    }
+  };
+
   const [failure, setFailure] = useState<ApiError | null>(null);
   const [upsellMessage, setUpsellMessage] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
@@ -320,26 +328,31 @@ export const MealPlanGenerate: React.FC = () => {
       <div className="flex w-full flex-col">
         {/* Top Header */}
         <section className="w-full px-margin-mobile pb-space-lg pt-6 sm:px-margin sm:pt-8">
-          <div className="flex items-center justify-between pb-space-sm">
-            <Link
-              to={PATHS.MEAL_PLANS.ROOT}
-              className="inline-flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant transition-colors hover:text-primary"
+          {/* Thanh điều hướng quay lại & Breadcrumb */}
+          <div className="flex items-center justify-between gap-space-sm pb-space-sm flex-wrap">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container hover:text-primary active:scale-95 cursor-pointer"
             >
               <Icon name="arrow_back" className="text-[18px]" />
-              Quay lại thực đơn tuần
-            </Link>
-            <nav aria-label="Điều hướng" className="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
-              <Link to={PATHS.HOME} className="hover:text-primary transition-colors">
+              <span>Quay lại</span>
+            </button>
+
+            <nav aria-label="Đường dẫn" className="flex min-w-0 max-w-full items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+              <Link to={PATHS.HOME} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
                 Trang chủ
               </Link>
-            <span>/</span>
-            <Link to={PATHS.MEAL_PLANS.ROOT} className="hover:text-primary transition-colors">
-              Thực đơn tuần
-            </Link>
-            <span>/</span>
-            <span className="font-semibold text-on-surface">Tạo mới</span>
-          </nav>
-        </div>
+              <span className="text-outline-variant">/</span>
+              <Link to={PATHS.MEAL_PLANS.ROOT} className="shrink-0 text-on-surface-variant no-underline hover:text-primary">
+                Thực đơn tuần
+              </Link>
+              <span className="text-outline-variant">/</span>
+              <span aria-current="page" className="min-w-0 truncate text-primary font-semibold sm:max-w-[320px]">
+                Thiết lập thực đơn
+              </span>
+            </nav>
+          </div>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-serif font-headline-lg text-headline-lg-mobile text-on-surface sm:text-headline-lg">

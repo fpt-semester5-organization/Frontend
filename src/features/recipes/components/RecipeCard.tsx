@@ -6,6 +6,7 @@ import { dietarySchoolLabel } from '@/constants/dietarySchools';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
+import { getFallbackFoodImage } from '@/lib/foodImages';
 import type { RecipeListItem } from '../types/recipe.types';
 
 interface RecipeCardProps {
@@ -17,7 +18,25 @@ interface RecipeCardProps {
 
 /** Thẻ công thức/video (trang chủ, kho công thức, gợi ý liên quan): chỉ dùng các trường GET /recipes trả về. */
 export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item, eager = false, className }, ref) => {
-  const [imgError, setImgError] = React.useState(false);
+  const fallbackImg = React.useMemo(
+    () => getFallbackFoodImage(item.title, item.foodName),
+    [item.title, item.foodName]
+  );
+  const [imgSrc, setImgSrc] = React.useState<string>(item.imageUrl || fallbackImg);
+  const [hasFallbackFailed, setHasFallbackFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgSrc(item.imageUrl || fallbackImg);
+    setHasFallbackFailed(false);
+  }, [item.imageUrl, fallbackImg]);
+
+  const handleImageError = () => {
+    if (imgSrc !== fallbackImg) {
+      setImgSrc(fallbackImg);
+    } else {
+      setHasFallbackFailed(true);
+    }
+  };
   const isVideo = item.type === 'VIDEO';
   const school = dietarySchoolLabel(item.dietarySchool);
   const kcal = Number.isFinite(item.caloriesKcal) ? Math.round(item.caloriesKcal) : null;
@@ -31,9 +50,9 @@ export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-container">
-        {item.imageUrl && !imgError ? (
+        {!hasFallbackFailed ? (
           <img referrerPolicy="no-referrer"
-            src={item.imageUrl}
+            src={imgSrc}
             alt={item.title}
             width={480}
             height={360}
@@ -41,7 +60,7 @@ export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item
             // React 18 chưa nhận prop fetchPriority nên ghi thẳng thuộc tính HTML.
             {...(eager ? { fetchpriority: 'high' } : {})}
             decoding="async"
-            onError={() => setImgError(true)}
+            onError={handleImageError}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
           />
         ) : (

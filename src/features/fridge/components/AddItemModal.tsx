@@ -149,9 +149,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
           <div
             className="max-h-40 overflow-y-auto rounded-lg border border-outline-variant/60 bg-surface-container-low"
             role="listbox"
-            aria-label="Kết quả tìm kiếm nguyên liệu"
-          >
-            {search.isPending ? (
+            aria-label="Kết quả tìm kiếm nguyên liệu">
+            {!keyword.trim() && !selectedIngredient ? (
+              <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
+                Nhập từ khóa để tìm nguyên liệu chuẩn
+              </div>
+            ) : search.isLoading || (keyword.trim() && search.isFetching && !search.data) ? (
               <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
                 Đang tìm nguyên liệu...
               </div>
@@ -159,7 +162,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
               <div className="p-3 font-body-sm text-body-sm text-red-600">
                 {apiErrorMessage(search.error, 'Lỗi tìm kiếm')}
               </div>
-            ) : keyword && (search.data ?? []).length === 0 ? (
+            ) : keyword.trim() && (search.data ?? []).length === 0 ? (
               <div className="p-3 font-body-sm text-body-sm text-on-surface-variant flex flex-col gap-1.5">
                 <span>Chưa có trong danh mục mẫu. Bạn có thể thêm trực tiếp:</span>
                 <button
@@ -175,33 +178,50 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ show, onHide, onExis
                   <span>Dùng tên: “{keyword.trim()}”</span>
                 </button>
               </div>
-            ) : !keyword && !selectedIngredient ? (
-              <div className="p-3 text-center font-body-sm text-body-sm text-on-surface-variant">
-                Nhập từ khóa để tìm nguyên liệu chuẩn
-              </div>
             ) : (
-              (search.data ?? []).map((opt) => (
-                <button
-                  key={opt.ingredientId}
-                  type="button"
-                  role="option"
-                  aria-selected={selectedIngredient?.ingredientId === opt.ingredientId}
-                  onClick={() => {
-                    setSelectedIngredient(opt);
-                    setValue('ingredientId', opt.ingredientId, { shouldValidate: true });
-                  }}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left font-body-sm text-body-sm transition-colors hover:bg-surface-container ${
-                    selectedIngredient?.ingredientId === opt.ingredientId
-                      ? 'bg-primary-fixed/40 font-semibold text-primary'
-                      : 'text-on-surface'
-                  }`}
-                >
-                  <span>{opt.name}</span>
-                  {selectedIngredient?.ingredientId === opt.ingredientId && (
-                    <Icon name="check" className="text-[18px] text-primary" />
+              <>
+                {(search.data ?? []).map((opt) => (
+                  <button
+                    key={opt.ingredientId}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedIngredient?.ingredientId === opt.ingredientId}
+                    onClick={() => {
+                      setSelectedIngredient(opt);
+                      setKeyword(opt.name);
+                      setValue('ingredientId', opt.ingredientId, { shouldValidate: true });
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left font-body-sm text-body-sm transition-colors hover:bg-surface-container ${
+                      selectedIngredient?.ingredientId === opt.ingredientId
+                        ? 'bg-primary-fixed/40 font-semibold text-primary'
+                        : 'text-on-surface'
+                    }`}
+                  >
+                    <span>{opt.name}</span>
+                    {selectedIngredient?.ingredientId === opt.ingredientId && (
+                      <Icon name="check" className="text-[18px] text-primary" />
+                    )}
+                  </button>
+                ))}
+                {keyword.trim() &&
+                  selectedIngredient?.name !== keyword.trim() &&
+                  !(search.data ?? []).some(
+                    (opt) => opt.name.toLowerCase() === keyword.trim().toLowerCase(),
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const opt = { ingredientId: 0, name: keyword.trim() };
+                        setSelectedIngredient(opt);
+                        setValue('ingredientId', undefined);
+                      }}
+                      className="flex w-full items-center gap-1.5 border-t border-outline-variant/40 px-3 py-2 text-left font-body-sm text-xs font-medium text-primary hover:bg-surface-container transition-colors"
+                    >
+                      <Icon name="add" className="text-[16px]" />
+                      <span>Dùng tên tùy chỉnh: “{keyword.trim()}”</span>
+                    </button>
                   )}
-                </button>
-              ))
+              </>
             )}
           </div>
 

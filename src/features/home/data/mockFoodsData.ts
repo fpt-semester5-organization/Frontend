@@ -38,6 +38,8 @@ export interface FoodDish {
   hasNoSpicy: boolean;
   hasTraditional: boolean;
   hasBuddhist: boolean;
+  hasHighProtein?: boolean;
+  hasSpicy?: boolean;
   recipes: FoodRecipeVariant[];
 }
 
