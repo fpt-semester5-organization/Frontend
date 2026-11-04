@@ -488,11 +488,14 @@ export const adminHandlers = [
   }),
 
   // GET /api/v1/fridge/quota
-  http.get(api('/fridge/quota'), async () => {
+  http.get(api('/fridge/quota'), async ({ request }) => {
+    const user = currentUser(request);
+    const isVip = user?.isVip || user?.role === 'VIP';
+    const limit = isVip ? 30 : 10;
     return ok({
       used: 0,
-      limit: 10,
-      remaining: 10,
+      limit,
+      remaining: limit,
       scope: 'daily',
     });
   }),

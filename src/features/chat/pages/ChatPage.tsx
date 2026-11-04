@@ -631,6 +631,7 @@ export const ChatPage: React.FC = () => {
                     <img
                       src={user.avatarUrl}
                       alt={displayName}
+                      referrerPolicy="no-referrer"
                       className="h-9 w-9 shrink-0 rounded-full object-cover border border-outline-variant/30"
                     />
                   ) : (

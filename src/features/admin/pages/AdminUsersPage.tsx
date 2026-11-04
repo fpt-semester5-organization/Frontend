@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState } from '@/components/common/EmptyState';
+import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { ROLE_LABEL } from '@/constants/roles';
@@ -123,8 +124,13 @@ const AdminUsersPage: React.FC = () => {
                 return (
                   <tr key={user.userId} className="hover:bg-surface-container-low">
                     <td className={TD}>
-                      <p className="font-label-md text-label-md text-on-surface">{user.fullName || 'Chưa đặt tên'}</p>
-                      <p className="break-all text-on-surface-variant">{user.email}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={user.fullName || user.email} src={user.avatarUrl} />
+                        <div className="min-w-0">
+                          <p className="font-label-md text-label-md text-on-surface">{user.fullName || 'Chưa đặt tên'}</p>
+                          <p className="break-all text-on-surface-variant">{user.email}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className={TD}>{ROLE_LABEL[user.role] ?? user.role}</td>
                     <td className={TD}>

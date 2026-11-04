@@ -207,6 +207,7 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
                         <img
                           src={user.avatarUrl}
                           alt={user.fullName || 'Avatar'}
+                          referrerPolicy="no-referrer"
                           className="h-10 w-10 shrink-0 rounded-full object-cover border border-outline-variant/40"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
