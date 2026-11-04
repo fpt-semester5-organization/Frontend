@@ -1,8 +1,10 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Logo } from '@/components/common/Logo';
 import { ServiceBanner } from '@/components/common/ServiceBanner';
 import { PATHS } from '@/routes/paths';
+import { LegalDocumentsModal } from '@/features/legal/components/LegalDocumentsModal';
+import type { LegalDocType } from '@/features/legal/types/legal.types';
 
 // Bảng chọn vai trò giả lập chỉ có khi chạy dữ liệu giả (VITE_ENABLE_MOCKS=true), không vào bản build.
 const MockSessionPanel =
@@ -14,6 +16,7 @@ const MockSessionPanel =
 export function AuthLayout() {
   const location = useLocation();
   const isLoginPage = location.pathname === PATHS.AUTH.LOGIN;
+  const [previewDoc, setPreviewDoc] = useState<LegalDocType | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -41,15 +44,40 @@ export function AuthLayout() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-center gap-3 px-gutter font-body-sm text-body-sm text-on-surface-variant">
           <p>© 2026 VeggieLife</p>
           <span>•</span>
-          <Link to={PATHS.TERMS} className="transition-colors hover:text-primary hover:underline">
+          <Link
+            to={PATHS.TERMS}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPreviewDoc('TERMS');
+            }}
+            className="cursor-pointer transition-colors hover:text-primary hover:underline"
+            title="Điều khoản sử dụng"
+          >
             Điều khoản
           </Link>
           <span>•</span>
-          <Link to={PATHS.PRIVACY} className="transition-colors hover:text-primary hover:underline">
+          <Link
+            to={PATHS.PRIVACY}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPreviewDoc('PRIVACY');
+            }}
+            className="cursor-pointer transition-colors hover:text-primary hover:underline"
+            title="Chính sách bảo mật"
+          >
             Chính sách bảo mật
           </Link>
         </div>
       </footer>
+      {previewDoc && (
+        <LegalDocumentsModal
+          show={true}
+          onHide={() => setPreviewDoc(null)}
+          initialDoc={previewDoc}
+        />
+      )}
       {MockSessionPanel && (
         <Suspense fallback={null}>
           <MockSessionPanel />
