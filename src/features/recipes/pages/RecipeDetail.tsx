@@ -193,6 +193,7 @@ const RecipeDetail: React.FC = () => {
                 return (
                   <img
                     src={data.imageUrl}
+                    referrerPolicy="no-referrer"
                     alt={`Ảnh công thức ${data.title}`}
                     width={960}
                     height={720}
@@ -332,22 +333,22 @@ const RecipeDetail: React.FC = () => {
                   {normalizedSteps.length === 0 ? (
                     <p className="mt-space-md font-body-md text-body-md text-on-surface-variant">Công thức chưa có các bước thực hiện.</p>
                   ) : (
-                    <ol className="mt-space-md flex flex-col gap-5">
+                    <ol className="mt-space-md flex flex-col gap-3.5">
                       {normalizedSteps.map((rawStep, index) => {
                         const cleanStep = rawStep.replace(/^Bước\s*\d+[:.]\s*/i, '').trim() || rawStep;
                         return (
                           <li
                             key={index}
-                            className="flex items-start gap-4 py-1"
+                            className="flex items-start gap-4 rounded-2xl border border-surface-container bg-surface-container-lowest/80 p-4 sm:p-5 shadow-2xs transition-all hover:border-primary/40 hover:bg-surface-container-lowest"
                           >
                             <span
                               aria-hidden="true"
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary font-bold text-sm shadow-xs mt-0.5"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary font-bold text-sm shadow-xs mt-0.5"
                             >
                               {index + 1}
                             </span>
                             <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="font-semibold text-xs text-primary mb-1">
+                              <p className="font-bold text-xs uppercase tracking-wider text-primary mb-1">
                                 Bước {index + 1}
                               </p>
                               <p className="font-body-md text-body-md leading-relaxed break-words text-on-surface">

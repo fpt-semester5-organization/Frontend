@@ -33,7 +33,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({ dish, className, onSelect })
       {/* Ảnh món ăn chất lượng cao tỉ lệ 4:3 */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container">
         {!imgError && dish.imageUrl ? (
-          <img
+          <img referrerPolicy="no-referrer"
             src={dish.imageUrl}
             alt={dish.foodName}
             width={480}

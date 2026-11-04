@@ -32,7 +32,7 @@ export const RecipeCard = React.forwardRef<HTMLElement, RecipeCardProps>(({ item
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-container">
         {item.imageUrl && !imgError ? (
-          <img
+          <img referrerPolicy="no-referrer"
             src={item.imageUrl}
             alt={item.title}
             width={480}

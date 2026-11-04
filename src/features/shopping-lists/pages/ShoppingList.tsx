@@ -924,7 +924,7 @@ return (
                         'group relative flex flex-col justify-between gap-2.5 rounded-2xl border p-3.5 transition-all no-underline shadow-2xs',
                         isComplete
                           ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/20'
-                          : 'border-primary/20 bg-surface-container-lowest hover:border-primary hover:shadow-xs'
+                          : 'border-surface-container bg-surface-container-lowest hover:border-primary/50 hover:shadow-xs'
                       )}
                       title={`Xem công thức nấu: ${meal.title}`}
                     >

@@ -460,7 +460,7 @@ export const HomeFoodSection: React.FC = () => {
                       className="flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-primary-fixed/20"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <img
+                        <img referrerPolicy="no-referrer"
                           src={dish.imageUrl}
                           alt={dish.foodName}
                           className="h-10 w-10 shrink-0 rounded-lg object-cover border border-outline-variant/40"

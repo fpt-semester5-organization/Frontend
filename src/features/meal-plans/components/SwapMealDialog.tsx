@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
@@ -6,10 +6,43 @@ import { Modal } from '@/components/ui/Modal';
 import { useRecipe } from '@/features/recipes/hooks/useRecipes';
 import { listRecipes } from '@/features/recipes/api/recipes.api';
 import type { RecipeListItem } from '@/features/recipes/types/recipe.types';
+import { FOOD_CATEGORIES } from '@/features/home/data/mockFoodsData';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { DAY_LABEL, MEAL_LABEL, SWAP_REASONS } from '../lib/labels';
 import type { MealSlot, SwapReason } from '../types/mealPlan.types';
+
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+/** Highlight ký tự khớp với từ khóa tìm kiếm */
+const HighlightMatch: React.FC<{ text: string; query: string }> = ({ text, query }) => {
+  const q = query.trim();
+  if (!q) return <>{text}</>;
+
+  const unaccentText = removeVietnameseTones(text).toLowerCase();
+  const unaccentQ = removeVietnameseTones(q).toLowerCase();
+  const matchIndex = unaccentText.indexOf(unaccentQ);
+
+  if (matchIndex === -1) return <>{text}</>;
+
+  const before = text.slice(0, matchIndex);
+  const match = text.slice(matchIndex, matchIndex + q.length);
+  const after = text.slice(matchIndex + q.length);
+
+  return (
+    <>
+      {before}
+      <mark className="bg-primary-fixed text-primary font-bold px-0.5 rounded-sm">{match}</mark>
+      {after}
+    </>
+  );
+};
 
 interface SwapMealDialogProps {
   slot: MealSlot | null;
@@ -59,13 +92,20 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<RecipeListItem[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeListItem | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<number | 'ALL'>('ALL');
 
-  // Debounce 300ms
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const scrollCategory = (dir: 'left' | 'right') => {
+    if (!categoryScrollRef.current) return;
+    const offset = dir === 'left' ? -220 : 220;
+    categoryScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+  };
+
+  // Debounce 250ms
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 300);
+    }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -79,7 +119,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     listRecipes({
       keyword: debouncedQuery.trim() || undefined,
       page: 1,
-      size: 50,
+      size: 60,
       sort: 'POPULAR',
     })
       .then((paged) => {
@@ -123,100 +163,102 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     }
   };
 
-  // Bộ lọc nhanh danh mục chuẩn xác theo Category_ID & tên món
-  const filteredSearchResults = searchResults.filter((recipe) => {
-    if (selectedCategory === 'ALL') return true;
-    const nameToCheck = `${recipe.foodName || ''} ${recipe.title || ''}`.toLowerCase();
-    const catId = (recipe as any).categoryId;
-    
-    if (selectedCategory === 'XAO') {
-      return catId === 14 || (!catId && /xào|áp chảo/i.test(nameToCheck));
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (val.trim() && selectedCategory !== 'ALL') {
+      setSelectedCategory('ALL');
     }
-    if (selectedCategory === 'NUOC') {
-      return catId === 11 || catId === 10 || catId === 3 || (!catId && /bún|phở|miến|hủ tiếu|mì|cháo|bánh canh|canh|súp|lẩu/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'DOKHO') {
-      return catId === 5 || catId === 9 || catId === 6 || catId === 4 || (!catId && /cơm|xôi|kho|rim|om|cuốn|chả giò|chiên|rán/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'DOUONG') {
-      return catId === 2 || (!catId && /nước ép|sinh tố|trà|sữa hạt|smoothie|juice/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'CANH') {
-      return catId === 3 || (!catId && /canh|súp|soup/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'KHO') {
-      return catId === 9 || (!catId && /kho|rim|om/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'COM') {
-      return catId === 5 || (!catId && /cơm|xôi/i.test(nameToCheck));
-    }
-    if (selectedCategory === 'GOI') {
-      return catId === 6 || catId === 7 || (!catId && /gỏi|cuốn|salad|nộm/i.test(nameToCheck));
-    }
-    return false;
-  });
+  };
+
+  // Bộ lọc nhanh danh mục chuẩn xác theo Category_ID & tên món (hỗ trợ cả tiếng Việt không dấu)
+  const filteredSearchResults = useMemo(() => {
+    return searchResults.filter((recipe) => {
+      // 1. Lọc theo danh mục database
+      if (selectedCategory !== 'ALL') {
+        const catId = (recipe as any).categoryId;
+        if (catId && catId !== selectedCategory) return false;
+      }
+
+      // 2. Lọc theo từ khóa
+      if (searchQuery.trim()) {
+        const q = removeVietnameseTones(searchQuery.trim().toLowerCase());
+        const name = removeVietnameseTones((recipe.foodName || '').toLowerCase());
+        const title = removeVietnameseTones((recipe.title || '').toLowerCase());
+        if (!name.includes(q) && !title.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }, [searchResults, selectedCategory, searchQuery]);
 
   return (
     <Modal show={slot !== null} onHide={onCancel} title="Đổi món ăn" locked={submitting} size="lg">
       {slot && (
-        <div className="flex flex-col gap-4 p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
-          {/* Thông tin món hiện tại */}
-          <div className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3.5 border border-surface-container shadow-2xs">
-            {slot.recipe?.foodImageUrl || (detail as any)?.foodImageUrl || slot.recipe?.imageUrl || detail?.imageUrl ? (
-              <img
-                src={slot.recipe?.foodImageUrl || (detail as any)?.foodImageUrl || detail?.imageUrl || slot.recipe?.imageUrl || ''}
-                alt={slot.recipe?.foodName || (detail as any)?.foodName || detail?.title || slot.recipe?.title || 'Món ăn'}
-                className="h-16 w-16 shrink-0 rounded-xl object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-container text-primary">
-                <Icon name="restaurant" className="text-[26px]" />
-              </div>
-            )}
+        <div className="flex flex-col gap-4">
+          {/* Món ăn hiện tại */}
+          <div className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3.5 border border-surface-container">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-container shadow-2xs">
+              {(slot.recipe?.foodImageUrl || slot.recipe?.imageUrl) ? (
+                <img
+                  referrerPolicy="no-referrer"
+                  src={slot.recipe.foodImageUrl || slot.recipe.imageUrl}
+                  alt={slot.recipe.foodName || slot.recipe.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-primary">
+                  <Icon name="restaurant" className="text-[24px]" />
+                </div>
+              )}
+            </div>
+
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <p className="font-label-sm text-xs text-on-surface-variant font-medium">
-                  {slot.mealType ? MEAL_LABEL[slot.mealType] : ''} · {slot.dayOfWeek ? (DAY_LABEL[slot.dayOfWeek] || slot.dayOfWeek) : ''}
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="font-serif font-bold text-xs uppercase tracking-wide text-primary">
+                  {DAY_LABEL[slot.dayOfWeek]} · {MEAL_LABEL[slot.mealType]}
+                </span>
                 {swapCount > 0 && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-primary-fixed/60 px-2 py-0.5 font-label-sm text-[11px] font-semibold text-primary">
-                    <Icon name="history" className="text-[12px]" />
+                  <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-secondary-container">
                     Đã đổi {swapCount} lần
                   </span>
                 )}
               </div>
-              <p className="truncate font-bold text-sm sm:text-base text-on-surface mt-0.5">
-                {slot.recipe?.foodName || (detail as any)?.foodName || detail?.title || slot.recipe?.title || 'Chưa có món'}
-              </p>
-              {(slot.recipe?.foodName || (detail as any)?.foodName) && (slot.recipe?.title || detail?.title) && (
-                <p className="truncate text-xs text-on-surface-variant italic">
-                  Công thức: {slot.recipe?.title || detail?.title}
+
+              <h4 className="font-serif font-bold text-sm text-on-surface truncate mt-0.5">
+                {slot.recipe?.foodName || slot.recipe?.title}
+              </h4>
+              {slot.recipe?.foodName && slot.recipe?.foodName !== slot.recipe?.title && (
+                <p className="truncate text-[11px] text-on-surface-variant italic">
+                  {slot.recipe?.title}
                 </p>
               )}
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-on-surface-variant">
-                <span className="flex items-center gap-1 font-semibold text-secondary">
-                  <Icon name="local_fire_department" className="text-[15px] text-secondary" />
-                  {formatNumber(Math.round(currentKcal))} kcal
+
+              <div className="flex items-center gap-3 text-xs text-on-surface-variant mt-1">
+                <span className="flex items-center gap-1">
+                  <Icon name="local_fire_department" className="text-[14px] text-secondary" />
+                  <strong className="text-secondary">{Math.round(currentKcal)}</strong> kcal
                 </span>
                 <span className="flex items-center gap-1">
-                  <Icon name="schedule" className="text-[15px] text-outline" />
+                  <Icon name="schedule" className="text-[14px]" />
                   {cookTime} phút
                 </span>
-                <span className="flex items-center gap-1">
-                  <Icon name="favorite" filled className="text-[15px] text-secondary" />
-                  {formatNumber(voteCount)}
-                </span>
+                {voteCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="favorite" className="text-[14px] text-primary" />
+                    {voteCount}
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 3 Tab chế độ đổi món theo yêu cầu */}
-          <div className="flex rounded-xl bg-surface-container p-1 border border-surface-container text-xs font-semibold">
+          {/* THANH CHỌN HÌNH THỨC ĐỔI MÓN */}
+          <div className="flex items-center rounded-xl bg-surface-container-low p-1 border border-surface-container text-xs font-medium">
             <button
               type="button"
               onClick={() => setActiveMode('REASON')}
               className={cn(
-                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all',
+                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer',
                 activeMode === 'REASON'
                   ? 'bg-surface-container-lowest text-primary shadow-2xs font-bold'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -230,7 +272,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
               type="button"
               onClick={() => setActiveMode('AI_NOTE')}
               className={cn(
-                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all',
+                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer',
                 activeMode === 'AI_NOTE'
                   ? 'bg-surface-container-lowest text-primary shadow-2xs font-bold'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -244,7 +286,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
               type="button"
               onClick={() => setActiveMode('SEARCH_DB')}
               className={cn(
-                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all',
+                'flex-1 py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer',
                 activeMode === 'SEARCH_DB'
                   ? 'bg-surface-container-lowest text-primary shadow-2xs font-bold'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -332,7 +374,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                     key={hint}
                     type="button"
                     onClick={() => setCustomNote((prev) => (prev ? `${prev}, ${hint}` : hint))}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-primary-fixed/40 text-on-surface-variant hover:text-primary transition-colors border border-surface-container"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-primary-fixed/40 text-on-surface-variant hover:text-primary transition-colors border border-surface-container cursor-pointer"
                   >
                     + {hint}
                   </button>
@@ -347,7 +389,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
           {/* CHẾ ĐỘ 3: TỰ TÌM KIẾM MÓN TRONG DATABASE ĐỂ THAY THẾ */}
           {activeMode === 'SEARCH_DB' && (
             <div className="space-y-3 animate-fadeIn">
-              {/* Thanh tìm kiếm có kính lúp debounce 300ms */}
+              {/* Thanh tìm kiếm có kính lúp debounce 250ms */}
               <div className="relative">
                 <Icon
                   name="search"
@@ -356,60 +398,95 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Nhập tên công thức thay thế..."
-                  className="w-full rounded-xl border border-surface-container bg-surface-container-low pl-10 pr-9 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-hidden transition-all"
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Nhập tên món ăn hoặc công thức thay thế (gõ chữ tìm kiếm ngay)..."
+                  className="w-full rounded-xl border border-surface-container bg-surface-container-low pl-10 pr-9 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-hidden transition-all"
                 />
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                    onClick={() => handleSearchChange('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer p-1"
                   >
-                    <Icon name="close" className="text-[14px]" />
+                    <Icon name="close" className="text-[15px]" />
                   </button>
                 )}
               </div>
 
-              {/* Bộ lọc nhanh danh mục */}
-              <div className="flex flex-wrap gap-1">
-                {[
-                  { id: 'ALL', label: 'Tất cả' },
-                  { id: 'XAO', label: 'Món xào' },
-                  { id: 'NUOC', label: 'Món nước' },
-                  { id: 'DOKHO', label: 'Đồ khô' },
-                  { id: 'DOUONG', label: 'Đồ uống' },
-                  { id: 'CANH', label: 'Món canh' },
-                  { id: 'GOI', label: 'Gỏi & Cuốn' },
-                ].map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-md text-[11px] font-medium transition-all',
-                      selectedCategory === cat.id
-                        ? 'bg-primary-container text-on-primary font-semibold'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                    )}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+              {/* BỘ LỌC DANH MỤC CÓ SẴN TRONG DATABASE VỚI THANH KÉO QUA LẠI */}
+              <div className="relative flex items-center gap-1.5 w-full">
+                <button
+                  type="button"
+                  onClick={() => scrollCategory('left')}
+                  className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-surface-container bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-all cursor-pointer"
+                  aria-label="Cuộn danh mục sang trái"
+                >
+                  <Icon name="chevron_left" className="text-[18px]" />
+                </button>
+
+                <div
+                  ref={categoryScrollRef}
+                  className="category-scrollbar flex items-center gap-1.5 overflow-x-auto pb-1.5 w-full scroll-smooth select-none"
+                >
+                  {FOOD_CATEGORIES.map((cat) => {
+                    const isSelected = selectedCategory === cat.categoryId;
+                    return (
+                      <button
+                        key={String(cat.categoryId)}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.categoryId)}
+                        className={cn(
+                          'whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 flex items-center gap-1 cursor-pointer',
+                          isSelected
+                            ? 'bg-primary-container text-on-primary font-bold shadow-xs'
+                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        )}
+                      >
+                        <Icon name={cat.iconName} className="text-[14px]" />
+                        <span>{cat.categoryName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => scrollCategory('right')}
+                  className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-surface-container bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-all cursor-pointer"
+                  aria-label="Cuộn danh mục sang phải"
+                >
+                  <Icon name="chevron_right" className="text-[18px]" />
+                </button>
               </div>
 
               {/* Kết quả tìm kiếm */}
               {searchLoading ? (
                 <div className="py-8 flex items-center justify-center gap-2 text-xs text-on-surface-variant">
                   <Icon name="refresh" className="text-[18px] animate-spin text-primary" />
-                  <span>Đang tra cứu database...</span>
+                  <span>Đang tra cứu cơ sở dữ liệu...</span>
                 </div>
               ) : filteredSearchResults.length === 0 ? (
-                <div className="py-6 text-center text-xs text-on-surface-variant">
-                  Không tìm thấy món ăn phù hợp với từ khóa "{searchQuery}".
+                <div className="py-8 flex flex-col items-center justify-center gap-2 text-center text-xs text-on-surface-variant">
+                  <Icon name="search_off" className="text-[28px] text-outline" />
+                  <span>
+                    {searchQuery.trim()
+                      ? `Không tìm thấy món ăn phù hợp với từ khóa "${searchQuery}".`
+                      : selectedCategory !== 'ALL'
+                      ? 'Chưa có món ăn nào trong danh mục này.'
+                      : 'Không có món ăn thay thế.'}
+                  </span>
+                  {searchQuery.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => handleSearchChange('')}
+                      className="mt-1 text-primary hover:underline font-semibold cursor-pointer"
+                    >
+                      Xóa tìm kiếm & xem tất cả món
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
                   {filteredSearchResults.map((recipe) => {
                     const isPicked = selectedRecipe?.recipeId === recipe.recipeId;
                     const diffKcal = Math.round(recipe.caloriesKcal) - Math.round(currentKcal);
@@ -428,6 +505,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                         <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-surface-container relative">
                           {((recipe as any).foodImageUrl || recipe.imageUrl) ? (
                             <img
+                              referrerPolicy="no-referrer"
                               src={(recipe as any).foodImageUrl || recipe.imageUrl}
                               alt={recipe.foodName || recipe.title}
                               className="h-full w-full object-cover"
@@ -440,11 +518,11 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-xs text-on-surface truncate">
-                            {recipe.foodName || recipe.title}
+                            <HighlightMatch text={recipe.foodName || recipe.title} query={searchQuery} />
                           </p>
                           {recipe.foodName && recipe.foodName !== recipe.title && (
                             <p className="truncate text-[11px] text-on-surface-variant italic">
-                              Công thức: {recipe.title}
+                              Công thức: <HighlightMatch text={recipe.title} query={searchQuery} />
                             </p>
                           )}
                           <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5">
@@ -494,7 +572,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveMode('SEARCH_DB')}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-primary/30 bg-primary/5 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-primary/30 bg-primary/5 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors cursor-pointer"
                 >
                   <Icon name="search" className="text-[16px]" />
                   <span>Chọn món khác trực tiếp từ cơ sở dữ liệu</span>
@@ -513,6 +591,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
               loading={submitting}
               disabled={
                 submitting ||
+                (activeMode === 'REASON' && !reason) ||
                 (activeMode === 'SEARCH_DB' && !selectedRecipe) ||
                 (activeMode === 'AI_NOTE' && !customNote.trim())
               }
