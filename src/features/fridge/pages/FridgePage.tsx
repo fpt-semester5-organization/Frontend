@@ -544,6 +544,14 @@ export const FridgePage: React.FC = () => {
   const dynamicGuestLimit = publicSettings?.chatLimitDailyGuest ?? QUOTA.guest.ai;
   const imageLimit = vip ? dynamicFridgeVip : dynamicFridgeFree;
 
+  // Tính toán hiển thị an toàn: Nếu người dùng là VIP nhưng activeQuota.limit đang trả về giá trị của gói Free (do cache hoặc API backend cũ), ưu tiên định mức VIP
+  const displayLimit = (vip && activeQuota && activeQuota.limit < dynamicFridgeVip)
+    ? dynamicFridgeVip
+    : (activeQuota?.limit ?? imageLimit);
+  const displayRemaining = (vip && activeQuota && activeQuota.limit < dynamicFridgeVip)
+    ? Math.max(0, dynamicFridgeVip - activeQuota.used)
+    : activeQuota?.remaining;
+
   // Xóa nguyên liệu khỏi tủ lạnh ảo
   const handleConfirmDelete = () => {
     if (!deletingItem || !authed) return;
@@ -590,7 +598,7 @@ export const FridgePage: React.FC = () => {
               {authed ? (
                 activeQuota ? (
                   <span>
-                    Còn <strong className="text-primary">{activeQuota.remaining}/{activeQuota.limit}</strong> lượt hôm nay
+                    Còn <strong className="text-primary">{displayRemaining}/{displayLimit}</strong> lượt hôm nay
                   </span>
                 ) : (
                   <span>

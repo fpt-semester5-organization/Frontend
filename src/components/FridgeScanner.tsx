@@ -260,21 +260,6 @@ export const FridgeScanner: React.FC<FridgeScannerProps> = ({
     <div
       className={`w-full max-w-4xl mx-auto rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-sm transition-all ${className}`}
     >
-      {/* HEADER: AI Vision Studio & Gemini 2.5 Flash Vision */}
-      <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-5">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[24px] text-primary" aria-hidden="true">
-            center_focus_strong
-          </span>
-          <h2 className="font-headline-sm text-lg sm:text-xl font-bold text-on-surface">
-            AI Vision Studio
-          </h2>
-        </div>
-        <span className="font-label-sm text-xs sm:text-sm font-medium text-on-surface-variant text-gray-500 dark:text-gray-400">
-          Gemini 2.5 Flash Vision
-        </span>
-      </div>
-
       {/* 1. MÀN HÌNH IDLE: FORM UI CŨ VỚI 2 NÚT NẰM CẠNH NHAU TRONG 1 KHUNG */}
       {state === 'idle' && (
         <div>
