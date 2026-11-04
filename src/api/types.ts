@@ -40,7 +40,8 @@ export interface ApiErrorBody {
   statusCode: number;
   errorCode: string;
   message: string;
-  details?: ApiFieldError[];
+  /** Mảng lỗi theo trường. Backend cũng đặt gói dữ liệu kèm lỗi (giống `data`) vào đây nên có thể là object hoặc null. */
+  details?: ApiFieldError[] | Record<string, unknown> | null;
   /** Có ở một số lỗi: remainingAttempts, suspendedUntil, lockedUntil, registerUrl/loginUrl, failedCriteria… */
   data?: Record<string, unknown> | null;
   correlationId?: string;
