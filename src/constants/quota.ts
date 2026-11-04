@@ -24,3 +24,5 @@ export const MEDICAL_DISCLAIMER =
 
 export const PASSWORD_RULE = 'Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.';
 export const OTP_TTL_SECONDS = 5 * 60;
+/** Khóa nhập OTP 15 phút sau 5 lần sai (BR-USR-AUTH-01). */
+export const OTP_LOCK_MS = 15 * 60_000;

@@ -18,7 +18,8 @@ export interface MockResponse {
   meta?: unknown;
   message?: string;
   errorCode?: string;
-  details?: { field: string; message: string }[];
+  /** Mảng lỗi theo trường; Backend cũng dùng trường này để chứa gói dữ liệu kèm lỗi, ví dụ { remainingAttempts }. */
+  details?: { field: string; message: string }[] | Record<string, unknown>;
 }
 
 /** Trả `undefined` khi không xử lý URL đó: request nhận 200 với `data: null`. */

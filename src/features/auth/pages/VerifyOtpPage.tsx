@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { apiErrorCode, apiErrorData, apiErrorMessage } from '@/api/http';
 import { FormAlert, SubmitButton } from '@/components/ui/forms';
-import { OTP_TTL_SECONDS } from '@/constants/quota';
+import { OTP_LOCK_MS, OTP_TTL_SECONDS } from '@/constants/quota';
 import { PATHS } from '@/routes/paths';
 import { toast } from '@/stores/ui.store';
 import { useResendOtp, useVerifyOtp } from '../hooks/useAuth';
@@ -19,11 +19,18 @@ interface OtpState {
   email?: string;
   otpExpiresIn?: number;
   purpose?: VerifyOtpForm['purpose'];
+  /** Có khi quay lại từ bước đặt mật khẩu mới: giữ đúng hạn mã, số lượt còn lại và trạng thái khóa. */
+  otpExpiresAt?: number;
+  attemptsLeft?: number | null;
+  lockedUntil?: number | null;
 }
 
 const fmt = formatMmSs;
-/** Khóa nhập OTP 15 phút sau 5 lần sai (BR-USR-AUTH-01). */
-const LOCK_MS = 15 * 60_000;
+
+function initialRemaining({ otpExpiresAt, otpExpiresIn }: OtpState) {
+  if (otpExpiresAt !== undefined) return Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000));
+  return otpExpiresIn ?? OTP_TTL_SECONDS;
+}
 
 export function VerifyOtpPage() {
   const navigate = useNavigate();
@@ -34,10 +41,10 @@ export function VerifyOtpPage() {
   const verify = useVerifyOtp();
   const resend = useResendOtp();
   const [digits, setDigits] = useState<string[]>(Array(6).fill(''));
-  const [remaining, setRemaining] = useState(state.otpExpiresIn ?? OTP_TTL_SECONDS);
-  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState(() => initialRemaining(state));
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(state.attemptsLeft ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(state.lockedUntil ?? null);
   const lockLeft = useCountdown(lockedUntil);
   const locked = lockLeft > 0;
   const refs = useRef<(HTMLInputElement | null)[]>([]);
@@ -72,8 +79,8 @@ export function VerifyOtpPage() {
     setError(null);
     if (code.length !== 6) return setError('Mã OTP gồm 6 chữ số');
     if (isReset) {
-      toast.success('Mã OTP hợp lệ. Vui lòng thiết lập mật khẩu mới.');
-      navigate(PATHS.AUTH.RESET_PASSWORD, { state: { email, otp: code } });
+      // Backend chỉ kiểm tra mã này khi gọi POST /auth/reset-password nên chưa thể báo mã hợp lệ ở bước này.
+      navigate(PATHS.AUTH.RESET_PASSWORD, { state: { email, otp: code, otpExpiresAt: Date.now() + remaining * 1000, attemptsLeft } });
       return;
     }
     verify.mutate(
@@ -82,7 +89,7 @@ export function VerifyOtpPage() {
         onError: (err) => {
           const c = apiErrorCode(err);
           setError(apiErrorMessage(err));
-          if (c === 'ERR_AUTH_OTP_LOCKED') setLockedUntil(Date.now() + LOCK_MS);
+          if (c === 'ERR_AUTH_OTP_LOCKED') setLockedUntil(Date.now() + OTP_LOCK_MS);
           // Số lần thử còn lại do server trả (data.remainingAttempts), không tự đếm ở FE
           const left = Number(apiErrorData(err).remainingAttempts);
           if (c === 'ERR_AUTH_OTP_INCORRECT' && Number.isFinite(left)) setAttemptsLeft(left);
@@ -100,10 +107,11 @@ export function VerifyOtpPage() {
         onSuccess: () => {
           toast.success('Đã gửi lại mã OTP');
           setRemaining(OTP_TTL_SECONDS);
+          setAttemptsLeft(null); // Mã mới được Backend đếm lại số lần sai từ đầu
           setDigits(Array(6).fill(''));
         },
         onError: (e) => {
-          if (apiErrorCode(e) === 'ERR_AUTH_OTP_LOCKED') setLockedUntil(Date.now() + LOCK_MS);
+          if (apiErrorCode(e) === 'ERR_AUTH_OTP_LOCKED') setLockedUntil(Date.now() + OTP_LOCK_MS);
           toast.error(apiErrorMessage(e));
         },
       },
@@ -181,7 +189,7 @@ export function VerifyOtpPage() {
           </div>
           <div className="w-full">
             <SubmitButton loading={!isReset && verify.isPending} disabled={locked || code.length !== 6 || remaining === 0}>
-              {isReset ? 'Xác nhận & Đổi mật khẩu' : 'Xác nhận'}
+              {isReset ? 'Tiếp tục' : 'Xác nhận'}
             </SubmitButton>
           </div>
           <Link to={backLink} className="mt-space-md flex items-center gap-1 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface">
