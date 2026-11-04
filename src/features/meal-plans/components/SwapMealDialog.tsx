@@ -115,7 +115,7 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
     if (activeMode === 'REASON') {
       onConfirm(reason, trimmed || undefined);
     } else if (activeMode === 'AI_NOTE') {
-      onConfirm(reason, trimmed || undefined);
+      onConfirm(null, trimmed || undefined);
     } else if (activeMode === 'SEARCH_DB') {
       if (selectedRecipe) {
         onConfirm(null, trimmed || undefined, selectedRecipe.recipeId);
