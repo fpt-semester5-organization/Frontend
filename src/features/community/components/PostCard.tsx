@@ -346,6 +346,7 @@ export const PostCard = React.forwardRef<HTMLElement, PostCardProps>(
           <VoteButton
             target={{ resource: targetResource, id }}
             voteCount={cardVoteCount}
+            hasVoted={item?.hasVoted ?? post?.hasVoted}
             onVoteChange={(count) => setCardVoteCount(count)}
             className="flex-1 justify-center bg-transparent"
           />

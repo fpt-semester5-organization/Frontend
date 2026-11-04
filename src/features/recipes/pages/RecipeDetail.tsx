@@ -325,7 +325,7 @@ const RecipeDetail: React.FC = () => {
             <div className="flex flex-wrap items-center gap-space-sm">
               {isPublic && (
                 <>
-                  <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
+                  <VoteButton target={target} voteCount={data.voteCount} hasVoted={data.hasVoted} canVote={data.memberActions.canVote} />
                   <a href="#comments" className={ACTION}>
                     <Icon name="chat_bubble_outline" className="text-[20px] text-on-surface-variant" />
                     {formatNumber(data.commentCount)} bình luận

@@ -26,7 +26,11 @@ export interface RecipeFoodFields {
 }
 
 /** Một mục của GET /recipes (FN-POST-01): công thức hoặc video công khai. */
-export type RecipeListItem = DeepRequired<Schemas['ListRecipesResponse']['data'][number]> & RecipeFoodFields;
+export type RecipeListItem = DeepRequired<Schemas['ListRecipesResponse']['data'][number]> &
+  RecipeFoodFields & {
+    /** Người dùng hiện tại đã thả tim công thức này chưa (Backend có, OpenAPI chưa có). */
+    hasVoted?: boolean;
+  };
 /** `foodId`: lọc công thức của một món (Backend có, OpenAPI chưa có). */
 export type RecipeListParams = NonNullable<ApiOperations['listRecipes']['parameters']['query']> & { foodId?: number };
 export type RecipeContentType = NonNullable<RecipeListParams['contentType']>;
@@ -65,6 +69,7 @@ export interface RecipeOwnerFields {
 export type RecipeDetail = Omit<RecipeDetailRaw, 'imageUrl' | 'description' | 'servings' | 'prepTimeMinutes' | 'ingredients'> &
   RecipeOwnerFields &
   RecipeFoodFields & {
+    hasVoted?: boolean;
     imageUrl: string | null;
     description: string | null;
     servings: number | null;

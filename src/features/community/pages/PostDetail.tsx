@@ -352,7 +352,7 @@ const PostDetail: React.FC = () => {
         />
 
         <footer className="flex flex-wrap items-center gap-space-sm pt-space-md">
-          <VoteButton target={target} voteCount={data.voteCount} canVote={data.memberActions.canVote} />
+          <VoteButton target={target} voteCount={data.voteCount} hasVoted={data.hasVoted} canVote={data.memberActions.canVote} />
           <button
             type="button"
             onClick={() => {

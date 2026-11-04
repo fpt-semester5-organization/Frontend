@@ -16,6 +16,8 @@ export type PostListItem = DeepRequired<Schemas['ListPostsResponse']['data'][num
   authorAvatarUrl?: string | null;
   moderationStatus?: string | null;
   visibility?: 'PUBLIC' | 'PRIVATE' | null;
+  /** Người dùng hiện tại đã thả tim bài này chưa (Backend có, OpenAPI chưa có). */
+  hasVoted?: boolean;
 };
 export type PostListParams = NonNullable<ApiOperations['listPosts']['parameters']['query']>;
 export type PostSort = NonNullable<PostListParams['sort']>;
@@ -49,6 +51,7 @@ export type PostDetail = Omit<PostDetailRaw, 'imageUrl' | 'videos' | 'recipes' |
   imageUrl: string | null;
   moderationStatus?: ModerationStatus | null;
   visibility?: 'PUBLIC' | 'PRIVATE' | null;
+  hasVoted?: boolean;
   author: {
     userId: number;
     fullName: string;
@@ -123,6 +126,7 @@ export interface CommunityFeedItem {
   videoId?: number;
   videoUrl?: string;
   moderationStatus?: string | null;
+  hasVoted?: boolean;
 }
 
 export const fromPost = (p: PostListItem): CommunityFeedItem => {
@@ -151,6 +155,7 @@ export const fromPost = (p: PostListItem): CommunityFeedItem => {
     authorAvatarUrl: p.authorAvatarUrl,
     createdAt: p.createdAt,
     voteCount: p.voteCount,
+    hasVoted: p.hasVoted,
     commentCount: p.commentCount,
     moderationStatus: p.moderationStatus,
     type: isVideo ? 'VIDEO' : isRecipeRep ? 'RECIPE' : ((p as { type?: string }).type || 'POST'),
@@ -183,6 +188,7 @@ export const fromRecipe = (r: import('@/features/recipes/types/recipe.types').Re
     authorName: (r as { authorName?: string }).authorName || 'Bếp Chay VeggieLife',
     authorAvatarUrl: (r as { authorAvatarUrl?: string }).authorAvatarUrl || '/logo.png',
     voteCount: r.voteCount,
+    hasVoted: r.hasVoted,
     cookTimeMinutes: r.cookTimeMinutes,
     caloriesKcal: r.caloriesKcal,
     dietarySchool: r.dietarySchool,

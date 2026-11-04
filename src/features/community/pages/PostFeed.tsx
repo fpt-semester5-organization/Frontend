@@ -15,7 +15,7 @@ import { FeedFilters } from '../components/FeedFilters';
 import { PostCard, PostFeedSkeleton } from '../components/PostCard';
 import { PostListToolbar } from '../components/PostListToolbar';
 import { useInfinitePosts } from '../hooks/usePosts';
-import { getRecentCreatedItems, isAllowedInCommunityFeed } from '../lib/recentFeedStore';
+import { getRecentCreatedItems, isAllowedInCommunityFeed, pruneRecentPosts } from '../lib/recentFeedStore';
 import {
   fromPost,
   fromRecipe,
@@ -76,6 +76,13 @@ const PostFeed: React.FC = () => {
     { keyword: keyword || undefined, sort, size: PAGE_SIZE },
     { enabled: wantPosts }
   );
+
+  // Bài ghim tạm không còn nằm trong danh sách máy chủ (đã chuyển riêng tư/ẩn) thì gỡ khỏi bảng tin
+  useEffect(() => {
+    const firstPage = postsQuery.data?.pages[0];
+    if (!wantPosts || !firstPage || postsQuery.isFetching || keyword) return;
+    pruneRecentPosts(new Set(firstPage.items.map((post: PostListItem) => post.postId)));
+  }, [wantPosts, keyword, postsQuery.data, postsQuery.isFetching]);
 
   const recipesQuery = useInfiniteRecipes(
     {
@@ -148,7 +155,13 @@ const PostFeed: React.FC = () => {
           : recipeItems;
 
     // Khi sort === 'NEWEST', luôn đặt các bài viết / công thức vừa tạo (recent) lên vị trí đầu tiên
-    const combined = sort === 'NEWEST' ? [...recent, ...raw] : raw;
+    // Bài ghim tạm lấy lại số tim và trạng thái đã thả tim từ máy chủ để nút tim luôn đúng sau khi tải lại
+    const serverByKey = new Map(raw.map((item) => [item.key, item]));
+    const syncedRecent = recent.map((item) => {
+      const server = serverByKey.get(item.key);
+      return server ? { ...item, voteCount: server.voteCount, hasVoted: server.hasVoted } : item;
+    });
+    const combined = sort === 'NEWEST' ? [...syncedRecent, ...raw] : raw;
 
     // Lọc bỏ trùng lặp: nếu cùng videoId hoặc cùng tiêu đề hoặc cùng ID
     const seenKeys = new Set<string>();
