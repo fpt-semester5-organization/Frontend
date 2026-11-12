@@ -1,0 +1,19 @@
+# Build image frontend bằng Cloud Build (dùng bởi deploy/deploy_frontend.sh). Giá trị VITE_* là công khai.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=VITE_API_BASE_URL=${_API_BASE_URL}
+      - --build-arg=VITE_HUB_BASE_URL=${_HUB_BASE_URL}
+      - --build-arg=VITE_GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}
+      - --build-arg=VITE_GOONG_MAPTILES_KEY=${_GOONG_MAPTILES_KEY}
+      - -t
+      - ${_IMAGE}
+      - .
+images: ["${_IMAGE}"]
+substitutions:
+  _API_BASE_URL: /api/v1
+  _HUB_BASE_URL: ""
+  _GOOGLE_CLIENT_ID: ""
+  _GOONG_MAPTILES_KEY: ""
+  _IMAGE: ""
