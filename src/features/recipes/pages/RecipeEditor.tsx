@@ -322,7 +322,8 @@ const RecipeEditor: React.FC = () => {
         }
         result = { id: editId as number, status: editStatus, message: '' };
       }
-      let { id: recipeId, status, message } = result;
+      const { id: recipeId } = result;
+      let { status, message } = result;
 
       if (file) {
         try {
