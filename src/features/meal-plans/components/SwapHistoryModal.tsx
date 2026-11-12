@@ -37,6 +37,9 @@ export interface SwapHistoryModalProps {
     }>;
   } | null;
   onClose: () => void;
+  /** Tiện ích chọn lại món cũ chỉ với 1 thao tác */
+  onRevertToRecipe?: (recipeId: number, recipeTitle: string) => void;
+  isReverting?: boolean;
 }
 
 function formatIsoDateTime(isoStr?: string | null): string {
@@ -69,6 +72,8 @@ export const SwapHistoryModal: React.FC<SwapHistoryModalProps> = ({
   planId,
   fallbackHistory,
   onClose,
+  onRevertToRecipe,
+  isReverting = false,
 }) => {
   const slotId = slot?.slotId ?? 0;
   const historyQuery = useMealSlotSwapHistory(slotId, slot !== null);
@@ -223,6 +228,19 @@ export const SwapHistoryModal: React.FC<SwapHistoryModalProps> = ({
                         </p>
                       </div>
                     </div>
+
+                    {onRevertToRecipe && (
+                      <button
+                        type="button"
+                        onClick={() => onRevertToRecipe(latestSwap.oldRecipeId, latestSwap.oldRecipeTitle || 'Món trước đó')}
+                        disabled={isReverting}
+                        title={`Quay lại món cũ: ${latestSwap.oldRecipeTitle}`}
+                        className="mt-2.5 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-container px-3 py-1.5 text-xs font-bold text-on-primary shadow-xs hover:bg-primary transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                      >
+                        <Icon name="undo" className="text-[16px]" />
+                        <span>Quay lại món cũ</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Cột phải: Món mới hiện tại */}
@@ -346,15 +364,40 @@ export const SwapHistoryModal: React.FC<SwapHistoryModalProps> = ({
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-[11px] font-bold text-on-surface-variant">
                             {idx + 1}
                           </span>
-                          <span className="line-through text-on-surface-variant truncate max-w-[140px] sm:max-w-[200px]" title={item.oldRecipeTitle}>
-                            {item.oldRecipeTitle}
-                          </span>
+                          {onRevertToRecipe ? (
+                            <button
+                              type="button"
+                              onClick={() => onRevertToRecipe(item.oldRecipeId, item.oldRecipeTitle)}
+                              disabled={isReverting}
+                              title={`Bấm để quay lại món cũ: ${item.oldRecipeTitle}`}
+                              className="line-through text-on-surface-variant hover:text-primary hover:no-underline truncate max-w-[140px] sm:max-w-[200px] text-left transition-colors cursor-pointer group inline-flex items-center gap-1 font-medium"
+                            >
+                              <span className="group-hover:underline truncate">{item.oldRecipeTitle}</span>
+                              <Icon name="undo" className="text-[13px] opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0" />
+                            </button>
+                          ) : (
+                            <span className="line-through text-on-surface-variant truncate max-w-[140px] sm:max-w-[200px]" title={item.oldRecipeTitle}>
+                              {item.oldRecipeTitle}
+                            </span>
+                          )}
                           <Icon name="arrow_forward" className="text-[14px] text-on-surface-variant shrink-0" />
                           <span className="font-bold text-primary truncate max-w-[140px] sm:max-w-[200px]" title={item.newRecipeTitle}>
                             {item.newRecipeTitle}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
+                          {onRevertToRecipe && (
+                            <button
+                              type="button"
+                              onClick={() => onRevertToRecipe(item.oldRecipeId, item.oldRecipeTitle)}
+                              disabled={isReverting}
+                              title={`Quay lại món cũ: ${item.oldRecipeTitle}`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-primary-fixed/80 text-primary hover:bg-primary-fixed hover:text-primary-dim px-2 py-0.5 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 disabled:opacity-50"
+                            >
+                              <Icon name="undo" className="text-[12px]" />
+                              <span>Quay lại món này</span>
+                            </button>
+                          )}
                           <span className="tabular-nums text-on-surface-variant">
                             {delta > 0 ? `+${delta}` : delta} kcal
                           </span>

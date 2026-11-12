@@ -877,6 +877,35 @@ export const MealPlanDetail: React.FC = () => {
     );
   };
 
+  // Quay lại món cũ từ Lịch sử đổi món (1 thao tác)
+  const handleRevertToRecipe = (slotId: number, recipeId: number, recipeTitle?: string) => {
+    if (editsLeft <= 0) {
+      const message = `Bạn đã dùng hết ${edits.limit} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`;
+      if (isVip) setNotice({ title: 'Hết lượt đổi món', message });
+      else setUpsell({ title: 'Bạn đã dùng hết lượt đổi món', message });
+      return;
+    }
+
+    swap.mutate(
+      {
+        slotId,
+        body: {
+          newRecipeId: recipeId,
+          customNote: 'Quay lại món cũ',
+        },
+      },
+      {
+        onSuccess: () => {
+          notifySuccess(`Đã quay lại món: ${recipeTitle || 'món cũ'}.`);
+          setHistorySlot(null);
+        },
+        onError: (err) => {
+          notifyApiError(err);
+        },
+      }
+    );
+  };
+
   const toggleComplete = (slot: MealSlot) => {
     complete.mutate(
       { slotId: slot.slotId, isCompleted: !slot.isCompleted },
@@ -1272,6 +1301,12 @@ export const MealPlanDetail: React.FC = () => {
         planId={planId}
         fallbackHistory={historySlot ? swapHistories[historySlot.slotId] : undefined}
         onClose={() => setHistorySlot(null)}
+        onRevertToRecipe={(recipeId, recipeTitle) => {
+          if (historySlot) {
+            handleRevertToRecipe(historySlot.slotId, recipeId, recipeTitle);
+          }
+        }}
+        isReverting={swap.isPending}
       />
 
       {/* MODAL 2: Modal tìm kiếm món ăn độc lập từ Database */}
