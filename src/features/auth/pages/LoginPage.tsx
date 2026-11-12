@@ -260,7 +260,7 @@ export function LoginPage() {
 
       <Modal show={askRestore} onHide={() => setAskRestore(false)} title="Tài khoản đang chờ xóa">
         <div className="flex flex-col gap-space-md p-space-lg">
-          <p className="font-body-md text-body-md text-on-surface-variant">Tài khoản này đang trong 30 ngày ân hạn xóa. Bạn có muốn khôi phục và tiếp tục đăng nhập?</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">Tài khoản này đang trong thời gian chờ xóa 30 ngày (có thể khôi phục). Bạn có muốn khôi phục và tiếp tục đăng nhập?</p>
           <div className="flex justify-end gap-space-sm">
             <button type="button" onClick={() => setAskRestore(false)} className="rounded-lg bg-surface-container px-4 py-2 font-label-md text-label-md text-on-surface">Để sau</button>
             <button

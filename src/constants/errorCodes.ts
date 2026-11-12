@@ -15,7 +15,7 @@ export const ERROR_CODES = {
   ERR_ALLERGEN_NOT_FOUND: { http: 404, message: "allergenId không tồn tại." },
   ERR_AUTH_ACCOUNT_BANNED: { http: 403, message: "Tài khoản bị đình chỉ/cấm." },
   ERR_AUTH_ACCOUNT_LINK_REQUIRED: { http: 409, message: "Email đã có tài khoản mật khẩu; cần currentPassword." },
-  ERR_AUTH_ACCOUNT_PENDING_DELETION: { http: 409, message: "Đang trong 30 ngày ân hạn xóa." },
+  ERR_AUTH_ACCOUNT_PENDING_DELETION: { http: 409, message: "Tài khoản đang trong thời gian chờ xóa 30 ngày (có thể khôi phục)." },
   ERR_AUTH_EMAIL_EXISTS: { http: 409, message: "Email đã được đăng ký." },
   ERR_AUTH_EMAIL_NOT_VERIFIED: { http: 403, message: "Tài khoản chưa kích hoạt." },
   ERR_AUTH_INVALID_CREDENTIALS: { http: 401, message: "Thông tin đăng nhập không đúng." },

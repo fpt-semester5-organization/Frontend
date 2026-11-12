@@ -60,7 +60,7 @@ const MetricCards: React.FC<{ health: HealthProfileData }> = ({ health }) => (
       accent
     />
     <Metric
-      label="Cân nặng"
+      label="Cân nặng hiện tại"
       value={`${formatNumber(health.currentWeightKg)} kg`}
       note={health.targetWeightKg !== null ? `Mục tiêu ${formatNumber(health.targetWeightKg)} kg` : 'Chưa đặt mục tiêu'}
     />

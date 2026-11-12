@@ -48,7 +48,7 @@ export async function uploadAvatar(file: File) {
   return res.data;
 }
 
-/** DELETE /users/me — FN-PROF-07 vô hiệu hóa tài khoản (ân hạn 30 ngày), xác nhận bằng mật khẩu. */
+/** DELETE /users/me — FN-PROF-07 vô hiệu hóa tài khoản (thời gian chờ xóa 30 ngày, có thể khôi phục), xác nhận bằng mật khẩu. */
 export async function deleteAccount(body: DeleteAccountBody) {
   const res = await http.delete<ApiEnvelope<DeleteAccountResult>>('/users/me', { data: body });
   return res.data;
