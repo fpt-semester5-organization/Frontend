@@ -240,6 +240,8 @@ export async function uploadAdminNutritionDocument(payload: UploadNutritionDocum
   return unwrap<NutritionDocument>(
     http.post('/admin/knowledge/documents/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // Sách dài cần nhúng hàng trăm đoạn; PDF scan còn phải OCR bằng Gemini (~1 giây/trang) → không dùng timeout chung 15 giây
+      timeout: 15 * 60 * 1000,
     })
   );
 }

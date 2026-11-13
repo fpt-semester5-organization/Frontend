@@ -111,6 +111,16 @@ export function formatUsd(value: number): string {
   return `$${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: 0 }).format(value)}`;
 }
 
+/** Tỷ giá quy đổi tham khảo để hiển thị chi phí ước tính bằng VND (Backend chỉ lưu USD — AIQuotaLogs.Cost_Estimate_USD). */
+export const USD_TO_VND_RATE = 26000;
+
+/** 0,0123 USD → "≈ 320 ₫"; chi phí nhỏ dưới 1 ₫ hiện "< 1 ₫". */
+export function formatVnd(usd: number, rate: number = USD_TO_VND_RATE): string {
+  const vnd = usd * rate;
+  if (vnd > 0 && vnd < 1) return '< 1 ₫';
+  return `≈ ${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(vnd)} ₫`;
+}
+
 /** Bảng số liệu: giữ tới 4 chữ số thập phân như Backend trả, không làm tròn theo độ lớn. */
 export const formatUsdExact = (value: number) =>
   `$${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 4 }).format(value)}`;

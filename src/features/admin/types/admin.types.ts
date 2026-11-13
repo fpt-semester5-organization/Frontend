@@ -311,6 +311,8 @@ export type KnowledgeSource =
 export type KnowledgeStatus = Omit<DeepRequired<Schemas['ListAdminKnowledgeStatusResponse']['data']>, 'lastIndexedAt' | 'bySource'> & {
   lastIndexedAt: string | null;
   bySource: Record<string, number>;
+  /** Số điểm vector bị Admin ẩn (không được chatbot tìm thấy); totalPoints/bySource chỉ tính điểm đang dùng. */
+  inactivePoints?: number;
 };
 
 export interface NutritionDocument {

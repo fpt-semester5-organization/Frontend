@@ -8,6 +8,7 @@ import { AuthLayout } from '@/layouts/AuthLayout';
 import { AdminLayout } from '@/layouts/AdminLayout';
 import { RequireAuth, GuestOnly, RequireAdmin } from '@/routes/guards';
 import { PATHS } from '@/routes/paths';
+import { RedirectWithSearch } from '@/routes/RedirectWithSearch';
 
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { RegisterPage } from '@/features/auth/pages/RegisterPage';
@@ -62,9 +63,7 @@ const AdminUserDetailPage = lazy(() => import('@/features/admin/pages/AdminUserD
 const AdminAiPage = lazy(() => import('@/features/admin/pages/AdminAiPage'));
 const AdminAiLayout = lazy(() => import('@/features/admin/layouts/AdminAiLayout'));
 const AiOverviewPage = lazy(() => import('@/features/admin/pages/ai/AiOverviewPage'));
-const AiAnalyticsPage = lazy(() => import('@/features/admin/pages/ai/AiAnalyticsPage'));
 const AiLogsPage = lazy(() => import('@/features/admin/pages/ai/AiLogsPage'));
-const AiRagPage = lazy(() => import('@/features/admin/pages/ai/AiRagPage'));
 const AiQualityPage = lazy(() => import('@/features/admin/pages/ai/AiQualityPage'));
 const AdminDietarySchoolsPage = lazy(() => import('@/features/admin/pages/AdminDietarySchoolsPage'));
 const AdminENumbersPage = lazy(() => import('@/features/admin/pages/AdminENumbersPage'));
@@ -207,9 +206,9 @@ const router = createBrowserRouter([
                 element: <AdminAiLayout />,
                 children: [
                   { index: true, element: <AiOverviewPage /> },
-                  { path: 'analytics', element: <AiAnalyticsPage /> },
+                  { path: 'analytics', element: <RedirectWithSearch to={PATHS.ADMIN.AI_LOGS} hash="cost" /> },
                   { path: 'logs', element: <AiLogsPage /> },
-                  { path: 'rag', element: <AiRagPage /> },
+                  { path: 'rag', element: <RedirectWithSearch to={PATHS.ADMIN.AI_QUALITY} hash="rag" /> },
                   { path: 'quality', element: <AiQualityPage /> },
                 ],
               },

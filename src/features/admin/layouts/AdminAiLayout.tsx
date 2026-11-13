@@ -22,28 +22,16 @@ export const AI_SUB_NAV: AiSubNavItem[] = [
     description: 'Bảng chỉ số tóm tắt, sức khỏe hệ thống và điều hướng nhanh.',
   },
   {
-    label: 'Phân tích Chi phí',
-    to: PATHS.ADMIN.AI_ANALYTICS,
-    icon: 'analytics',
-    description: 'Biểu đồ chi phí token theo ngày, tính năng, phân rã Input/Output và Top Spenders.',
-  },
-  {
-    label: 'Kho tri thức RAG',
-    to: PATHS.ADMIN.AI_RAG,
-    icon: 'database',
-    description: 'Trạng thái Vector Database, tài liệu dinh dưỡng PDF và quản lý tri thức.',
-  },
-  {
-    label: 'Chất lượng Chatbot',
-    to: PATHS.ADMIN.AI_QUALITY,
-    icon: 'verified',
-    description: 'Chỉ số SLA vận hành và phiếu khảo sát đánh giá chất lượng Chatbot từ người dùng.',
-  },
-  {
-    label: 'Nhật ký cuộc gọi',
+    label: 'Chi phí & Nhật ký API AI',
     to: PATHS.ADMIN.AI_LOGS,
     icon: 'receipt_long',
-    description: 'Tra cứu toàn bộ lịch sử gọi AI, kiểm tra prompt, response, latency và mã lỗi.',
+    description: 'Phân tích chi phí token (theo ngày, tính năng, Input/Output, Top Spenders) và tra cứu từng lượt gọi AI.',
+  },
+  {
+    label: 'Chất lượng & Tri thức Chatbot',
+    to: PATHS.ADMIN.AI_QUALITY,
+    icon: 'verified',
+    description: 'Chỉ số SLA, khảo sát đánh giá Chatbot và Kho tri thức RAG (Qdrant, tài liệu dinh dưỡng PDF).',
   },
 ];
 

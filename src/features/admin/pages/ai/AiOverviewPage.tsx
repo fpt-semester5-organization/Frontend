@@ -29,7 +29,8 @@ export const AiOverviewPage: React.FC = () => {
   const matrix = useMemo(() => buildCostMatrix(data?.series ?? []), [data]);
 
   const level = budgetLevel(data?.usagePercent ?? 0);
-  const meterColor = level === 'throttled' ? 'bg-error' : level === 'warning' ? 'bg-warning' : 'bg-primary';
+  const meterColor =
+    level === 'throttled' ? 'bg-error' : level === 'warning' ? 'bg-warning' : 'bg-primary';
 
   const circuitState = metrics.data?.circuit?.state;
   const circuitInfo = (circuitState && CIRCUIT_STATE[circuitState]) || {
@@ -41,7 +42,9 @@ export const AiOverviewPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-space-lg">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-body-sm text-body-sm text-on-surface-variant">Số liệu vận hành mô hình AI và ngân sách thời gian thực</span>
+        <span className="font-body-sm text-body-sm text-on-surface-variant">
+          Số liệu vận hành mô hình AI và ngân sách thời gian thực
+        </span>
         <div className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-low px-2.5 py-1 text-[12px] font-medium text-on-surface-variant ring-1 ring-surface-container">
           <Icon name="schedule" className="text-[15px] text-primary" />
           <span>Múi giờ: GMT+7 (Asia/Ho_Chi_Minh)</span>
@@ -52,7 +55,9 @@ export const AiOverviewPage: React.FC = () => {
       {level !== 'ok' && (
         <FormAlert
           tone={level === 'throttled' ? 'error' : 'warning'}
-          title={level === 'throttled' ? 'Đã chạm 100% ngân sách ngày' : 'Đã dùng từ 80% ngân sách ngày'}
+          title={
+            level === 'throttled' ? 'Đã chạm 100% ngân sách ngày' : 'Đã dùng từ 80% ngân sách ngày'
+          }
         >
           {level === 'throttled'
             ? 'Hệ thống đang hạ tải: chuyển sang bộ nhớ đệm và mô hình nội bộ tiết kiệm cho tới hết ngày.'
@@ -68,17 +73,25 @@ export const AiOverviewPage: React.FC = () => {
           ))}
         </div>
       ) : !data ? (
-        <AdminQueryError error={dashboard.error} onRetry={() => void dashboard.refetch()} retrying={dashboard.isRefetching} />
+        <AdminQueryError
+          error={dashboard.error}
+          onRetry={() => void dashboard.refetch()}
+          retrying={dashboard.isRefetching}
+        />
       ) : (
         <div className="grid gap-space-md sm:grid-cols-2 lg:grid-cols-4">
           {/* Card 1: Chi phí hôm nay */}
           <div className={cn(CARD, 'flex flex-col justify-between p-space-md')}>
             <div className="flex items-center justify-between">
-              <span className="font-label-md text-label-md text-on-surface-variant">Chi phí hôm nay (GMT+7)</span>
+              <span className="font-label-md text-label-md text-on-surface-variant">
+                Chi phí hôm nay (GMT+7)
+              </span>
               <Icon name="today" className="text-[20px] text-primary" />
             </div>
             <div className="my-1">
-              <p className="font-headline-md text-headline-md text-on-surface">{formatUsd(data.todayCostUsd)}</p>
+              <p className="font-headline-md text-headline-md text-on-surface">
+                {formatUsd(data.todayCostUsd)}
+              </p>
               <div
                 role="meter"
                 aria-label="Mức dùng ngân sách ngày"
@@ -87,7 +100,10 @@ export const AiOverviewPage: React.FC = () => {
                 aria-valuenow={Math.round(data.usagePercent)}
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-primary-fixed"
               >
-                <div className={cn('h-full rounded-full', meterColor)} style={{ width: `${Math.min(100, Math.max(0, data.usagePercent))}%` }} />
+                <div
+                  className={cn('h-full rounded-full', meterColor)}
+                  style={{ width: `${Math.min(100, Math.max(0, data.usagePercent))}%` }}
+                />
               </div>
             </div>
             <p className="font-body-xs text-body-xs text-on-surface-variant">
@@ -98,21 +114,28 @@ export const AiOverviewPage: React.FC = () => {
           {/* Card 2: Tổng chi phí trong kỳ (30 ngày) */}
           <div className={cn(CARD, 'flex flex-col justify-between p-space-md')}>
             <div className="flex items-center justify-between">
-              <span className="font-label-md text-label-md text-on-surface-variant">Chi phí 30 ngày qua</span>
+              <span className="font-label-md text-label-md text-on-surface-variant">
+                Chi phí 30 ngày qua
+              </span>
               <Icon name="date_range" className="text-[20px] text-info" />
             </div>
             <div className="my-1">
-              <p className="font-headline-md text-headline-md text-on-surface">{formatUsd(matrix.total.costUsd)}</p>
+              <p className="font-headline-md text-headline-md text-on-surface">
+                {formatUsd(matrix.total.costUsd)}
+              </p>
             </div>
             <p className="font-body-xs text-body-xs text-on-surface-variant">
-              {matrix.dates.length} ngày phát sinh · Hạn mức {formatUsd(data.dailyBudgetUsd * 30)}/tháng
+              {matrix.dates.length} ngày phát sinh · Hạn mức {formatUsd(data.dailyBudgetUsd * 30)}
+              /tháng
             </p>
           </div>
 
           {/* Card 3: Token tiêu thụ */}
           <div className={cn(CARD, 'flex flex-col justify-between p-space-md')}>
             <div className="flex items-center justify-between">
-              <span className="font-label-md text-label-md text-on-surface-variant">Token tiêu thụ</span>
+              <span className="font-label-md text-label-md text-on-surface-variant">
+                Token tiêu thụ
+              </span>
               <Icon name="token" className="text-[20px] text-secondary" />
             </div>
             <div className="my-1">
@@ -121,26 +144,36 @@ export const AiOverviewPage: React.FC = () => {
               </p>
             </div>
             <p className="font-body-xs text-body-xs text-on-surface-variant">
-              Input: {formatTokens(data.totalPromptTokens ?? 0)} · Output: {formatTokens(data.totalCompletionTokens ?? 0)}
+              Input: {formatTokens(data.totalPromptTokens ?? 0)} · Output:{' '}
+              {formatTokens(data.totalCompletionTokens ?? 0)}
             </p>
           </div>
 
           {/* Card 4: Sức khỏe AI & Kho tri thức */}
           <div className={cn(CARD, 'flex flex-col justify-between p-space-md')}>
             <div className="flex items-center justify-between">
-              <span className="font-label-md text-label-md text-on-surface-variant">Sức khỏe hệ thống</span>
-              <StatusBadge tone={circuitInfo.tone} icon={circuitInfo.tone === 'success' ? 'check_circle' : 'warning'}>
+              <span className="font-label-md text-label-md text-on-surface-variant">
+                Sức khỏe hệ thống
+              </span>
+              <StatusBadge
+                tone={circuitInfo.tone}
+                icon={circuitInfo.tone === 'success' ? 'check_circle' : 'warning'}
+              >
                 {circuitInfo.label}
               </StatusBadge>
             </div>
             <div className="my-1">
               <p className="font-headline-md text-headline-md text-on-surface">
                 {kb.data ? `${formatNumber(kb.data.totalPoints)}` : '–'}
-                <span className="ml-1 text-label-md font-normal text-on-surface-variant">vector</span>
+                <span className="ml-1 text-label-md font-normal text-on-surface-variant">
+                  vector
+                </span>
               </p>
             </div>
             <p className="font-body-xs text-body-xs text-on-surface-variant truncate">
-              {kb.data?.lastIndexedAt ? `Đồng bộ: ${formatServerDateTime(kb.data.lastIndexedAt)}` : 'Chưa đồng bộ'}
+              {kb.data?.lastIndexedAt
+                ? `Đồng bộ: ${formatServerDateTime(kb.data.lastIndexedAt)}`
+                : 'Chưa đồng bộ'}
             </p>
           </div>
         </div>
@@ -150,8 +183,13 @@ export const AiOverviewPage: React.FC = () => {
       {data && (
         <div className="flex flex-col gap-space-sm">
           <div className="flex items-center justify-between">
-            <h3 className="font-headline-sm text-headline-sm text-on-surface">Tiêu thụ theo Người dùng</h3>
-            <Link to={PATHS.ADMIN.AI_ANALYTICS} className="font-label-md text-label-md text-primary hover:underline">
+            <h3 className="font-headline-sm text-headline-sm text-on-surface">
+              Tiêu thụ theo Người dùng
+            </h3>
+            <Link
+              to={PATHS.ADMIN.AI_COST}
+              className="font-label-md text-label-md text-primary hover:underline"
+            >
               Xem toàn bộ phân tích chi phí &rarr;
             </Link>
           </div>

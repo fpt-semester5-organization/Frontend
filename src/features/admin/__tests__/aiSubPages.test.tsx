@@ -5,10 +5,16 @@ import { mockApi, type MockHandler } from '@/test/mockApi';
 import { renderWithProviders } from '@/test/test-utils';
 import { AdminAiLayout } from '../layouts/AdminAiLayout';
 import { AiOverviewPage } from '../pages/ai/AiOverviewPage';
-import { AiAnalyticsPage } from '../pages/ai/AiAnalyticsPage';
+import { Route, Routes, useLocation } from 'react-router-dom';
+import { RedirectWithSearch } from '@/routes/RedirectWithSearch';
+import { AiKnowledgeSection } from '../components/AiKnowledgeSection';
 import { AiLogsPage } from '../pages/ai/AiLogsPage';
-import { AiRagPage } from '../pages/ai/AiRagPage';
 import { AiQualityPage } from '../pages/ai/AiQualityPage';
+
+const LocationProbe = () => {
+  const { pathname, search, hash } = useLocation();
+  return <p data-testid="location">{`${pathname}${search}${hash}`}</p>;
+};
 
 const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
 beforeAll(() => Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 800 }));
@@ -162,16 +168,15 @@ const handler = (): MockHandler => (req) => {
 };
 
 describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
-  it('1. AdminAiLayout hiển thị thanh điều hướng Sub-Nav với đầy đủ 5 mục', () => {
+  it('1. AdminAiLayout hiển thị thanh điều hướng Sub-Nav gộp còn 3 mục', () => {
     renderWithProviders(<AdminAiLayout />, '/admin/ai');
     expect(screen.getByText('Quản lý & Giám sát AI')).toBeInTheDocument();
 
     const nav = screen.getByRole('navigation', { name: 'Điều hướng phân hệ AI' });
+    expect(within(nav).getAllByRole('link')).toHaveLength(3);
     expect(within(nav).getByText('Tổng quan')).toBeInTheDocument();
-    expect(within(nav).getByText('Phân tích Chi phí')).toBeInTheDocument();
-    expect(within(nav).getByText('Kho tri thức RAG')).toBeInTheDocument();
-    expect(within(nav).getByText('Chất lượng Chatbot')).toBeInTheDocument();
-    expect(within(nav).getByText('Nhật ký cuộc gọi')).toBeInTheDocument();
+    expect(within(nav).getByText('Chi phí & Nhật ký API AI')).toBeInTheDocument();
+    expect(within(nav).getByText('Chất lượng & Tri thức Chatbot')).toBeInTheDocument();
   });
 
   it('2. AiOverviewPage hiển thị các thẻ KPI tổng quan và khối Tiêu thụ theo Người dùng', async () => {
@@ -185,14 +190,24 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
   });
 
-  it('3. AiAnalyticsPage hiển thị bộ lọc, biểu đồ, nút xem bảng số liệu và top spenders', async () => {
-    mockApi(handler());
-    renderWithProviders(<AiAnalyticsPage />, '/admin/ai/analytics?from=2026-10-05&to=2026-10-06');
+  it('3. Phần Phân tích Chi phí (trong AiLogsPage) hiển thị biểu đồ, nút xem bảng số liệu, không có Top 5', async () => {
+    const calls = mockApi(handler());
+    renderWithProviders(<AiLogsPage />, '/admin/ai/logs?from=2026-10-05&to=2026-10-06');
+
+    expect(screen.getByRole('heading', { name: 'Phân tích Chi phí' })).toBeInTheDocument();
+    // Một thanh lọc ngày dùng chung cho cả chi phí và nhật ký
+    expect(screen.getAllByRole('group', { name: 'Khoảng thời gian' })).toHaveLength(1);
+    await waitFor(() => {
+      const dashboard = calls.find((c) => c.url === '/admin/llmops/dashboard');
+      const logs = calls.find((c) => c.url === '/admin/llmops/logs');
+      expect(dashboard?.params).toMatchObject({ from: '2026-10-05', to: '2026-10-06' });
+      expect(logs?.params).toMatchObject({ from: '2026-10-05', to: '2026-10-06' });
+    });
 
     expect(await screen.findByRole('button', { name: 'Xem bảng số liệu' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Cách xem' })).toBeInTheDocument();
     expect(screen.queryByText('Phân bổ theo Hạng Hội viên')).not.toBeInTheDocument();
-    expect(screen.getByText('Top 5 tài khoản tiêu thụ')).toBeInTheDocument();
+    expect(screen.queryByText('Top 5 tài khoản tiêu thụ')).not.toBeInTheDocument();
 
     // Kiểm tra chuyển đổi các loại biểu đồ
     const switcher = screen.getByRole('group', { name: 'Cách xem' });
@@ -218,21 +233,22 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     expect(screen.getByLabelText('Biểu đồ chi phí AI theo ngày')).toBeInTheDocument();
   });
 
-  it('4. AiLogsPage hiển thị bảng tra cứu cuộc gọi toàn màn hình', async () => {
+  it('4. AiLogsPage hiển thị bảng tra cứu truy vấn API AI toàn màn hình', async () => {
     mockApi(handler());
     renderWithProviders(<AiLogsPage />, '/admin/ai/logs');
 
-    expect(await screen.findByText(/Nhật ký cuộc gọi AI/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nhật ký truy vấn API AI/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Tìm theo tên, email hoặc lỗi...')).toBeInTheDocument();
     expect(await screen.findByText('Trần Văn VIP')).toBeInTheDocument();
   });
 
-  it('5. AiRagPage hiển thị trạng thái Qdrant, phân bổ nguồn và form reindex', async () => {
+  it('5. AiKnowledgeSection hiển thị trạng thái Qdrant, danh sách tài liệu và thao tác ẩn/xóa', async () => {
     const calls = mockApi(handler());
-    renderWithProviders(<AiRagPage />, '/admin/ai/rag');
+    renderWithProviders(<AiKnowledgeSection />, '/admin/ai/quality#rag');
 
     expect(screen.getByRole('heading', { name: 'Kho tri thức Chatbot (Qdrant Vector DB)' })).toBeInTheDocument();
-    expect(await screen.findByText('2.450')).toBeInTheDocument();
+    // Chỉ đếm đoạn tài liệu dinh dưỡng đang dùng (chatbot chỉ trích NUTRITION_DOC), không lấy tổng mọi nguồn
+    expect(await screen.findByText('1.200')).toBeInTheDocument();
     expect(screen.getAllByText('Tài liệu dinh dưỡng').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Danh sách Tài liệu Dinh dưỡng PDF trong Vector DB')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Làm mới' })).not.toBeInTheDocument();
@@ -277,11 +293,15 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     expect(await screen.findByText('Trần Văn Nam')).toBeInTheDocument();
     expect(screen.getByText(/Tư vấn thực đơn giảm cân ăn chay có hữu ích không\?/)).toBeInTheDocument();
     expect(screen.getByText('5 sao', { selector: 'span' })).toBeInTheDocument();
+
+    // Kho tri thức RAG nằm trong cùng trang
+    expect(screen.getByRole('heading', { name: 'Kho tri thức Chatbot (Qdrant Vector DB)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Tải lên tài liệu PDF mới' })).toBeInTheDocument();
   });
 
-  it('7. AiRagPage gửi tệp PDF lên POST /admin/knowledge/documents/upload', async () => {
+  it('7. AiKnowledgeSection gửi tệp PDF lên POST /admin/knowledge/documents/upload', async () => {
     const calls = mockApi(handler());
-    renderWithProviders(<AiRagPage />, '/admin/ai/rag');
+    renderWithProviders(<AiKnowledgeSection />, '/admin/ai/quality#rag');
 
     await userEvent.click(screen.getByRole('button', { name: '+ Tải lên tài liệu PDF mới' }));
     expect(await screen.findByText('Tải lên Tài liệu Dinh dưỡng PDF')).toBeInTheDocument();
@@ -301,5 +321,20 @@ describe('Phân hệ Giám sát AI - Sub-pages & Navigation', () => {
     await waitFor(() => {
       expect(calls.some((c) => c.method === 'POST' && c.url === '/admin/knowledge/documents/upload')).toBe(true);
     });
+  });
+
+  it.each([
+    ['/admin/ai/analytics?from=2026-10-05&to=2026-10-06', '/admin/ai/logs?from=2026-10-05&to=2026-10-06#cost'],
+    ['/admin/ai/rag', '/admin/ai/quality#rag'],
+  ])('8. Địa chỉ cũ %s chuyển hướng sang %s, giữ bộ lọc', (from, expected) => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/ai/analytics" element={<RedirectWithSearch to="/admin/ai/logs" hash="cost" />} />
+        <Route path="/admin/ai/rag" element={<RedirectWithSearch to="/admin/ai/quality" hash="rag" />} />
+        <Route path="*" element={<LocationProbe />} />
+      </Routes>,
+      from
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent(expected);
   });
 });

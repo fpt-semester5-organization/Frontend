@@ -16,7 +16,7 @@ interface LlmopsLogDetailSheetProps {
 }
 
 /**
- * Modal hiển thị thông tin cốt lõi của một lượt gọi AI (dành cho Admin / Báo cáo nghiệm thu).
+ * Modal hiển thị thông tin cốt lõi của một lượt truy vấn API AI (dành cho Admin / Báo cáo nghiệm thu).
  * Chỉ tập trung vào các trường dữ liệu thực tế từ Database: Người gọi, Tính năng, Thời gian, Token, Chi phí và Lỗi (nếu có).
  */
 export const LlmopsLogDetailSheet: React.FC<LlmopsLogDetailSheetProps> = ({ log, onClose }) => {
@@ -63,7 +63,7 @@ export const LlmopsLogDetailSheet: React.FC<LlmopsLogDetailSheetProps> = ({ log,
             </div>
             <div>
               <h2 id="llmops-dialog-title" className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                Chi tiết lượt gọi AI #{log.logId}
+                Chi tiết lượt truy vấn API AI #{log.logId}
               </h2>
               <p className="font-body-xs text-on-surface-variant">
                 {formatServerDateTime(log.createdAt)}

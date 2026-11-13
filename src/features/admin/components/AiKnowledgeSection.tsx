@@ -6,34 +6,35 @@ import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
+import { apiErrorMessage } from '@/api/http';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { notifySuccess } from '@/lib/notify';
 import { formatServerDateTime } from '@/lib/serverDate';
-import { AdminQueryError, CONTROL, ServerMessageDialog } from '../../components/AdminUi';
-import { NutritionPdfPreviewModal } from '../../components/NutritionPdfPreviewModal';
+import { AdminQueryError, CONTROL, ServerMessageDialog } from './AdminUi';
+import { NutritionPdfPreviewModal } from './NutritionPdfPreviewModal';
 import {
   useDeleteNutritionDocument,
   useKnowledgeStatus,
   useNutritionDocuments,
   useUpdateNutritionDocumentStatus,
   useUploadNutritionDocument,
-} from '../../hooks/useAdminAi';
-import { handleWriteError } from '../../lib/writeError';
-import type { NutritionDocument } from '../../types/admin.types';
+} from '../hooks/useAdminAi';
+import { handleWriteError } from '../lib/writeError';
+import type { NutritionDocument } from '../types/admin.types';
 
 type TabType = 'all' | 'active' | 'hidden';
 
 const PAGE_SIZE = 10;
 
 /**
- * Trang Quản trị Kho tri thức Chatbot RAG (Qdrant · `/admin/ai/rag` - FN-CHAT-07).
+ * Phần Kho tri thức Chatbot RAG (Qdrant · FN-CHAT-07), đặt trong trang Chất lượng & Tri thức Chatbot (`/admin/ai/quality#rag`).
  * Thiết kế tinh gọn chuẩn shadcn-admin:
  * - Lọc trạng thái với Horizontal Tabs (Tất cả, Đang dùng, Đã ẩn).
  * - Modal upload tài liệu PDF & Dialog tái lập chỉ mục (reindex) không làm mất ngữ cảnh.
  * - Phân trang 10 mục/trang, loại bỏ danh sách vô tận, tối ưu trải nghiệm end-user.
  */
-export const AiRagPage: React.FC = () => {
+export const AiKnowledgeSection: React.FC = () => {
   const [jobId, setJobId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const status = useKnowledgeStatus(isPolling);
@@ -148,7 +149,7 @@ export const AiRagPage: React.FC = () => {
         },
         onError: (err) => {
           handleWriteError(err);
-          setUploadError('Tải lên hoặc vector hoá tài liệu thất bại.');
+          setUploadError(apiErrorMessage(err, 'Tải lên hoặc vector hoá tài liệu thất bại.'));
         },
       }
     );
@@ -157,10 +158,10 @@ export const AiRagPage: React.FC = () => {
   const activeCount = documents.filter((d) => d.isActive).length;
   const hiddenCount = documents.filter((d) => !d.isActive).length;
   const activeChunks = documents.filter((d) => d.isActive).reduce((acc, cur) => acc + cur.chunks, 0);
-  const hiddenChunks = documents.filter((d) => !d.isActive).reduce((acc, cur) => acc + cur.chunks, 0);
-  const totalChunksFromDocs = documents.reduce((acc, cur) => acc + cur.chunks, 0);
-  const effectiveTotalPoints = status.data ? status.data.totalPoints : totalChunksFromDocs;
-  const effectiveActivePoints = Math.max(0, effectiveTotalPoints - hiddenChunks);
+  const hiddenChunksFromDocs = documents.filter((d) => !d.isActive).reduce((acc, cur) => acc + cur.chunks, 0);
+  // Số thật từ Qdrant: bySource chỉ đếm điểm đang dùng, inactivePoints đếm điểm bị ẩn (chatbot chỉ trích NUTRITION_DOC)
+  const effectiveActivePoints = status.data ? (status.data.bySource?.NUTRITION_DOC ?? 0) : activeChunks;
+  const hiddenChunks = status.data?.inactivePoints ?? hiddenChunksFromDocs;
 
   // Danh sách lọc theo Tab và Search
   const displayDocuments = useMemo(() => {
@@ -203,12 +204,15 @@ export const AiRagPage: React.FC = () => {
   }, [previewDoc]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <section id="rag" aria-labelledby="ai-rag-heading" className="flex scroll-mt-24 flex-col gap-5">
       {/* 1. Header tinh gọn */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight text-on-surface">
+      <div className="flex flex-col gap-1">
+        <h2 id="ai-rag-heading" className="font-headline-sm text-headline-sm text-on-surface">
           Kho tri thức Chatbot (Qdrant Vector DB)
         </h2>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Số liệu kho tri thức là trạng thái hiện tại, không phụ thuộc khoảng thời gian đã chọn ở trên.
+        </p>
       </div>
 
       {/* 2. 4 Thẻ KPI thống kê số liệu rõ ràng */}
@@ -527,10 +531,16 @@ export const AiRagPage: React.FC = () => {
         <div className="p-5 flex flex-col gap-4">
           <p className="text-xs text-on-surface-variant">
             Tài liệu tải lên sẽ được trích xuất văn bản và tự động tạo vector embeddings vào Qdrant để Chatbot RAG truy xuất chính xác.
+            PDF scan (chỉ có ảnh) được nhận dạng chữ (OCR) tự động bằng AI, mất khoảng 1 giây mỗi trang và có tính chi phí AI.
           </p>
 
           <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
             {uploadError && <FormAlert tone="error">{uploadError}</FormAlert>}
+            {uploadDocMutation.isPending && (
+              <FormAlert tone="info">
+                Đang trích xuất văn bản và vector hoá tài liệu. Với sách dài hoặc PDF scan cần OCR, quá trình có thể mất vài phút — vui lòng giữ cửa sổ này.
+              </FormAlert>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor={uploadFileId} className="text-xs font-semibold text-on-surface">
@@ -671,8 +681,7 @@ export const AiRagPage: React.FC = () => {
       />
 
       <ServerMessageDialog message={conflict} onClose={() => setConflict(null)} />
-    </div>
+    </section>
   );
 };
 
-export default AiRagPage;

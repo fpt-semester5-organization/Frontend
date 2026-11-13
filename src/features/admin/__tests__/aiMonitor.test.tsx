@@ -183,7 +183,7 @@ describe('SCR-41 Giám sát AI', () => {
     expect(await screen.findByText('Đang có job đồng bộ chạy.')).toBeInTheDocument();
   });
 
-  it('không có lượt gọi AI trong kỳ: trạng thái rỗng thay cho biểu đồ', async () => {
+  it('không có lượt truy vấn API AI trong kỳ: trạng thái rỗng thay cho biểu đồ', async () => {
     mockApi(handler({ llmops: { data: { ...LLMOPS, usagePercent: 0, todayCostUsd: 0, series: [] } } }));
     renderWithProviders(<AdminAiPage />, ROUTE);
     expect(await screen.findByText('Chưa có dữ liệu chi phí')).toBeInTheDocument();
@@ -206,23 +206,23 @@ describe('SCR-41 Giám sát AI', () => {
     expect(screen.getByText('tranvanvip@gmail.com')).toBeInTheDocument();
   });
 
-  it('chuyển tab Nhật ký cuộc gọi (Logs): hiển thị bảng log, mở modal xem chi tiết lỗi', async () => {
+  it('chuyển tab Nhật ký truy vấn API AI: hiển thị bảng log, mở modal xem chi tiết lỗi', async () => {
     mockApi(handler());
     renderWithProviders(<AdminAiPage />, ROUTE);
 
-    await userEvent.click(await screen.findByRole('tab', { name: /Nhật ký cuộc gọi/ }));
-    expect(await screen.findByText('Nhật ký cuộc gọi AI (Request Logs)')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('tab', { name: /Nhật ký truy vấn API AI/ }));
+    expect(await screen.findByRole('heading', { name: 'Nhật ký truy vấn API AI' })).toBeInTheDocument();
     expect(screen.getByText('Lê Văn Lỗi')).toBeInTheDocument();
     expect(screen.getByText('Tủ lạnh AI', { selector: 'td span' })).toBeInTheDocument();
 
     // Mở modal xem chi tiết
-    const detailButtons = screen.getAllByRole('button', { name: /Xem chi tiết lượt gọi/ });
+    const detailButtons = screen.getAllByRole('button', { name: /Xem chi tiết lượt truy vấn/ });
     await userEvent.click(detailButtons[1]); // Lượt gọi 1000 có lỗi
-    expect(await screen.findByText('Chi tiết lượt gọi AI #1000')).toBeInTheDocument();
+    expect(await screen.findByText('Chi tiết lượt truy vấn API AI #1000')).toBeInTheDocument();
     expect(screen.getByText(/Gemini API rate limit exceeded/)).toBeInTheDocument();
 
     // Đóng modal
     await userEvent.click(screen.getAllByRole('button', { name: 'Đóng' })[0]);
-    expect(screen.queryByText('Chi tiết lượt gọi AI #1000')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chi tiết lượt truy vấn API AI #1000')).not.toBeInTheDocument();
   });
 });
