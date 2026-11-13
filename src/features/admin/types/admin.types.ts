@@ -82,6 +82,18 @@ export type FoodGroup = NonNullable<Row<Schemas['ListAdminIngredientsResponse'][
 export type AdminIngredient = DeepRequired<Row<Schemas['ListAdminIngredientsResponse']['data']>> & {
   imageUrl?: string | null;
   isLocked?: boolean;
+  /** Số ảnh ứng viên PENDING cắt từ ảnh tủ lạnh người dùng (BR-ADM-ING-02). */
+  candidateCount?: number;
+};
+/** GET /admin/ingredients/{id}/candidates — FN-ADM-12-CAND (OpenAPI chưa có). */
+export type IngredientCandidate = {
+  candidateId: number;
+  croppedImageUrl: string;
+  /** Độ tin cậy AI 0..1. */
+  confidenceScore: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  sessionId: number;
+  createdAt: string;
 };
 export type IngredientFilters = Query<'listAdminIngredients'> & {
   foodGroup?: string;

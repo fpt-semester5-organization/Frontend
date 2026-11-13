@@ -5,6 +5,8 @@ import {
   createAdminIngredient,
   listAdminDietarySchools,
   listAdminENumbers,
+  applyAdminIngredientCandidate,
+  listAdminIngredientCandidates,
   listAdminIngredients,
   listAllergens,
   replaceAdminIngredientAllergens,
@@ -33,6 +35,7 @@ export const masterDataKeys = {
   eNumberList: (filters: ENumberFilters) => [...masterDataKeys.eNumbers, filters] as const,
   ingredients: ['admin', 'ingredients'] as const,
   ingredientList: (filters: IngredientFilters) => [...masterDataKeys.ingredients, filters] as const,
+  ingredientCandidates: (id: number) => [...masterDataKeys.ingredients, 'candidates', id] as const,
   allergens: ['allergens'] as const,
 };
 
@@ -143,6 +146,25 @@ export function useUploadIngredientImage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, file }: { id: number; file: File }) => uploadAdminIngredientImage(id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: masterDataKeys.ingredients }),
+  });
+}
+
+/** FN-ADM-12-CAND: ảnh ứng viên cắt từ ảnh tủ lạnh người dùng, chờ Admin duyệt. */
+export function useIngredientCandidates(id: number | undefined) {
+  return useQuery({
+    queryKey: masterDataKeys.ingredientCandidates(id ?? 0),
+    queryFn: () => listAdminIngredientCandidates(id as number),
+    enabled: typeof id === 'number' && id > 0,
+    retry: retryServerErrorsOnce,
+  });
+}
+
+/** FN-ADM-12-APPLY (BR-ADM-ING-03): duyệt 01 ảnh ứng viên làm ảnh đại diện chính thức. */
+export function useApplyIngredientCandidate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, candidateId }: { id: number; candidateId: number }) => applyAdminIngredientCandidate(id, candidateId),
     onSuccess: () => qc.invalidateQueries({ queryKey: masterDataKeys.ingredients }),
   });
 }

@@ -43,6 +43,7 @@ import type {
   UpdateUserStatusResult,
   UploadNutritionDocumentPayload,
   WriteResult,
+  IngredientCandidate,
 } from '../types/admin.types';
 
 /** Bỏ tham số rỗng để URL gọn và Backend không nhận chuỗi rỗng (`?keyword=`). */
@@ -134,6 +135,16 @@ export const uploadAdminIngredientImage = (id: number, file: File) => {
     })
   );
 };
+
+/** GET /admin/ingredients/{id}/candidates — FN-ADM-12-CAND: tối đa 05 ảnh ứng viên PENDING từ tủ lạnh người dùng. */
+export const listAdminIngredientCandidates = (id: number) =>
+  unwrap<IngredientCandidate[]>(http.get(`/admin/ingredients/${id}/candidates`));
+
+/** POST /admin/ingredients/{id}/apply-candidate — FN-ADM-12-APPLY (BR-ADM-ING-03): Admin duyệt ảnh ứng viên làm ảnh đại diện. */
+export const applyAdminIngredientCandidate = (id: number, candidateId: number) =>
+  write<{ ingredientId: number; candidateId: number; imageUrl: string }>(
+    http.post(`/admin/ingredients/${id}/apply-candidate`, { candidateId }),
+  );
 
 /** POST /admin/allergens — FN-ADM-12. */
 export const createAdminAllergen = (body: CreateAllergenBody) =>

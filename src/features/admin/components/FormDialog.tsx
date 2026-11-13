@@ -9,6 +9,8 @@ interface FormDialogProps {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
   loading?: boolean;
+  /** Khóa nút lưu (vd. nguyên liệu đang bị Khóa — BR-ADM-ING-01). */
+  submitDisabled?: boolean;
   danger?: boolean;
   size?: 'sm' | 'lg';
   children: ReactNode;
@@ -22,6 +24,7 @@ export const FormDialog: React.FC<FormDialogProps> = ({
   onSubmit,
   submitLabel,
   loading = false,
+  submitDisabled = false,
   danger = false,
   size,
   children,
@@ -33,7 +36,7 @@ export const FormDialog: React.FC<FormDialogProps> = ({
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Hủy
         </Button>
-        <Button type="submit" variant={danger ? 'danger' : 'primary'} loading={loading}>
+        <Button type="submit" variant={danger ? 'danger' : 'primary'} loading={loading} disabled={submitDisabled}>
           {submitLabel}
         </Button>
       </div>
