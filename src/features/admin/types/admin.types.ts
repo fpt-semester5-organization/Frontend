@@ -127,16 +127,12 @@ export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResp
   featuresJson?: string | null;
   effectiveFrom?: string | null;
 };
-export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'] & { featuresJson?: string };
+export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'];
 export type UpdatePlanBody = {
   planName?: string;
   durationDays?: number;
   priceVnd?: number;
   isActive?: boolean;
-  /** Chỉ gửi khi đổi quyền lợi: Backend so chuỗi, khác là tạo phiên bản mới. */
-  featuresJson?: string;
-  /** Lý do ghi vào lịch sử phiên bản (≤ 255 ký tự). */
-  changeReason?: string;
 };
 
 /** GET /admin/subscription-plans/{id}/versions: lịch sử phiên bản của một gói, mới nhất trước. */

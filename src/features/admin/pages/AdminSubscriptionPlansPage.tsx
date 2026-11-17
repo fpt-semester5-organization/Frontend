@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -9,20 +9,11 @@ import { Button } from '@/components/ui/Button';
 import { FormAlert } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
-import { QUOTA } from '@/constants/quota';
 import { cn } from '@/lib/cn';
 import { formatNumber, formatVnd } from '@/lib/format';
 import { notifyInfo, notifySuccess } from '@/lib/notify';
 import { formatServerDateTime } from '@/lib/serverDate';
-import {
-  QUOTA_KEYS,
-  mergePlanQuotas,
-  parsePlanQuotas,
-  perThirtyDays,
-  quotaRows,
-  type PlanQuotas,
-} from '@/features/subscription/lib/benefits';
-import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
+import { QUOTA_KEYS, parsePlanQuotas, perThirtyDays, quotaRows } from '@/features/subscription/lib/benefits';
 import {
   AdminPageHeader,
   AdminQueryError,
@@ -47,7 +38,7 @@ import {
   useUpdatePlan,
 } from '../hooks/useAdminBilling';
 import { handleWriteError } from '../lib/writeError';
-import type { AdminPlan, UpdatePlanBody } from '../types/admin.types';
+import type { AdminPlan } from '../types/admin.types';
 
 const STORAGE_PLAN_ORDER_KEY = 'veggielife_vip_plans_order';
 const STORAGE_TAB_ORDER_KEY = 'veggielife_vip_tabs_order';
@@ -56,50 +47,22 @@ const positiveInt = (message: string) =>
   z.number({ invalid_type_error: message }).int('Phải là số nguyên').positive('Phải lớn hơn 0');
 const toNumber = (v: unknown) => (v === '' || v === null || v === undefined ? undefined : Number(v));
 
-/** Hạn mức VIP lưu trong Features_JSON của gói; Backend đọc số nguyên 32 bit nên chặn số quá lớn. */
-const quotaInt = (message: string) => positiveInt(message).max(1_000_000, 'Tối đa 1.000.000');
-const quotaFields = {
-  chatLimitDaily: quotaInt('Nhập số câu hỏi'),
-  mealPlanLimitWeekly: quotaInt('Nhập số thực đơn'),
-  fridgeScanLimitDaily: quotaInt('Nhập số ảnh'),
-};
-const QUOTA_FIELDS: { key: keyof PlanQuotas; label: string }[] = [
-  { key: 'chatLimitDaily', label: 'Hỏi Trợ lý AI (câu/ngày)' },
-  { key: 'mealPlanLimitWeekly', label: 'Tạo thực đơn tuần (lần/tuần)' },
-  { key: 'fridgeScanLimitDaily', label: 'Quét tủ lạnh (ảnh/ngày)' },
-];
-
-/** POST /admin/subscription-plans: planName ≤ 100 (duy nhất), durationDays > 0, priceVnd > 0, kèm quyền lợi của gói. */
+/** POST /admin/subscription-plans: planName ≤ 100 (duy nhất), durationDays > 0, priceVnd > 0. */
 const createPlanSchema = z.object({
   planName: z.string().trim().min(1, 'Nhập tên gói').max(100, 'Tên gói tối đa 100 ký tự'),
   durationDays: positiveInt('Nhập số ngày'),
   priceVnd: positiveInt('Nhập giá'),
-  ...quotaFields,
 });
 type CreatePlanValues = z.infer<typeof createPlanSchema>;
 
-/** PUT /admin/subscription-plans/{id}: Full Edit. Đổi tên, thời hạn, giá hoặc quyền lợi tạo phiên bản mới. */
+/** PUT /admin/subscription-plans/{id}: Full Edit. Đổi tên, thời hạn hoặc giá tạo phiên bản mới. */
 const editPlanSchema = z.object({
   planName: z.string().trim().min(1, 'Nhập tên gói').max(100, 'Tên gói tối đa 100 ký tự'),
   durationDays: positiveInt('Nhập số ngày'),
   priceVnd: positiveInt('Nhập giá'),
   isActive: z.boolean().default(true),
-  ...quotaFields,
-  changeReason: z.string().trim().max(255, 'Lý do tối đa 255 ký tự').optional(),
 });
 type EditPlanValues = z.infer<typeof editPlanSchema>;
-
-const numberOr = (value: unknown, fallback: number) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
-
-/** Hạn mức VIP đang cấu hình chung: dùng làm giá trị gợi ý khi gói chưa lưu hạn mức riêng. */
-function useVipQuotaDefaults(): Required<PlanQuotas> {
-  const { data } = usePublicSettings();
-  return {
-    chatLimitDaily: numberOr(data?.chatLimitDailyVip, QUOTA.chatPerDay.vip),
-    mealPlanLimitWeekly: numberOr(data?.mealPlanWeeklyLimitVip, QUOTA.mealPlanPerWeek.vip),
-    fridgeScanLimitDaily: numberOr(data?.fridgeScanLimitDailyVip, QUOTA.fridgeImagesPerDay.vip),
-  };
-}
 
 const planVersionLabel = (plan: AdminPlan) =>
   plan.version === undefined
@@ -115,51 +78,6 @@ function planQuotaHint(plan: AdminPlan) {
   if (count === 0) return 'Gói chưa lưu hạn mức riêng: người mua nhận hạn mức VIP trong "Chỉ số hệ thống" tại thời điểm sử dụng.';
   if (count < QUOTA_KEYS.length) return 'Hạn mức chưa lưu trong gói sẽ theo "Chỉ số hệ thống" tại thời điểm sử dụng.';
   return undefined;
-}
-
-/** Ba ô nhập hạn mức dùng chung cho hộp thoại tạo và sửa gói. */
-function QuotaInputs({
-  idPrefix,
-  field,
-  errors,
-}: {
-  idPrefix: string;
-  field: (key: keyof PlanQuotas) => UseFormRegisterReturn;
-  errors: Partial<Record<keyof PlanQuotas, { message?: string }>>;
-}) {
-  return (
-    <fieldset className="flex flex-col gap-2 rounded-xl border border-surface-container p-space-md">
-      <legend className="px-1 font-label-md text-label-md font-semibold text-on-surface">Quyền lợi người mua nhận được</legend>
-      {QUOTA_FIELDS.map(({ key, label }) => {
-        const id = `${idPrefix}-${key}`;
-        const error = errors[key]?.message;
-        return (
-          <div key={key} className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-space-md">
-              <label htmlFor={id} className="font-label-md text-label-md text-on-surface">
-                {label} <span className="text-secondary">*</span>
-              </label>
-              <input
-                id={id}
-                type="number"
-                min={1}
-                inputMode="numeric"
-                aria-invalid={!!error}
-                aria-describedby={error ? `${id}-err` : undefined}
-                className={cn(CONTROL, 'w-28 shrink-0 text-right')}
-                {...field(key)}
-              />
-            </div>
-            {error && (
-              <p id={`${id}-err`} role="alert" className="text-right font-label-sm text-label-sm text-error">
-                {error}
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </fieldset>
-  );
 }
 
 /** PUT /admin/subscription-plans/{id}: priceVnd > 0. */
@@ -567,7 +485,7 @@ const AdminSubscriptionPlansPage: React.FC = () => {
               </div>
             ) : (
               /* Dạng bảng chi tiết hỗ trợ quản trị */
-              <TableShell label="Danh sách gói VIP" minWidth="min-w-[1040px]">
+              <TableShell label="Danh sách gói VIP" minWidth="min-w-[880px]">
                 <thead>
                   <tr>
                     <th scope="col" className={TH}>Thứ tự</th>
@@ -575,7 +493,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
                     <th scope="col" className={`${TH} text-right`}>Thời hạn</th>
                     <th scope="col" className={`${TH} text-right`}>Giá</th>
                     <th scope="col" className={`${TH} text-right`}>Quy đổi 30 ngày</th>
-                    <th scope="col" className={TH}>Quyền lợi người mua</th>
                     <th scope="col" className={TH}>Phiên bản</th>
                     <th scope="col" className={TH}>Trạng thái</th>
                     <th scope="col" className={TH}><span className="sr-only">Thao tác</span></th>
@@ -628,19 +545,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
                         <td className={`${TD} text-right tabular-nums font-semibold`}>{formatVnd(plan.priceVnd)}</td>
                         <td className={`${TD} text-right tabular-nums text-on-surface-variant font-body-sm`}>
                           ≈ {formatVnd(per30)}
-                        </td>
-                        <td className={`${TD} font-body-sm text-body-sm`}>
-                          {planQuotaRows(plan).length > 0 ? (
-                            <ul className="flex flex-col gap-0.5">
-                              {planQuotaRows(plan).map(([label, value]) => (
-                                <li key={label}>
-                                  <span className="text-on-surface-variant">{label}:</span> <span className="font-semibold">{value}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-on-surface-variant">{planQuotaHint(plan) ? 'Theo Chỉ số hệ thống' : '—'}</span>
-                          )}
                         </td>
                         <td className={`${TD} font-body-sm text-body-sm`}>
                           {plan.version !== undefined ? (
@@ -784,7 +688,6 @@ const CreatePlanDialog: React.FC<{ show: boolean; onClose: () => void }> = ({ sh
   const [conflict, setConflict] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [previewFeatured, setPreviewFeatured] = useState(false);
-  const { chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily } = useVipQuotaDefaults();
 
   const {
     register,
@@ -796,16 +699,16 @@ const CreatePlanDialog: React.FC<{ show: boolean; onClose: () => void }> = ({ sh
     formState: { errors },
   } = useForm<CreatePlanValues>({
     resolver: zodResolver(createPlanSchema),
-    defaultValues: { planName: '', durationDays: 30, priceVnd: 49000, chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily },
+    defaultValues: { planName: '', durationDays: 30, priceVnd: 49000 },
   });
 
   useEffect(() => {
     if (show) {
       setFormError(null);
       setPreviewFeatured(false);
-      reset({ planName: '', durationDays: 30, priceVnd: 49000, chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily });
+      reset({ planName: '', durationDays: 30, priceVnd: 49000 });
     }
-  }, [show, reset, chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily]);
+  }, [show, reset]);
 
   const watchedPlanName = watch('planName');
   const watchedDurationDays = watch('durationDays');
@@ -813,10 +716,7 @@ const CreatePlanDialog: React.FC<{ show: boolean; onClose: () => void }> = ({ sh
 
   const submit = handleSubmit((values) => {
     setFormError(null);
-    const { chatLimitDaily: chat, mealPlanLimitWeekly: meal, fridgeScanLimitDaily: fridge, ...spec } = values;
-    // Quyền lợi lưu cùng gói để giao dịch chụp lại lúc mua; thiếu thì người mua trôi theo Chỉ số hệ thống.
-    const body = { ...spec, featuresJson: mergePlanQuotas(null, { chatLimitDaily: chat, mealPlanLimitWeekly: meal, fridgeScanLimitDaily: fridge }) };
-    create.mutate(body, {
+    create.mutate(values, {
       onSuccess: (res) => {
         notifySuccess(res.message || `Đã tạo gói ${values.planName}.`);
         onClose();
@@ -929,8 +829,6 @@ const CreatePlanDialog: React.FC<{ show: boolean; onClose: () => void }> = ({ sh
               </FormRow>
             </div>
 
-            <QuotaInputs idPrefix="create-plan" field={(key) => register(key, { setValueAs: toNumber })} errors={errors} />
-
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-surface-container bg-surface-container-low p-3 hover:bg-surface-container transition-colors">
               <input
                 type="checkbox"
@@ -944,7 +842,7 @@ const CreatePlanDialog: React.FC<{ show: boolean; onClose: () => void }> = ({ sh
             </label>
 
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Gói mới sẽ được mở bán ngay sau khi tạo và xuất hiện ở trang thanh toán VIP của người dùng. Người mua giữ đúng các quyền lợi trên đến khi gói hết hạn.
+              Gói mới sẽ được mở bán ngay sau khi tạo và xuất hiện ở trang thanh toán VIP của người dùng.
             </p>
           </div>
 
@@ -980,7 +878,6 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
   const [conflict, setConflict] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [previewFeatured, setPreviewFeatured] = useState(false);
-  const defaults = useVipQuotaDefaults();
 
   const {
     register,
@@ -988,27 +885,21 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
     reset,
     setError,
     watch,
-    formState: { errors, dirtyFields },
+    formState: { errors },
   } = useForm<EditPlanValues>({ resolver: zodResolver(editPlanSchema) });
 
   useEffect(() => {
     if (plan) {
       setFormError(null);
-      // Gói chưa lưu hạn mức nào thì gợi ý theo Chỉ số hệ thống (đúng mức người mua đang nhận).
-      const saved = parsePlanQuotas(plan.featuresJson);
       reset({
         planName: plan.planName,
         durationDays: plan.durationDays,
         priceVnd: plan.priceVnd,
         isActive: plan.isActive,
-        chatLimitDaily: saved?.chatLimitDaily ?? defaults.chatLimitDaily,
-        mealPlanLimitWeekly: saved?.mealPlanLimitWeekly ?? defaults.mealPlanLimitWeekly,
-        fridgeScanLimitDaily: saved?.fridgeScanLimitDaily ?? defaults.fridgeScanLimitDaily,
-        changeReason: '',
       });
       setPreviewFeatured(plan.durationDays >= 365);
     }
-  }, [plan, reset, defaults.chatLimitDaily, defaults.mealPlanLimitWeekly, defaults.fridgeScanLimitDaily]);
+  }, [plan, reset]);
 
   const watchedPlanName = watch('planName');
   const watchedDurationDays = watch('durationDays');
@@ -1018,16 +909,8 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
   const submit = handleSubmit((values) => {
     if (!plan) return;
     setFormError(null);
-    const { chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily, changeReason, ...spec } = values;
-    const nextQuotas = { chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily };
-    const saved = parsePlanQuotas(plan.featuresJson);
-    // Backend so chuỗi Features_JSON: chỉ gửi khi Admin thật sự đổi một hạn mức, tránh tạo phiên bản mới không cần thiết.
-    const quotasChanged = QUOTA_KEYS.some((key) => dirtyFields[key] && saved?.[key] !== nextQuotas[key]);
-    const body: UpdatePlanBody = { ...spec };
-    if (quotasChanged) body.featuresJson = mergePlanQuotas(plan.featuresJson, nextQuotas);
-    if (changeReason) body.changeReason = changeReason;
     update.mutate(
-      { id: plan.planId, body },
+      { id: plan.planId, body: values },
       {
         onSuccess: (res) => {
           notifySuccess(res.message || `Đã cập nhật gói ${values.planName}.`);
@@ -1036,7 +919,7 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
         onError: (error) => {
           const apiError = handleWriteError(error, {
             setError,
-            fields: ['planName', 'durationDays', 'priceVnd', 'isActive', 'changeReason'],
+            fields: ['planName', 'durationDays', 'priceVnd', 'isActive'],
             onConflict: setConflict,
           });
           if (apiError.status === 400 && apiError.details.length === 0) setFormError(apiError.message);
@@ -1097,24 +980,6 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
               </FormRow>
             </div>
 
-            <QuotaInputs idPrefix="edit-plan" field={(key) => register(key, { setValueAs: toNumber })} errors={errors} />
-
-            <FormRow
-              id="edit-plan-reason"
-              label="Lý do thay đổi"
-              error={errors.changeReason?.message}
-              hint="Ghi vào lịch sử phiên bản của gói (không bắt buộc)."
-            >
-              <input
-                id="edit-plan-reason"
-                maxLength={255}
-                placeholder="Ví dụ: Tăng hạn mức Trợ lý AI cho gói tháng"
-                aria-invalid={!!errors.changeReason}
-                className={CONTROL}
-                {...register('changeReason')}
-              />
-            </FormRow>
-
             <fieldset className="flex flex-col gap-1.5">
               <legend className="font-label-md text-label-md text-on-surface font-semibold mb-1">
                 Trạng thái hiển thị
@@ -1144,7 +1009,7 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
             </label>
 
             <FormAlert tone="info">
-              Đổi tên, thời hạn, giá hoặc quyền lợi sẽ tạo phiên bản mới của gói
+              Đổi tên, thời hạn hoặc giá sẽ tạo phiên bản mới của gói
               {plan?.version !== undefined ? ` (hiện là phiên bản ${plan.version})` : ''}. Chỉ đơn hàng tạo sau khi lưu theo
               thông số mới; người đã mua giữ nguyên giá, thời hạn và quyền lợi ghi trên biên lai (BR-ADM-PAY-001).
             </FormAlert>

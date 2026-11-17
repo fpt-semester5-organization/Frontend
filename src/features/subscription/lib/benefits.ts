@@ -82,16 +82,6 @@ export function parsePlanQuotas(json: string | null | undefined): PlanQuotas | n
   return Object.fromEntries(QUOTA_KEYS.map((key) => [key, read(QUOTA_KEY_NAMES[key])])) as PlanQuotas;
 }
 
-/**
- * Ghi ba hạn mức vào Features_JSON của gói, giữ nguyên các khóa khác (cờ đặc quyền, mô tả).
- * Bỏ khóa trùng nghĩa (khác hoa thường hoặc snake_case) để Backend không đọc nhầm giá trị cũ.
- */
-export function mergePlanQuotas(json: string | null | undefined, quotas: Required<PlanQuotas>): string {
-  const aliases = new Set(QUOTA_KEYS.flatMap((key) => QUOTA_KEY_NAMES[key].map((name) => name.toLowerCase())));
-  const kept = Object.entries(asObject(json) ?? {}).filter(([key]) => !aliases.has(key.toLowerCase()));
-  return JSON.stringify({ ...quotas, ...Object.fromEntries(kept) });
-}
-
 /** Dòng quyền lợi để hiển thị. Hỗ trợ fallback từ dynamic settings hoặc QUOTA mặc định. */
 export function benefitRows(
   benefits: { free?: TierBenefits; vip?: TierBenefits } | undefined,
