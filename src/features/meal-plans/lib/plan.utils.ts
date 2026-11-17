@@ -39,6 +39,15 @@ export function progress(plan: { slots: MealSlot[] }) {
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
+/**
+ * Hạn mức đổi món theo độ dài thực đơn, giống MealPlanService.CalculateScaledLimit của Backend:
+ * mức chuẩn 7 ngày (MEAL_SWAP_LIMIT_DRAFT / MEAL_SWAP_LIMIT_ACTIVE) quy đổi theo số ngày, làm tròn lên, tối thiểu 1.
+ */
+export function scaledSwapLimit(baseSevenDayLimit: number, durationDays: number): number {
+  const days = Math.min(30, Math.max(1, Math.trunc(durationDays) || 1));
+  return days === 7 ? baseSevenDayLimit : Math.max(1, Math.ceil((baseSevenDayLimit * days) / 7));
+}
+
 /** Giai đoạn chỉnh sửa hiện hành: nháp dùng hạn mức "trước kích hoạt", đang áp dụng dùng "sau kích hoạt" (FN-MEAL-03). */
 export function editsOfPhase(plan: Pick<MealPlanDetail, 'planStatus' | 'edits'>) {
   const post = plan.planStatus === 'ACTIVE' || plan.planStatus === 'ARCHIVED';

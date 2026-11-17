@@ -14,6 +14,7 @@ import { notifyApiError } from '@/lib/notify';
 import { downloadReceiptPdf } from '../api/subscription.api';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { usePaymentReceipt } from '../hooks/useSubscription';
+import { paidDurationDays } from '../lib/benefits';
 import { GATEWAY_LABEL, statusInfo, type PaymentReceipt } from '../types/subscription.types';
 
 const TONE = { ok: 'bg-primary-fixed text-on-primary-fixed', wait: 'bg-secondary-fixed text-on-secondary-fixed', bad: 'bg-error-container text-on-error-container' };
@@ -81,7 +82,7 @@ function ReceiptSheet({ receipt }: { receipt: PaymentReceipt }) {
 
       <Group id="receipt-plan" title="Gói dịch vụ">
         <Row label="Tên gói">{receipt.planName}</Row>
-        <Row label="Thời hạn">{receipt.durationDays} ngày</Row>
+        <Row label="Thời hạn">{paidDurationDays(receipt.vipStartsAt, receipt.vipEndsAt) ?? receipt.durationDays} ngày</Row>
         <Row label="Hiệu lực từ">{formatServerDateTime(receipt.vipStartsAt)}</Row>
         <Row label="Hiệu lực đến">{formatServerDateTime(receipt.vipEndsAt)}</Row>
       </Group>

@@ -12,13 +12,6 @@ export const QUOTA = {
   guestFeedPostsBeforePrompt: 5, // BR-GUEST-01: xem tới bài thứ 5 thì hiện popup đăng ký
 } as const;
 
-/** Giá seed gói VIP (D111) — Admin sửa được qua FN-ADM-13; giá thật lấy từ GET /vip-plans. */
-export const VIP_PLAN_SEED = [
-  { id: 'vip-30', days: 30, priceVnd: 49_000 },
-  { id: 'vip-90', days: 90, priceVnd: 129_000 },
-  { id: 'vip-365', days: 365, priceVnd: 449_000 },
-] as const;
-
 export const MEDICAL_DISCLAIMER =
   'Khuyến nghị mang tính chất tham khảo dinh dưỡng, vui lòng tham vấn ý kiến bác sĩ chuyên khoa đối với các bệnh lý nền.';
 

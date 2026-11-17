@@ -1,8 +1,13 @@
 import { QUOTA } from '@/constants/quota';
+import { parseServerDate } from '@/lib/format';
 import type { TierBenefits } from '../types/subscription.types';
 
-/** Tính năng chỉ VIP mới có (BR-PAY-SUB-03), ngoài các hạn mức trong `benefitRows`. */
-export const VIP_EXCLUSIVE_FEATURES = ['Xem calo chi tiết của thực đơn tuần', 'Xuất PDF thực đơn và danh sách đi chợ'];
+/**
+ * Tính năng chỉ VIP mới có (BR-PAY-SUB-03), ngoài các hạn mức trong `benefitRows`.
+ * Chỉ liệt kê tính năng Backend thực sự chặn theo VIP: GET /meal-plans/{id}/nutrition?level=DETAILED.
+ * Không quảng cáo xuất PDF thực đơn vì Backend chưa có GET /meal-plans/{id}/export.
+ */
+export const VIP_EXCLUSIVE_FEATURES = ['Xem calo chi tiết của thực đơn tuần'];
 
 export interface BenefitFallbackLimits {
   chatDailyLimitFree?: number;
@@ -47,6 +52,19 @@ export function benefitRows(
       ['Số lần được dùng tính năng Quét tủ lạnh', `${benefits?.vip?.fridgePhotosPerDay ?? defaultVipFridge} ảnh/ngày`],
     ] as [string, string][],
   };
+}
+
+/**
+ * Số ngày VIP đã mua, tính từ ngày hiệu lực ghi trên chính giao dịch (theo ngày UTC).
+ * Không dùng `durationDays` của biên lai vì Backend đọc giá trị đó từ gói hiện tại: Admin đổi thời hạn gói thì biên lai cũ đổi theo.
+ * Backend đặt hạn = ngày bắt đầu + số ngày của gói (làm tròn tới 23:59:59 UTC), nên hiệu số theo ngày UTC đúng bằng số ngày đã mua.
+ */
+export function paidDurationDays(startsAt: string | null | undefined, endsAt: string | null | undefined): number | null {
+  const start = parseServerDate(startsAt);
+  const end = parseServerDate(endsAt);
+  if (!start || !end || end <= start) return null;
+  const utcDay = (date: Date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return Math.round((utcDay(end) - utcDay(start)) / 86_400_000);
 }
 
 /** Giá quy đổi theo 30 ngày, suy ra từ dữ liệu API (không có số cứng). */

@@ -19,13 +19,19 @@ export const VipUpsellDialog: React.FC<{ show: boolean; onHide: () => void; titl
   message,
 }) => {
   const { data: publicSettings } = usePublicSettings();
+  // Hạn mức hiện hành do Admin cấu hình (GET /system/settings/public); QUOTA chỉ dùng khi chưa tải được cấu hình.
   const vipPlans = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
   const freePlans = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
+  const vipChat = publicSettings?.chatLimitDailyVip ?? QUOTA.chatPerDay.vip;
+  const freeChat = publicSettings?.chatLimitDailyFree ?? QUOTA.chatPerDay.free;
+  const vipFridge = publicSettings?.fridgeScanLimitDailyVip ?? QUOTA.fridgeImagesPerDay.vip;
+  const freeFridge = publicSettings?.fridgeScanLimitDailyFree ?? QUOTA.fridgeImagesPerDay.free;
 
   const benefits = [
     `Tạo tới ${vipPlans} thực đơn mỗi tuần (gói Free: ${freePlans})`,
+    `Hỏi Trợ lý AI tới ${vipChat} câu mỗi ngày (gói Free: ${freeChat})`,
+    `Quét tủ lạnh tới ${vipFridge} ảnh mỗi ngày (gói Free: ${freeFridge})`,
     'Xem calo từng món, từng bữa và so với mục tiêu mỗi ngày',
-    'Xuất thực đơn và danh sách đi chợ ra PDF để in',
   ];
 
   return (
