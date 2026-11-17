@@ -1,6 +1,8 @@
 /**
  * SCR-33 · subscription/MySubscription · `/me/subscription`   (FN-SUB-04: GET /users/me/subscription, guard RequireAuth)
- * Trạng thái VIP, hạn dùng, lịch sử giao dịch từ server; hạn mức Free/VIP lấy từ `benefits` của GET /subscription-plans.
+ * Trạng thái VIP, hạn dùng, lịch sử giao dịch từ server. Hạn mức lấy từ `features` của chính người dùng
+ * (VIP: theo bản chụp của gói đã mua, không đổi khi Admin sửa gói); Backend cũ chưa có `features` thì dùng
+ * `benefits` của GET /subscription-plans.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -10,7 +12,7 @@ import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { useMySubscription, useNow, usePlans, useVipClaimSync } from '../hooks/useSubscription';
-import { benefitRows } from '../lib/benefits';
+import { benefitRows, quotaRows } from '../lib/benefits';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { displayStatus, readPendingOrder, secondsLeft } from '../lib/pendingOrder';
 import { GATEWAY_LABEL, statusInfo } from '../types/subscription.types';
@@ -27,7 +29,8 @@ export function MySubscriptionPage() {
   const d = q.data;
   useVipClaimSync(d?.isVip);
   const rows = benefitRows(plans.data?.benefits, publicSettings);
-  const quotas = d?.isVip ? rows.vip : rows.free;
+  const quotas = d?.features ? quotaRows(d.features) : d?.isVip ? rows.vip : rows.free;
+  const purchasedVersion = d?.isVip && d.features?.isVip ? d.features.planVersion : undefined;
   const txs = [...(d?.transactions ?? [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   // Đơn đã lưu chỉ thôi theo dõi khi server báo kết thúc: danh sách có thể chưa có đơn vừa tạo (Backend cache 5 phút).
   const stored = useMemo(() => readPendingOrder(userId), [userId]);
@@ -72,13 +75,20 @@ export function MySubscriptionPage() {
               </section>
             )}
 
-            <section aria-label="Hạn mức hiện tại" className="grid grid-cols-1 gap-gutter sm:grid-cols-3">
-              {quotas.map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
-                  <p className="font-label-md text-label-md text-on-surface-variant">{label}</p>
-                  <p className="font-headline-sm text-headline-sm text-primary">{value}</p>
-                </div>
-              ))}
+            <section aria-label="Hạn mức hiện tại" className="flex flex-col gap-space-sm">
+              {purchasedVersion !== undefined && (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Hạn mức theo gói bạn đã mua (phiên bản {purchasedVersion}), giữ nguyên đến khi gói hết hạn kể cả khi gói được cập nhật.
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-gutter sm:grid-cols-3">
+                {quotas.map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+                    <p className="font-label-md text-label-md text-on-surface-variant">{label}</p>
+                    <p className="font-headline-sm text-headline-sm text-primary">{value}</p>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm">

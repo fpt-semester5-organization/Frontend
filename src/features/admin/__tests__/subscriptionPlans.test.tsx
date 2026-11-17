@@ -177,6 +177,105 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
     });
   });
 
+  describe('phiên bản gói và quyền lợi người mua (BR-PAY-SUB-01)', () => {
+    const PLAN_V2 = {
+      ...PLAN,
+      priceVnd: 59000,
+      version: 2,
+      effectiveFrom: '2026-11-17T09:23:28',
+      featuresJson: '{"chatLimitDaily":300,"mealPlanLimitWeekly":5,"fridgeScanLimitDaily":50,"adFree":true}',
+    };
+    const VERSIONS = [
+      { versionId: 4, planId: 1, version: 2, planName: 'VIP 1 tháng', price: 59000, durationDays: 30, featuresJson: PLAN_V2.featuresJson, effectiveFrom: '2026-11-17T09:23:28', effectiveTo: null, updatedByAdminId: 1, updatedByAdminName: 'Quản trị viên', changeReason: 'Tăng hạn mức AI', createdAt: '2026-11-17T09:23:28' },
+      { versionId: 2, planId: 1, version: 1, planName: 'VIP 1 tháng', price: 49000, durationDays: 30, featuresJson: '{"chatLimitDaily":200,"mealPlanLimitWeekly":3,"fridgeScanLimitDaily":30}', effectiveFrom: '2026-11-04T07:07:19', effectiveTo: '2026-11-17T09:23:28', updatedByAdminId: 1, updatedByAdminName: 'Quản trị viên', changeReason: null, createdAt: '2026-11-04T07:07:19' },
+    ];
+
+    it('thẻ gói hiện phiên bản hiện hành, quyền lợi người mua và mở được lịch sử phiên bản', async () => {
+      const calls = mockApi((req) => (req.url.endsWith('/versions') ? { data: VERSIONS } : { data: [PLAN_V2] }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      const card = await screen.findByRole('article', { name: 'VIP 1 tháng' });
+      expect(within(card).getByText('Phiên bản 2 · từ 17/11/2026 16:23')).toBeInTheDocument();
+      expect(within(card).getByText('Hỏi Trợ lý AI').nextElementSibling).toHaveTextContent('300 câu/ngày');
+      expect(within(card).getByText('Tạo thực đơn tuần').nextElementSibling).toHaveTextContent('5 lần/tuần');
+
+      await userEvent.click(within(card).getByRole('button', { name: 'Lịch sử phiên bản VIP 1 tháng' }));
+      const dialog = screen.getByRole('dialog');
+      const items = await within(dialog).findAllByRole('listitem');
+      expect(calls.some((c) => c.method === 'GET' && c.url === '/admin/subscription-plans/1/versions')).toBe(true);
+      expect(items).toHaveLength(2);
+      expect(within(items[0]).getByRole('heading', { name: 'Phiên bản 2' })).toBeInTheDocument();
+      expect(within(items[0]).getByText('Đang áp dụng')).toBeInTheDocument();
+      expect(within(items[0]).getByText('Lý do: Tăng hạn mức AI')).toBeInTheDocument();
+      expect(within(items[1]).getByText('200 câu/ngày')).toBeInTheDocument();
+      expect(within(items[1]).getByText(/Áp dụng từ 04\/11\/2026 14:07 đến 17\/11\/2026 16:23/)).toBeInTheDocument();
+      expect(within(items[1]).queryByText('Đang áp dụng')).not.toBeInTheDocument();
+    });
+
+    it('gói chưa lưu hạn mức riêng: nói rõ người mua theo Chỉ số hệ thống', async () => {
+      mockApi(() => ({ data: [{ ...PLAN, version: 1, effectiveFrom: '2026-11-04T07:07:19', featuresJson: null }] }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      const card = await screen.findByRole('article', { name: 'VIP 1 tháng' });
+      expect(within(card).getByText(/Gói chưa lưu hạn mức riêng/)).toBeInTheDocument();
+    });
+
+    it('sửa quyền lợi: gửi featuresJson giữ các khóa khác và lý do thay đổi; cảnh báo sẽ tạo phiên bản mới', async () => {
+      const calls = mockApi((req) =>
+        req.method === 'GET' ? { data: [PLAN_V2] } : { message: 'Đã cập nhật gói.', data: { planId: 1, priceVnd: 59000 } }
+      );
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      await userEvent.click(await screen.findByRole('button', { name: 'Sửa VIP 1 tháng' }));
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText(/tạo phiên bản mới của gói \(hiện là phiên bản 2\)/)).toBeInTheDocument();
+      const chat = within(dialog).getByRole('spinbutton', { name: /Hỏi Trợ lý AI/ });
+      expect(chat).toHaveValue(300);
+      await userEvent.clear(chat);
+      await userEvent.type(chat, '350');
+      await userEvent.type(within(dialog).getByRole('textbox', { name: /Lý do thay đổi/ }), 'Tăng hạn mức chat');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+
+      await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
+      const body = calls.find((c) => c.method === 'PUT')?.body as { featuresJson: string; changeReason: string };
+      expect(body.changeReason).toBe('Tăng hạn mức chat');
+      expect(JSON.parse(body.featuresJson)).toEqual({ chatLimitDaily: 350, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50, adFree: true });
+    });
+
+    it('sửa gói mà không đổi quyền lợi: không gửi featuresJson (Backend so chuỗi, gửi lại sẽ tạo phiên bản thừa)', async () => {
+      const calls = mockApi((req) =>
+        req.method === 'GET' ? { data: [PLAN_V2] } : { message: 'Đã cập nhật gói.', data: { planId: 1, priceVnd: 59000 } }
+      );
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      await userEvent.click(await screen.findByRole('button', { name: 'Sửa VIP 1 tháng' }));
+      const dialog = screen.getByRole('dialog');
+      await userEvent.clear(within(dialog).getByRole('textbox', { name: /^Tên gói/ }));
+      await userEvent.type(within(dialog).getByRole('textbox', { name: /^Tên gói/ }), 'VIP 1 tháng mới');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+
+      await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
+      const body = calls.find((c) => c.method === 'PUT')?.body;
+      expect(body).toMatchObject({ planName: 'VIP 1 tháng mới' });
+      expect(body).not.toHaveProperty('featuresJson');
+      expect(body).not.toHaveProperty('changeReason');
+    });
+
+    it('tạo gói: lưu quyền lợi vào featuresJson để giao dịch chụp lại lúc mua', async () => {
+      const calls = mockApi((req) => (req.method === 'GET' ? { data: [PLAN] } : { message: 'Đã tạo gói.', data: { planId: 2 } }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      expect(await screen.findByText('VIP 1 tháng')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /Thêm gói/ }));
+      const dialog = screen.getByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText(/Tên gói/), 'Gói VIP 6 Tháng');
+      const fridge = within(dialog).getByRole('spinbutton', { name: /Quét tủ lạnh/ });
+      await userEvent.clear(fridge);
+      await userEvent.type(fridge, '40');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo gói' }));
+
+      await waitFor(() => expect(calls.find((c) => c.method === 'POST')).toBeDefined());
+      const body = calls.find((c) => c.method === 'POST')?.body as { featuresJson: string };
+      // Hai ô không sửa giữ giá trị gợi ý theo hạn mức VIP chung (mặc định QUOTA khi chưa tải được Chỉ số hệ thống)
+      expect(JSON.parse(body.featuresJson)).toEqual({ chatLimitDaily: 200, mealPlanLimitWeekly: 3, fridgeScanLimitDaily: 40 });
+    });
+  });
+
   it('đã loại bỏ phần Đối soát giao dịch và dùng chuẩn từ Cấu hình gói VIP (không dùng gói thuê bao)', async () => {
     mockApi(() => ({ data: [PLAN] }));
     renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');

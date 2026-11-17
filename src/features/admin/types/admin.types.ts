@@ -118,14 +118,43 @@ export interface Allergen {
 
 // ---------- Gói VIP & đối soát (SCR-44: FN-ADM-13) ----------
 
-export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResponse']['data']>>;
-export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'];
+/**
+ * Gói VIP phía Admin. Backend e08f103 bổ sung phiên bản gói (BR-PAY-SUB-01): `version` tăng mỗi lần đổi tên, thời hạn,
+ * giá hoặc quyền lợi; `featuresJson` là quyền lợi người mua từ phiên bản này nhận được (chụp vào giao dịch lúc mua).
+ */
+export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResponse']['data']>> & {
+  version?: number;
+  featuresJson?: string | null;
+  effectiveFrom?: string | null;
+};
+export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'] & { featuresJson?: string };
 export type UpdatePlanBody = {
   planName?: string;
   durationDays?: number;
   priceVnd?: number;
   isActive?: boolean;
+  /** Chỉ gửi khi đổi quyền lợi: Backend so chuỗi, khác là tạo phiên bản mới. */
+  featuresJson?: string;
+  /** Lý do ghi vào lịch sử phiên bản (≤ 255 ký tự). */
+  changeReason?: string;
 };
+
+/** GET /admin/subscription-plans/{id}/versions: lịch sử phiên bản của một gói, mới nhất trước. */
+export interface AdminPlanVersion {
+  versionId: number;
+  planId: number;
+  version: number;
+  planName: string;
+  price: number;
+  durationDays: number;
+  featuresJson?: string | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  updatedByAdminId: number;
+  updatedByAdminName?: string | null;
+  changeReason?: string | null;
+  createdAt: string;
+}
 export type ReconcileAction = Schemas['ReconcileAdminPaymentRequest']['action'];
 export type ReconcileBody = Schemas['ReconcileAdminPaymentRequest'];
 export type ReconcileResult = DeepRequired<Schemas['ReconcileAdminPaymentResponse']['data']>;
