@@ -6,6 +6,7 @@ import type {
   AdminPaymentFilters,
   AdminPaymentTransaction,
   AdminPlan,
+  AdminPlanVersion,
   AdminSurveyFilters,
   AdminSurveyListResult,
   AdminUser,
@@ -161,7 +162,14 @@ export const listAdminPlans = () => unwrap<AdminPlan[]>(http.get('/admin/subscri
 /** POST /admin/subscription-plans — FN-ADM-13. */
 export const createAdminPlan = (body: CreatePlanBody) => write<{ planId: number }>(http.post('/admin/subscription-plans', body));
 
-/** PUT /admin/subscription-plans/{id} — FN-ADM-13: giá mới chỉ áp dụng cho đơn mới (BR-ADM-PAY-001). */
+/** GET /admin/subscription-plans/{id}/versions — lịch sử phiên bản gói (BR-PAY-SUB-01), mới nhất trước. */
+export const listAdminPlanVersions = (id: number) =>
+  unwrap<AdminPlanVersion[]>(http.get(`/admin/subscription-plans/${id}/versions`));
+
+/**
+ * PUT /admin/subscription-plans/{id} — FN-ADM-13: đổi tên, thời hạn, giá hoặc quyền lợi tạo phiên bản mới;
+ * chỉ đơn tạo sau khi lưu theo phiên bản mới, người đã mua giữ quyền lợi trên biên lai (BR-ADM-PAY-001, BR-PAY-SUB-01).
+ */
 export const updateAdminPlan = (id: number, body: UpdatePlanBody) =>
   write<{ planId: number; priceVnd: number }>(http.put(`/admin/subscription-plans/${id}`, body));
 

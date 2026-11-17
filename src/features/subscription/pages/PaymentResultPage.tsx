@@ -16,7 +16,7 @@ import { PATHS } from '@/routes/paths';
 import { useAuthStore } from '@/stores/auth.store';
 import { PageError, PageSkeleton } from '../components/SubStates';
 import { useMySubscription, useNow, usePlans } from '../hooks/useSubscription';
-import { VIP_EXCLUSIVE_FEATURES, benefitRows } from '../lib/benefits';
+import { VIP_EXCLUSIVE_FEATURES, benefitRows, quotaRows } from '../lib/benefits';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { clearPendingOrder, displayStatus, formatCountdown, readPendingOrder, secondsLeft } from '../lib/pendingOrder';
 import { refreshVipSessionClaims } from '../lib/sessionClaims';
@@ -105,7 +105,9 @@ export function PaymentResultPage() {
   const planName = tx?.planName || (order?.planName ?? (status === 'SUCCESS' ? sub.data?.plan?.planName : undefined));
   const plans = usePlans();
   const { data: publicSettings } = usePublicSettings();
-  const vipRows = benefitRows(plans.data?.benefits, publicSettings).vip;
+  // Quyền lợi của chính gói vừa mua (bản chụp lúc mua); Backend cũ chưa trả `features` thì dùng bảng quyền lợi chung.
+  const features = sub.data?.features;
+  const vipRows = features?.isVip ? quotaRows(features) : benefitRows(plans.data?.benefits, publicSettings).vip;
 
   return (
     <main className="min-h-screen w-full bg-background">

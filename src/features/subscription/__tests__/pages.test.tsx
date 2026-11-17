@@ -288,6 +288,20 @@ describe('PaymentResultPage (SCR-32)', () => {
     expect(screen.queryByText(/Chưa cập nhật được tài khoản/)).not.toBeInTheDocument();
   });
 
+  it('SUCCESS -> quyền lợi theo đúng gói vừa mua (features từ server), không theo bảng quyền lợi chung', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({
+      ...tx('SUCCESS'),
+      features: { isVip: true, planVersion: 2, chatLimitDaily: 300, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50 },
+    });
+    renderWithProviders(<PaymentResultPage />, '/vip/result?transactionId=3001');
+    const benefits = await screen.findByRole('region', { name: 'Quyền lợi VIP đã mở khóa' });
+    expect(within(benefits).getByText('300 câu/ngày')).toBeInTheDocument();
+    expect(within(benefits).getByText('5 lần/tuần')).toBeInTheDocument();
+    expect(within(benefits).getByText('50 ảnh/ngày')).toBeInTheDocument();
+    expect(within(benefits).queryByText('tối đa 200 câu/ngày')).not.toBeInTheDocument();
+    expect(within(benefits).getByText('Xem calo chi tiết của thực đơn tuần')).toBeInTheDocument();
+  });
+
   it('làm mới phiên thất bại -> báo rõ và thử lại được, không báo sai là chưa thanh toán', async () => {
     vi.mocked(api.getMySubscription).mockResolvedValue(tx('SUCCESS'));
     vi.mocked(refreshVipSessionClaims).mockResolvedValueOnce(false);
@@ -445,6 +459,29 @@ describe('PaymentReceiptPage (FN-SUB-04)', () => {
     expect(within(sheet).getByText('04/12/2026 06:59')).toBeInTheDocument();
   });
 
+  it('ghi phiên bản gói và quyền lợi chụp lúc mua (giữ đúng biên lai khi Admin sửa gói sau đó)', async () => {
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue({
+      ...receipt,
+      planVersion: 1,
+      snapshotFeaturesJson: '{"chatLimitDaily":200,"mealPlanLimitWeekly":3,"fridgeScanLimitDaily":30,"adFree":true}',
+    });
+    renderReceipt();
+    const sheet = await screen.findByRole('article');
+    expect(within(sheet).getByText('Phiên bản gói').nextElementSibling).toHaveTextContent('1');
+    const bought = within(sheet).getByRole('region', { name: 'Quyền lợi đã mua' });
+    expect(within(bought).getByText('Hỏi Trợ lý AI').nextElementSibling).toHaveTextContent('200 câu/ngày');
+    expect(within(bought).getByText('Tạo thực đơn tuần').nextElementSibling).toHaveTextContent('3 lần/tuần');
+    expect(within(bought).getByText('Quét tủ lạnh').nextElementSibling).toHaveTextContent('30 ảnh/ngày');
+  });
+
+  it('biên lai chưa có bản chụp quyền lợi (Backend cũ): không hiện mục Quyền lợi đã mua', async () => {
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
+    renderReceipt();
+    const sheet = await screen.findByRole('article');
+    expect(within(sheet).queryByRole('region', { name: 'Quyền lợi đã mua' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByText('Phiên bản gói')).not.toBeInTheDocument();
+  });
+
   it('thời hạn theo ngày hiệu lực của giao dịch: Admin đổi thời hạn gói không làm đổi biên lai cũ', async () => {
     // Backend trả durationDays của gói hiện tại (Admin đã đổi gói 1 tháng thành 90 ngày); giao dịch vẫn là 30 ngày.
     vi.mocked(api.getPaymentReceipt).mockResolvedValue({ ...receipt, durationDays: 90 });
@@ -586,6 +623,37 @@ describe('MySubscriptionPage (SCR-33)', () => {
     // Backend chặn mua gói mới khi VIP còn hạn nên không có nút Gia hạn dẫn tới đơn bị từ chối.
     expect(screen.queryByRole('link', { name: 'Gia hạn' })).not.toBeInTheDocument();
     expect(screen.getByText('Bạn có thể đăng ký gói mới sau khi gói hiện tại hết hạn.')).toBeInTheDocument();
+  });
+
+  it('VIP: hạn mức theo gói đã mua (features), nêu phiên bản và không đổi theo bảng quyền lợi chung', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({
+      isVip: true,
+      plan: plans.plans[1],
+      endsAt: '2026-12-17T23:59:59Z',
+      features: { isVip: true, planVersion: 1, chatLimitDaily: 150, mealPlanLimitWeekly: 2, fridgeScanLimitDaily: 25 },
+      transactions: [],
+    });
+    renderWithProviders(<MySubscriptionPage />);
+    const quotas = await screen.findByRole('region', { name: 'Hạn mức hiện tại' });
+    expect(within(quotas).getByText('150 câu/ngày')).toBeInTheDocument();
+    expect(within(quotas).getByText('2 lần/tuần')).toBeInTheDocument();
+    expect(within(quotas).getByText('25 ảnh/ngày')).toBeInTheDocument();
+    expect(within(quotas).getByText(/theo gói bạn đã mua \(phiên bản 1\)/)).toBeInTheDocument();
+    expect(within(quotas).queryByText('tối đa 200 câu/ngày')).not.toBeInTheDocument();
+  });
+
+  it('Thành viên: hạn mức Free từ features của server, không có dòng phiên bản', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({
+      isVip: false,
+      plan: null,
+      features: { isVip: false, planVersion: 0, chatLimitDaily: 15, mealPlanLimitWeekly: 1, fridgeScanLimitDaily: 8 },
+      transactions: [],
+    });
+    renderWithProviders(<MySubscriptionPage />);
+    const quotas = await screen.findByRole('region', { name: 'Hạn mức hiện tại' });
+    expect(within(quotas).getByText('15 câu/ngày')).toBeInTheDocument();
+    expect(within(quotas).getByText('8 ảnh/ngày')).toBeInTheDocument();
+    expect(within(quotas).queryByText(/phiên bản/)).not.toBeInTheDocument();
   });
 
   it('Free chưa có giao dịch: hạn mức Free + trạng thái rỗng', async () => {

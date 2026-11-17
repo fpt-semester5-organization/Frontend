@@ -5,6 +5,7 @@ import {
   createAdminPlan,
   deleteAdminPlan,
   listAdminPayments,
+  listAdminPlanVersions,
   listAdminPlans,
   reconcileAdminPayment,
   updateAdminPlan,
@@ -14,12 +15,24 @@ import type { AdminPaymentFilters, CreatePlanBody, ReconcileBody, UpdatePlanBody
 
 export const billingKeys = {
   plans: ['admin', 'subscription-plans'] as const,
+  /** Nằm dưới khóa `plans` nên sửa gói xong lịch sử phiên bản cũng được tải lại. */
+  planVersions: (planId: number | null) => ['admin', 'subscription-plans', planId, 'versions'] as const,
   payments: (filters?: AdminPaymentFilters) => ['admin', 'payments', filters ?? {}] as const,
   paymentsAll: ['admin', 'payments'] as const,
 };
 
 export function useAdminPlans() {
   return useQuery({ queryKey: billingKeys.plans, queryFn: listAdminPlans, retry: retryServerErrorsOnce });
+}
+
+/** Lịch sử phiên bản của một gói; chỉ tải khi mở hộp thoại lịch sử. */
+export function useAdminPlanVersions(planId: number | null) {
+  return useQuery({
+    queryKey: billingKeys.planVersions(planId),
+    queryFn: () => listAdminPlanVersions(planId as number),
+    enabled: planId !== null,
+    retry: retryServerErrorsOnce,
+  });
 }
 
 /** Đổi gói thì trang Gói VIP công khai (SCR-30) cũng cần tải lại. */

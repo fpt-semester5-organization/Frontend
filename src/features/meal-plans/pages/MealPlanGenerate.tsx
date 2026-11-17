@@ -25,6 +25,7 @@ import { QUOTA } from '@/constants/quota';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { listFridgeItems } from '@/features/fridge/api/fridge.api';
 import { useCurrentUser } from '@/features/profile/hooks/useProfile';
+import { useMySubscription } from '@/features/subscription/hooks/useSubscription';
 import { GENDER_OPTIONS, GOAL_OPTIONS, labelOf } from '@/features/profile/lib/healthMetrics';
 import { toApiError, type ApiError } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
@@ -60,6 +61,9 @@ const SECTION_TITLE = 'font-serif font-headline-sm text-headline-sm text-primary
 export const MealPlanGenerate: React.FC = () => {
   const navigate = useNavigate();
   const isVip = useAuthStore((state) => state.user?.isVip ?? false);
+  const signedIn = useAuthStore((state) => !!state.user);
+  // Hạn mức tuần của chính người dùng: VIP theo gói đã mua (bản chụp lúc mua), Free theo cấu hình chung.
+  const mySubscription = useMySubscription({ enabled: signedIn });
   const profile = useCurrentUser();
   const createPlan = useCreateMealPlan();
 
@@ -316,7 +320,7 @@ export const MealPlanGenerate: React.FC = () => {
   const { data: publicSettings } = usePublicSettings();
   const vipLimit = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
   const freeLimit = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
-  const limit = isVip ? vipLimit : freeLimit;
+  const limit = mySubscription.data?.features?.mealPlanLimitWeekly ?? (isVip ? vipLimit : freeLimit);
   // Lượt đổi món do Admin cấu hình cho thực đơn 7 ngày, Backend quy đổi theo số ngày đang chọn.
   const draftSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitDraft ?? QUOTA.mealsPerPlan, numberOfDays);
   const activeSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitActive ?? QUOTA.mealsPerPlan, numberOfDays);
