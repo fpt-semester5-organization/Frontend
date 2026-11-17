@@ -27,6 +27,7 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     icon: 'shuffle',
     min: 1,
     max: 100,
+    step: 7,
   },
   MEAL_SWAP_LIMIT_ACTIVE: {
     label: 'Đổi món khi Đang áp dụng',
@@ -34,6 +35,7 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     icon: 'change_circle',
     min: 1,
     max: 100,
+    step: 7,
   },
   MEAL_PLAN_WEEKLY_LIMIT_FREE: {
     label: 'Thực đơn tuần (Miễn phí)',
@@ -454,6 +456,11 @@ export const SystemSettingsTab: React.FC = () => {
                           </label>
                           <span className="text-[11px] text-on-surface-variant/75 font-mono">
                             Mặc định: {defaultVal}{meta?.unit ? ` ${meta.unit}` : ''}
+                            {(key === 'MEAL_SWAP_LIMIT_DRAFT' || key === 'MEAL_SWAP_LIMIT_ACTIVE') && Number(currentValue) > 0 && (
+                              <span className="ml-1 text-primary font-sans font-medium">
+                                (~{(Number(currentValue) / 7).toFixed(1)} lượt/ngày)
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>
