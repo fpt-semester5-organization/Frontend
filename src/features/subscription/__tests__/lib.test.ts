@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { VIP_EXCLUSIVE_FEATURES, benefitRows, mergePlanQuotas, paidDurationDays, parsePlanQuotas, perThirtyDays, quotaRows } from '../lib/benefits';
+import { VIP_EXCLUSIVE_FEATURES, benefitRows, paidDurationDays, parsePlanQuotas, perThirtyDays, quotaRows } from '../lib/benefits';
 import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, payosCheckoutUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { decodeJwtClaims } from '../lib/sessionClaims';
 import { checkoutSchema, parsePlanId } from '../schemas/checkout.schemas';
@@ -105,11 +105,6 @@ describe('benefits & claims', () => {
     expect(parsePlanQuotas('khong-phai-json')).toBeNull();
     expect(parsePlanQuotas('[1,2]')).toBeNull();
     expect(parsePlanQuotas(null)).toBeNull();
-  });
-  it('mergePlanQuotas ghi đè 3 hạn mức, bỏ khóa trùng nghĩa, giữ cờ đặc quyền và mô tả', () => {
-    const merged = JSON.parse(mergePlanQuotas('{"chat_limit_daily":100,"ChatLimitDaily":120,"adFree":true,"description":"V1"}', { chatLimitDaily: 300, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50 }));
-    expect(merged).toEqual({ chatLimitDaily: 300, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50, adFree: true, description: 'V1' });
-    expect(JSON.parse(mergePlanQuotas('hỏng', { chatLimitDaily: 1, mealPlanLimitWeekly: 2, fridgeScanLimitDaily: 3 }))).toEqual({ chatLimitDaily: 1, mealPlanLimitWeekly: 2, fridgeScanLimitDaily: 3 });
   });
   it('quotaRows chỉ có dòng cho hạn mức có giá trị; nhãn ngắn cho chỗ hẹp', () => {
     expect(quotaRows({ chatLimitDaily: 300, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50 })).toEqual([
