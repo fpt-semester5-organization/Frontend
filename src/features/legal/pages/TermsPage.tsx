@@ -481,7 +481,7 @@ export default function TermsPage() {
               </h2>
               <div className="space-y-3 font-body-md text-body-md text-on-surface-variant leading-relaxed">
                 <p>
-                  7.1. <strong>Gói hội viên VIP:</strong> VeggieLife cung cấp các gói nâng cấp VIP với quyền lợi mở rộng hạn mức AI, tạo thực đơn tuần không giới hạn và công thức độc quyền.
+                  7.1. <strong>Gói hội viên VIP:</strong> VeggieLife cung cấp các gói nâng cấp VIP với quyền lợi mở rộng hạn mức Trợ lý AI, quét tủ lạnh, số thực đơn tuần được tạo và xem calo chi tiết của thực đơn. Hạn mức cụ thể của từng thời kỳ được công bố tại trang Gói VIP.
                 </p>
                 <p>
                   7.2. <strong>Phương thức thanh toán:</strong> Mọi giao dịch được thanh toán bằng tiền đồng Việt Nam (VNĐ) qua các cổng thanh toán uy tín (MoMo, VietQR / chuyển khoản ngân hàng).

@@ -55,6 +55,14 @@ describe('PricingPage (SCR-30)', () => {
     expect(screen.getAllByRole('link', { name: 'Chọn gói' })[0]).toHaveAttribute('href', '/vip/checkout/1');
   });
 
+  it('VIP còn hạn: không cho chọn gói mới và nói rõ khi nào được đăng ký (Backend chặn ERR_VIP_ALREADY_ACTIVE)', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({ isVip: true, plan: plans.plans[1], endsAt: '2026-12-03T23:59:59', transactions: [] });
+    renderWithProviders(<PricingPage />);
+    expect(await screen.findByText(/còn hiệu lực đến 04\/12\/2026 06:59/)).toBeInTheDocument();
+    expect(await screen.findAllByText('Đang dùng VIP')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: 'Chọn gói' })).not.toBeInTheDocument();
+  });
+
   it('trạng thái lỗi có nút thử lại', async () => {
     vi.mocked(api.listPlans).mockRejectedValueOnce(apiError(500, 'ERR_SYS_DATABASE_UNAVAILABLE', 'Lỗi hệ thống'));
     renderWithProviders(<PricingPage />);
@@ -90,6 +98,17 @@ describe('CheckoutPage (SCR-31)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Tạo mã VietQR' }));
     expect(await screen.findByText('VL_1')).toBeInTheDocument();
   };
+
+  it('VIP còn hạn: không hiện bước chọn cổng, không tạo đơn, dẫn về Gói của tôi', async () => {
+    vi.mocked(api.getMySubscription).mockResolvedValue({ isVip: true, plan: plans.plans[1], endsAt: '2026-12-03T23:59:59', transactions: [] });
+    renderCheckout();
+    expect(await screen.findByText('Bạn đang có gói VIP còn hiệu lực')).toBeInTheDocument();
+    expect(screen.getByText(/đến 04\/12\/2026 06:59/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tạo mã VietQR' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xem gói của tôi' })).toHaveAttribute('href', '/me/subscription');
+    expect(screen.queryByText(/cộng dồn/)).not.toBeInTheDocument();
+    expect(api.checkout).not.toHaveBeenCalled();
+  });
 
   it('gói không tồn tại -> trạng thái không tìm thấy', async () => {
     renderCheckout('99');
@@ -263,7 +282,9 @@ describe('PaymentResultPage (SCR-32)', () => {
     expect(await screen.findByRole('status', { name: '' })).toHaveTextContent('Thanh toán thành công');
     const benefits = screen.getByRole('region', { name: 'Quyền lợi VIP đã mở khóa' });
     expect(within(benefits).getByText('tối đa 200 câu/ngày')).toBeInTheDocument();
-    expect(within(benefits).getByText('Xuất PDF thực đơn và danh sách đi chợ')).toBeInTheDocument();
+    expect(within(benefits).getByText('Xem calo chi tiết của thực đơn tuần')).toBeInTheDocument();
+    // Backend không có API xuất PDF thực đơn nên không được hứa quyền lợi này.
+    expect(within(benefits).queryByText(/PDF/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Chưa cập nhật được tài khoản/)).not.toBeInTheDocument();
   });
 
@@ -424,6 +445,15 @@ describe('PaymentReceiptPage (FN-SUB-04)', () => {
     expect(within(sheet).getByText('04/12/2026 06:59')).toBeInTheDocument();
   });
 
+  it('thời hạn theo ngày hiệu lực của giao dịch: Admin đổi thời hạn gói không làm đổi biên lai cũ', async () => {
+    // Backend trả durationDays của gói hiện tại (Admin đã đổi gói 1 tháng thành 90 ngày); giao dịch vẫn là 30 ngày.
+    vi.mocked(api.getPaymentReceipt).mockResolvedValue({ ...receipt, durationDays: 90 });
+    renderReceipt();
+    const sheet = await screen.findByRole('article');
+    expect(within(sheet).getByText('30 ngày')).toBeInTheDocument();
+    expect(within(sheet).queryByText('90 ngày')).not.toBeInTheDocument();
+  });
+
   it('In: mở hộp thoại in với tên file theo số biên lai rồi trả lại tiêu đề trang', async () => {
     vi.mocked(api.getPaymentReceipt).mockResolvedValue(receipt);
     let titleWhenPrinting = '';
@@ -553,6 +583,9 @@ describe('MySubscriptionPage (SCR-33)', () => {
     expect(screen.getByText('#3001')).toBeInTheDocument();
     expect(screen.getByText('tối đa 200 câu/ngày')).toBeInTheDocument();
     expect(screen.getByText('Thành công')).toBeInTheDocument();
+    // Backend chặn mua gói mới khi VIP còn hạn nên không có nút Gia hạn dẫn tới đơn bị từ chối.
+    expect(screen.queryByRole('link', { name: 'Gia hạn' })).not.toBeInTheDocument();
+    expect(screen.getByText('Bạn có thể đăng ký gói mới sau khi gói hiện tại hết hạn.')).toBeInTheDocument();
   });
 
   it('Free chưa có giao dịch: hạn mức Free + trạng thái rỗng', async () => {

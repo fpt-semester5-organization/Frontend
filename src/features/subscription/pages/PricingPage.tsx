@@ -4,15 +4,21 @@
  */
 import { Link } from 'react-router-dom';
 import { formatVnd } from '@/lib/format';
+import { formatServerDateTime } from '@/lib/serverDate';
 import { PATHS } from '@/routes/paths';
 import { selectIsVip, useAuthStore } from '@/stores/auth.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
-import { usePlans } from '../hooks/useSubscription';
+import { useMySubscription, usePlans } from '../hooks/useSubscription';
 import { benefitRows, perThirtyDays } from '../lib/benefits';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 
 export function PricingPage() {
-  const isVip = useAuthStore(selectIsVip);
+  const claimVip = useAuthStore(selectIsVip);
+  const signedIn = useAuthStore((s) => !!s.user);
+  // Backend chặn mua gói mới khi VIP còn hiệu lực (ERR_VIP_ALREADY_ACTIVE): trạng thái lấy từ server, JWT chỉ dùng khi chưa tải xong.
+  const sub = useMySubscription({ enabled: signedIn });
+  const isVip = sub.data ? sub.data.isVip : claimVip;
+  const vipEndsAt = sub.data?.isVip ? sub.data.endsAt : null;
   const q = usePlans();
   const { data: publicSettings } = usePublicSettings();
   const plans = (q.data?.plans ?? []).filter((p) => p.isActive).sort((a, b) => a.durationDays - b.durationDays);
@@ -26,9 +32,12 @@ export function PricingPage() {
           <h1 className="font-headline-lg text-headline-lg text-primary">Gói VIP</h1>
           <p className="font-body-md text-body-md text-on-surface-variant">Mở rộng hạn mức AI. Thanh toán qua MoMo hoặc VietQR.</p>
           {isVip && (
-            <Link to={PATHS.ME.SUBSCRIPTION} className="w-fit font-label-md text-label-md text-secondary hover:underline">
-              Bạn đang là VIP, xem gói của tôi
-            </Link>
+            <p role="status" className="rounded-lg bg-secondary-fixed px-space-md py-space-sm font-body-sm text-body-sm text-on-secondary-fixed">
+              Bạn đang có gói VIP còn hiệu lực{vipEndsAt ? ` đến ${formatServerDateTime(vipEndsAt)}` : ''}. Bạn có thể đăng ký gói mới sau khi gói hiện tại hết hạn.{' '}
+              <Link to={PATHS.ME.SUBSCRIPTION} className="font-label-md text-label-md underline underline-offset-2">
+                Xem gói của tôi
+              </Link>
+            </p>
           )}
         </header>
 
@@ -54,9 +63,15 @@ export function PricingPage() {
                       <p className="font-headline-lg text-headline-lg">{formatVnd(p.priceVnd)}</p>
                       <p className={`font-body-sm text-body-sm ${featured ? 'text-on-primary-container' : 'text-on-surface-variant'}`}>≈ {formatVnd(perThirtyDays(p.priceVnd, p.durationDays))} / 30 ngày</p>
                     </div>
-                    <Link to={PATHS.SUBSCRIPTION.CHECKOUT(p.planId)} className={`mt-auto rounded-lg px-4 py-3 text-center font-label-md text-label-md transition-colors ${featured ? 'bg-surface-container-lowest text-primary hover:bg-surface-container' : 'bg-primary-container text-on-primary hover:bg-primary'}`}>
-                      Chọn gói
-                    </Link>
+                    {isVip ? (
+                      <span aria-disabled="true" className={`mt-auto cursor-not-allowed rounded-lg px-4 py-3 text-center font-label-md text-label-md opacity-60 ${featured ? 'bg-surface-container-lowest text-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+                        Đang dùng VIP
+                      </span>
+                    ) : (
+                      <Link to={PATHS.SUBSCRIPTION.CHECKOUT(p.planId)} className={`mt-auto rounded-lg px-4 py-3 text-center font-label-md text-label-md transition-colors ${featured ? 'bg-surface-container-lowest text-primary hover:bg-surface-container' : 'bg-primary-container text-on-primary hover:bg-primary'}`}>
+                        Chọn gói
+                      </Link>
+                    )}
                   </article>
                 );
               })}

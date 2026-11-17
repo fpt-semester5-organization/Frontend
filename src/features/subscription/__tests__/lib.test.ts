@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { benefitRows, perThirtyDays } from '../lib/benefits';
+import { VIP_EXCLUSIVE_FEATURES, benefitRows, paidDurationDays, perThirtyDays } from '../lib/benefits';
 import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, payosCheckoutUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { decodeJwtClaims } from '../lib/sessionClaims';
 import { checkoutSchema, parsePlanId } from '../schemas/checkout.schemas';
@@ -88,6 +88,18 @@ describe('benefits & claims', () => {
     expect(rows.free[0][1]).toBe('20 câu/ngày');
   });
   it('perThirtyDays', () => expect(perThirtyDays(129000, 90)).toBe(43000));
+  it('paidDurationDays: số ngày đã mua lấy từ ngày hiệu lực của giao dịch', () => {
+    // Backend làm tròn hạn tới 23:59:59 UTC
+    expect(paidDurationDays('2026-11-03T10:00:00', '2026-12-03T23:59:59')).toBe(30);
+    expect(paidDurationDays('2026-11-17T00:00:30Z', '2027-02-15T23:59:59Z')).toBe(90);
+    // Dữ liệu cũ chưa làm tròn: hạn = bắt đầu + số ngày
+    expect(paidDurationDays('2026-10-05T10:00:00Z', '2026-11-04T10:00:00Z')).toBe(30);
+    expect(paidDurationDays(null, '2026-11-04T10:00:00Z')).toBeNull();
+    expect(paidDurationDays('2026-11-04T10:00:00Z', '2026-11-04T09:00:00Z')).toBeNull();
+  });
+  it('không quảng cáo xuất PDF thực đơn: Backend chưa có API này', () => {
+    expect(VIP_EXCLUSIVE_FEATURES.join(' ')).not.toMatch(/PDF/);
+  });
   it('decodeJwtClaims đọc role + isVip', () => {
     const t = `h.${b64({ role: 'VIP', isVip: true })}.s`;
     expect(decodeJwtClaims(t)).toEqual({ role: 'VIP', isVip: true });

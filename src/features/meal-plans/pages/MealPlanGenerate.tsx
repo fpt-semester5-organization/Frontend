@@ -38,6 +38,7 @@ import {
   todayInVietnam,
 } from '../lib/dates';
 import { BUDGET_LABEL, BUDGET_TIER_DETAILS } from '../lib/labels';
+import { scaledSwapLimit } from '../lib/plan.utils';
 import { generatePlanSchema, type GeneratePlanValues } from '../types/mealPlan.schemas';
 import type { BudgetTier } from '../types/mealPlan.types';
 import {
@@ -316,6 +317,9 @@ export const MealPlanGenerate: React.FC = () => {
   const vipLimit = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
   const freeLimit = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
   const limit = isVip ? vipLimit : freeLimit;
+  // Lượt đổi món do Admin cấu hình cho thực đơn 7 ngày, Backend quy đổi theo số ngày đang chọn.
+  const draftSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitDraft ?? QUOTA.mealsPerPlan, numberOfDays);
+  const activeSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitActive ?? QUOTA.mealsPerPlan, numberOfDays);
   const generating = createPlan.isPending;
 
   // Tính toán tiêu đề kế hoạch dạng chuẩn: "Thực đơn từ Thứ Hai 03/11/2026 đến Chủ Nhật 09/11/2026 (7 ngày)"
@@ -920,8 +924,9 @@ export const MealPlanGenerate: React.FC = () => {
                   <li className="flex items-start gap-space-xs">
                     <Icon name="swap_horiz" className="shrink-0 text-[18px] text-secondary" />
                     <span>
-                      Chỉnh sửa tối đa <strong className="text-on-surface">{QUOTA.mealsPerPlan} lần</strong> khi còn bản nháp
-                      và {QUOTA.mealsPerPlan} lần đổi món sau khi kích hoạt.
+                      Với thực đơn {numberOfDays} ngày: chỉnh sửa tối đa{' '}
+                      <strong className="text-on-surface">{draftSwapLimit} lần</strong> khi còn bản nháp và{' '}
+                      <strong className="text-on-surface">{activeSwapLimit} lần</strong> đổi món sau khi kích hoạt.
                     </span>
                   </li>
                   <li className="flex items-start gap-space-xs">

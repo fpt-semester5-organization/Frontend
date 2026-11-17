@@ -233,7 +233,7 @@ export const ChatPage: React.FC = () => {
   const displayName = authed
     ? user?.fullName || user?.email?.split('@')[0] || 'Thành viên VeggieLife'
     : 'Khách trải nghiệm';
-  const planName = !authed ? 'Khách' : isVip ? 'Pro' : 'Thành viên';
+  const planName = !authed ? 'Khách' : isVip ? 'VIP' : 'Thành viên';
   const initials = authed
     ? user?.fullName
       ? user.fullName

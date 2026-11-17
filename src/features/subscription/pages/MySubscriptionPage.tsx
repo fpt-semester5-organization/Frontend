@@ -55,7 +55,14 @@ export function MySubscriptionPage() {
                 <h2 className="font-headline-md text-headline-md text-primary">{d?.isVip ? (d.plan?.planName ?? 'VIP') : 'Thành viên'}</h2>
                 {d?.isVip && d.endsAt && <p className="font-body-sm text-body-sm text-on-surface-variant">Hết hạn lúc {formatServerDateTime(d.endsAt)}</p>}
               </div>
-              <Link to={PATHS.SUBSCRIPTION.PRICING} className="rounded-lg bg-primary-container px-5 py-2.5 text-center font-label-md text-label-md text-on-primary hover:bg-primary">{d?.isVip ? 'Gia hạn' : 'Nâng cấp VIP'}</Link>
+              {d?.isVip ? (
+                // Backend không cho mua gói mới khi VIP còn hiệu lực (ERR_VIP_ALREADY_ACTIVE), nên không có nút gia hạn.
+                <p className="max-w-[280px] font-body-sm text-body-sm text-on-surface-variant sm:text-right">
+                  Bạn có thể đăng ký gói mới sau khi gói hiện tại hết hạn.
+                </p>
+              ) : (
+                <Link to={PATHS.SUBSCRIPTION.PRICING} className="rounded-lg bg-primary-container px-5 py-2.5 text-center font-label-md text-label-md text-on-primary hover:bg-primary">Nâng cấp VIP</Link>
+              )}
             </section>
 
             {resumable && (

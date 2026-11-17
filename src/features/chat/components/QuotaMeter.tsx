@@ -10,6 +10,9 @@ interface QuotaMeterProps {
   unit: string;
   isVip?: boolean;
   isAuthenticated?: boolean;
+  /** Hạn mức câu/ngày của VIP và Thành viên do Admin cấu hình (CHAT_LIMIT_DAILY_VIP / _FREE); thiếu thì dùng QUOTA mặc định. */
+  vipDailyLimit?: number;
+  freeDailyLimit?: number;
 }
 
 export const QuotaMeter: React.FC<QuotaMeterProps> = ({
@@ -19,6 +22,8 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
   unit,
   isVip = false,
   isAuthenticated = false,
+  vipDailyLimit = QUOTA.chatPerDay.vip,
+  freeDailyLimit = QUOTA.chatPerDay.free,
 }) => {
   const percentage = Math.min(100, Math.max(0, Math.round((used / Math.max(1, limit)) * 100)));
   const isNearLimit = percentage >= 80;
@@ -49,7 +54,7 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
           to={PATHS.SUBSCRIPTION.PRICING}
           className="mt-0.5 inline-flex items-center gap-1 font-label-sm text-xs font-semibold text-primary transition hover:underline"
         >
-          <span>Nâng cấp VIP ({QUOTA.chatPerDay.vip} câu/ngày)</span>
+          <span>Nâng cấp VIP ({vipDailyLimit} câu/ngày)</span>
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">north_east</span>
         </Link>
       )}
@@ -58,7 +63,7 @@ export const QuotaMeter: React.FC<QuotaMeterProps> = ({
           to={PATHS.AUTH.REGISTER}
           className="mt-0.5 inline-flex items-center gap-1 font-label-sm text-xs font-semibold text-primary transition hover:underline"
         >
-          <span>Đăng ký để nhận 20 câu/ngày</span>
+          <span>Đăng ký để nhận {freeDailyLimit} câu/ngày</span>
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">north_east</span>
         </Link>
       )}
