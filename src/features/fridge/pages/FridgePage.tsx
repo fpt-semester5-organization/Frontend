@@ -23,11 +23,11 @@ import { FridgeScanner } from '@/components/FridgeScanner';
 import { useFridgeScanStore } from '../stores/fridgeScan.store';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  createFridgeItem,
   deleteFridgeItem,
   getLatestFridgeSession,
-  updateFridgeItem,
+  saveFridgeItemsBatch,
 } from '../api/fridge.api';
+import { formatSaveSummary, isNonVegetarianMeat, toBatchItems } from '../lib/fridgeBatch';
 import {
   fridgeKeys,
   useDeleteFridgeItem,
@@ -77,49 +77,6 @@ function cleanTechnicalCodes(text: string): string {
     .replace(/\s+\./g, '.')
     .replace(/\.\s*\./g, '.')
     .trim();
-}
-
-// Kiểm tra nguyên liệu có phải là đồ ăn mặn (thịt, cá, gia cầm, hải sản) cần loại trừ khỏi tủ lạnh chay
-function isNonVegetarianMeat(item: { name: string; foodGroup?: string | null; isRedMeat?: boolean }): boolean {
-  const name = (item.name || '').toLowerCase().trim();
-  if (
-    name.includes('chay') ||
-    name.includes('thực vật') ||
-    name.includes('thuần chay') ||
-    name.includes('vegan') ||
-    name.includes('plant-based') ||
-    name.includes('non-dairy')
-  ) {
-    return false;
-  }
-  // Trứng, sữa, nước uống, bánh ngọt KHÔNG PHẢI là đồ ăn mặn / thịt cá
-  if (
-    name.includes('trứng') || name.includes('hột gà') || name.includes('hột vịt') ||
-    name.includes('sữa') || name.includes('kem') || name.includes('phô mai') || name.includes('bơ') ||
-    name.includes('nước') || name.includes('trà') || name.includes('bánh')
-  ) {
-    return false;
-  }
-  if (item.isRedMeat) return true;
-  const fg = (item.foodGroup || '').toUpperCase().trim();
-  if (
-    fg.includes('RED_MEAT') || fg.includes('THỊT ĐỎ') ||
-    fg.includes('MEAT') || fg.includes('THỊT') ||
-    fg.includes('POULTRY') || fg.includes('GIA CẦM') ||
-    fg.includes('SEAFOOD') || fg.includes('HẢI SẢN') ||
-    fg.includes('THỦY HẢI SẢN') || fg.includes('FISH') || fg.includes('CÁ')
-  ) {
-    return true;
-  }
-  const meatKeywords = [
-    'thịt', 'bò', 'heo', 'lợn', 'gà', 'vịt', 'ngan', 'ngỗng', 'cừu', 'dê', 'bê',
-    'ba rọi', 'ba chỉ', 'sườn non', 'sườn heo', 'sườn bò', 'xương heo', 'xương bò',
-    'bò bít tết', 'beefsteak', 'beef', 'pork', 'chicken',
-    'cá ', 'cá hồi', 'cá thu', 'cá chép', 'cá lóc', 'cá tra', 'cá basa', 'cá ngừ', 'cá đuối', 'cá trích',
-    'tôm', 'cua', 'ghẹ', 'mực', 'bạch tuộc', 'hàu', 'sò', 'nghêu', 'ốc', 'sứa', 'hải sản',
-    'chả cá', 'chả lụa', 'giò lụa', 'xúc xích heo', 'xúc xích bò', 'lạp xưởng', 'pate gan', 'mỡ heo'
-  ];
-  return meatKeywords.some((k) => name.includes(k));
 }
 
 // Chuyển Blob/File thành Base64 Data URL để lưu trữ bền vững trong Zustand store
@@ -211,6 +168,8 @@ export const FridgePage: React.FC = () => {
   } = useFridgeScanStore();
 
   const [isSavingToFridge, setIsSavingToFridge] = useState(false);
+  // Câu tóm tắt kết quả lưu gần nhất (số liệu thật từ backend)
+  const [saveSummary, setSaveSummary] = useState<string | null>(null);
   const [editingDetectedIndex, setEditingDetectedIndex] = useState<number | null>(null);
   const [serverError, setServerError] = useState<{ message: string; isTooSmall: boolean } | null>(null);
   const [mainTab, setMainTab] = useState<'vision' | 'inventory'>('vision');
@@ -270,6 +229,7 @@ export const FridgePage: React.FC = () => {
             selectedFileName: `Lịch sử quét (${new Date(latest.createdAt).toLocaleDateString('vi-VN')})`,
             detectionResult: {
               saved: true,
+              sessionId: latest.sessionId,
               detected: enriched,
             },
             detectedItems: enriched,
@@ -470,56 +430,31 @@ export const FridgePage: React.FC = () => {
         clearDeletedInventoryIds();
       }
 
-      // 2. Cập nhật các mục đã có trong kho hoặc thêm mới các mục chưa có
-      let savedCount = 0;
-      const operations: Promise<unknown>[] = [];
-      for (const item of detectedItems) {
-        const itemDisplayName = item.quantity ? `${item.name} (${item.quantity})` : item.name;
-        const itemThumb = item.thumbnailUrl || getCachedThumbnail(item.name) || undefined;
-        if (item.inventoryId) {
-          operations.push(
-            updateFridgeItem(item.inventoryId, {
-              customItemName: itemDisplayName,
-              freshnessStatus: item.freshnessStatus,
-              thumbnailUrl: itemThumb,
-            })
-          );
-          savedCount++;
-        } else if (!isNonVegetarianMeat(item)) {
-          operations.push(
-            createFridgeItem({
-              ingredientId: item.ingredientId ?? undefined,
-              customItemName: itemDisplayName,
-              freshnessStatus: item.freshnessStatus,
-              thumbnailUrl: itemThumb,
-            })
-          );
-          savedCount++;
-        }
+      // 2. Lưu hàng loạt trong một giao dịch: backend gộp mục trùng nguyên liệu, ghi đè mục đã có, bỏ qua đồ mặn (D123)
+      const batchItems = toBatchItems(detectedItems, getCachedThumbnail);
+      if (batchItems.length === 0) {
+        await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
+        setIsSavedToFridge(true);
+        setSaveSummary(null);
+        toast.warning('Không có nguyên liệu thực vật nào để lưu trữ.');
+        return;
       }
 
-      if (operations.length > 0) {
-        await Promise.allSettled(operations);
-      }
+      const result = await saveFridgeItemsBatch(batchItems, detectionResult?.sessionId);
 
       // 3. Làm mới cache dữ liệu kho tủ lạnh
       await queryClient.invalidateQueries({ queryKey: fridgeKeys.all });
 
       setIsSavedToFridge(true);
-
-      if (savedCount === detectedItems.length && savedCount > 0) {
-        toast.success(`Đã lưu thành công cả ${savedCount} nguyên liệu vào tủ lạnh!`);
-      } else if (savedCount > 0) {
-        toast.success(
-          `Đã lưu ${savedCount}/${detectedItems.length} nguyên liệu vào tủ lạnh cá nhân.`
-        );
+      const summary = formatSaveSummary(result, detectedItems.length, detectedItems.length - batchItems.length);
+      setSaveSummary(summary);
+      if (result.created + result.updated > 0) {
+        toast.success(summary);
       } else {
-        toast.warning(
-          'Không có nguyên liệu nào khớp với danh mục nguyên liệu thực vật để lưu trữ.'
-        );
+        toast.warning('Không có nguyên liệu thực vật nào để lưu trữ.');
       }
-    } catch {
-      toast.error('Có lỗi xảy ra khi lưu vào tủ lạnh cá nhân. Vui lòng thử lại.');
+    } catch (err) {
+      toast.error(toApiError(err).message || 'Có lỗi xảy ra khi lưu vào tủ lạnh cá nhân. Vui lòng thử lại.');
     } finally {
       setIsSavingToFridge(false);
     }
@@ -952,7 +887,7 @@ export const FridgePage: React.FC = () => {
 
                 {/* KHU VỰC HÀNH ĐỘNG: LƯU VÀO TỦ LẠNH CÁ NHÂN & XEM KHO */}
                 <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-5 rounded-2xl border border-primary/25 bg-gradient-to-r from-emerald-500/10 via-primary-fixed/20 to-primary/10 p-5 sm:p-6 shadow-sm">
-                  <div className="flex items-center gap-3.5">
+                  <div className="flex min-w-0 flex-1 items-center gap-3.5 md:min-w-[18rem]">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-md">
                       <Icon name="kitchen" className="text-[28px]" />
                     </div>
@@ -962,7 +897,7 @@ export const FridgePage: React.FC = () => {
                       </h4>
                       <p className="font-body-sm text-xs sm:text-sm text-on-surface-variant">
                         {isSavedToFridge
-                          ? `Đã lưu thành công ${detectedItems.length} nguyên liệu vào kho tủ lạnh của bạn.`
+                          ? saveSummary ?? 'Kết quả nhận diện này đã được lưu vào kho tủ lạnh của bạn.'
                           : authed
                           ? `Đã nhận diện ${detectedItems.length} nguyên liệu. Bấm "Lưu vào tủ lạnh cá nhân" để đồng bộ lưu trữ và nhận gợi ý món ăn.`
                           : 'Bạn chưa đăng nhập. Vui lòng đăng nhập hoặc tạo tài khoản để lưu nguyên liệu vào kho tủ lạnh.'}
@@ -970,7 +905,7 @@ export const FridgePage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto justify-end">
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                     <Button
                       variant="secondary"
                       size="md"

@@ -4,6 +4,8 @@ import type {
   DetectionQuota,
   DetectedItem,
   DetectionResult,
+  FridgeBatchItem,
+  FridgeBatchSaveResult,
   Freshness,
   FridgeItem,
   IngredientOption,
@@ -55,6 +57,19 @@ export const createFridgeItem = (f: AddItemForm): Promise<FridgeItem> =>
       freshnessStatus: f.freshnessStatus ?? 'FRESH',
       thumbnailUrl: f.thumbnailUrl,
     }),
+  );
+
+/**
+ * FN-VIS-02 (D123) — POST /fridge/items/batch
+ * Lưu hàng loạt kết quả nhận diện trong một giao dịch: backend gộp mục trùng nguyên liệu,
+ * ghi đè dòng đã có, bỏ qua đồ mặn và trả số mục tạo mới / cập nhật / bỏ qua.
+ */
+export const saveFridgeItemsBatch = (
+  items: FridgeBatchItem[],
+  sessionId?: number | null,
+): Promise<FridgeBatchSaveResult> =>
+  unwrap<FridgeBatchSaveResult>(
+    http.post('/fridge/items/batch', { sessionId: sessionId ?? undefined, items }),
   );
 
 /**

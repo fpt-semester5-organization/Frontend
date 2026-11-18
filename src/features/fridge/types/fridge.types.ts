@@ -33,9 +33,27 @@ export interface DetectionQuota {
 
 export interface DetectionResult {
   saved: boolean;
+  /** Mã phiên nhận diện (chỉ Thành viên) — gửi lại khi lưu hàng loạt để gắn Session_ID. */
+  sessionId?: number | null;
   detected: DetectedItem[];
   warnings?: string[];
   quota?: DetectionQuota | null;
+}
+
+export interface FridgeBatchItem {
+  ingredientId?: number;
+  customItemName: string;
+  freshnessStatus: Freshness;
+  thumbnailUrl?: string;
+}
+
+export interface FridgeBatchSaveResult {
+  requested: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  items: FridgeItem[];
+  skippedItems: { name: string; reason: 'NON_VEGETARIAN' | 'INVALID_NAME' }[];
 }
 
 export interface RecipeSuggestion {
