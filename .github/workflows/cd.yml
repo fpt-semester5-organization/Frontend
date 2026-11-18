@@ -1,0 +1,120 @@
+name: Frontend CD (Deploy)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deployment target'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - cloud-run
+          - firebase
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT || 'veggielife-510817' }}
+  REGION: ${{ secrets.GCP_REGION || 'asia-southeast1' }}
+  SERVICE_NAME: veggielife-frontend
+  BACKEND_SERVICE_NAME: veggielife-backend
+
+jobs:
+  deploy-cloud-run:
+    name: Deploy to Google Cloud Run
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == 'cloud-run' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Compute Backend URL and Image Tag
+        id: config
+        run: |
+          PROJECT_NUMBER=$(gcloud projects describe ${{ env.PROJECT_ID }} --format='value(projectNumber)')
+          BE_URL="https://${{ env.BACKEND_SERVICE_NAME }}-${PROJECT_NUMBER}.${{ env.REGION }}.run.app"
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/veggielife/frontend:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/veggielife/frontend:latest"
+          echo "backend_url=${BE_URL}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "image_latest=${IMAGE_LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build \
+            --build-arg VITE_API_BASE_URL="${{ steps.config.outputs.backend_url }}/api/v1" \
+            --build-arg VITE_HUB_BASE_URL="${{ steps.config.outputs.backend_url }}" \
+            --build-arg VITE_GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --build-arg VITE_GOONG_MAPTILES_KEY="${{ secrets.GOONG_MAPTILES_KEY }}" \
+            -t "${{ steps.config.outputs.image }}" \
+            -t "${{ steps.config.outputs.image_latest }}" .
+          
+          docker push "${{ steps.config.outputs.image }}"
+          docker push "${{ steps.config.outputs.image_latest }}"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --project ${{ env.PROJECT_ID }} \
+            --region ${{ env.REGION }} \
+            --image "${{ steps.config.outputs.image }}" \
+            --port 8080 \
+            --memory 256Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 3 \
+            --allow-unauthenticated
+
+      - name: Show Service URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --project ${{ env.PROJECT_ID }} --region ${{ env.REGION }} --format='value(status.url)')
+          echo "Frontend successfully deployed to Cloud Run: $URL"
+
+  deploy-firebase:
+    name: Deploy to Firebase Hosting
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == 'firebase' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        env:
+          VITE_API_BASE_URL: https://${{ env.BACKEND_SERVICE_NAME }}-veggielife-510817.${{ env.REGION }}.run.app/api/v1
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_GOONG_MAPTILES_KEY: ${{ secrets.GOONG_MAPTILES_KEY }}
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        if: env.FIREBASE_SERVICE_ACCOUNT != ''
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VEGGIELIFE_510817 }}
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VEGGIELIFE_510817 }}
+          channelId: live
+          projectId: ${{ env.PROJECT_ID }}
