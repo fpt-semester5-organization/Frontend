@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -11,12 +11,18 @@ interface CameraScannerProps {
   paused: boolean;
   /** Bật camera ngay khi hiện (bấm "Quét sản phẩm khác" sau lần quét trước). */
   autoStart?: boolean;
+  /** Ảnh sản phẩm vừa quét: hiện ngay trong khung camera thay cho màn "Đã quét xong". */
+  productImage?: { src: string; alt: string } | null;
 }
 
 /** Khung quét bằng camera (ZXing). Lần đầu người dùng bấm "Bật camera" thì trình duyệt mới hỏi quyền. */
-export const CameraScanner: React.FC<CameraScannerProps> = ({ onDetected, onUnavailable, paused, autoStart }) => {
+export const CameraScanner: React.FC<CameraScannerProps> = ({ onDetected, onUnavailable, paused, autoStart, productImage }) => {
   const { videoRef, state, start, stop } = useBarcodeCamera(onDetected);
   const live = state === 'starting' || state === 'scanning';
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = !live && paused && !!productImage && !imageFailed;
+
+  useEffect(() => setImageFailed(false), [productImage?.src]);
 
   useEffect(() => {
     if (autoStart) void start();
@@ -58,7 +64,21 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onDetected, onUnav
           </div>
         )}
 
-        {!live && (
+        {showImage && productImage && (
+          <div data-testid="product-image-frame" className="absolute inset-0 flex items-center justify-center bg-surface-container-lowest p-space-sm">
+            <img
+              src={productImage.src}
+              alt={productImage.alt}
+              className="h-full w-full object-contain"
+              onError={() => setImageFailed(true)}
+            />
+            <span className="absolute right-2 bottom-2 rounded-full bg-inverse-surface/70 px-2 py-0.5 font-label-sm text-label-sm text-inverse-on-surface">
+              Ảnh: Open Food Facts
+            </span>
+          </div>
+        )}
+
+        {!live && !showImage && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-sm px-space-lg text-center text-inverse-on-surface">
             <Icon name="barcode_scanner" className="text-[48px] opacity-90" />
             <p className="font-label-lg text-label-lg">{paused ? 'Đã quét xong' : 'Quét mã vạch trên bao bì'}</p>

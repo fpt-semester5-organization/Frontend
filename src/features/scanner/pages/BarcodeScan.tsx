@@ -295,6 +295,11 @@ const BarcodeScan: React.FC = () => {
               paused={lookup.isPending || !!lookup.data}
               onDetected={(barcode) => runLookup(barcode, 'CAMERA_BARCODE')}
               onUnavailable={handleCameraUnavailable}
+              productImage={
+                lookup.data?.data?.imageUrl
+                  ? { src: lookup.data.data.imageUrl, alt: lookup.data.data.productName }
+                  : null
+              }
             />
           ) : (
             <ManualBarcodeForm
@@ -316,7 +321,8 @@ const BarcodeScan: React.FC = () => {
             </p>
           )}
 
-          {lookup.data?.data?.imageUrl && (
+          {/* Chế độ camera hiện ảnh ngay trong khung quét; nhập tay thì hiện khung ảnh riêng */}
+          {mode === 'manual' && lookup.data?.data?.imageUrl && (
             <div
               data-testid="product-image-frame"
               className="flex flex-col items-center justify-center overflow-hidden rounded-xl border border-surface-container bg-surface-container-low p-space-md shadow-xs"
