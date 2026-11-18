@@ -15,7 +15,7 @@ import type {
 } from '../types/mealPlan.types';
 
 /** AI sinh thực đơn ≤ 8 giây, Fallback ≤ 2 giây (FN-MEAL-01): chờ dư để không cắt ngang khi mạng chậm. */
-const GENERATE_TIMEOUT_MS = 30 * 1000;
+const GENERATE_TIMEOUT_MS = 110 * 1000; // dưới giới hạn 120 giây của proxy Vercel
 
 /** GET /meal-plans — FN-MEAL-02 Danh sách thực đơn của tôi, mới nhất trước. */
 export async function listMealPlans(params: { page: number; size: number }) {

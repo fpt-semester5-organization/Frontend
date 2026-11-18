@@ -36,3 +36,5 @@ plan-nvtamm/
 # Kiểm thử E2E (Playwright) nằm ngoài unit test; unit test *.test.ts(x), src/test/ và vitest.config.ts được commit
 *.spec.ts
 *.spec.tsx
+.vercel
+.env*

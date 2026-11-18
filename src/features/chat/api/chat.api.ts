@@ -11,7 +11,8 @@ import type {
 } from '../types/chat.types';
 import type { SurveyForm } from '../schemas/chat.schema';
 
-export const AI_TIMEOUT_MS = 25000;
+// Dưới giới hạn 120 giây của proxy Vercel (rewrite /api/* trong vercel.json).
+export const AI_TIMEOUT_MS = 110000;
 
 /** FN-CHAT-01 — POST /api/v1/chat/sessions (Khách & Thành viên) */
 export async function createChatSession(body: {
@@ -42,7 +43,7 @@ export async function listChatSessions(
   };
 }
 
-/** FN-CHAT-02 — POST /api/v1/chat/sessions/{id}/messages (RAG qua AI service, timeout 25s) */
+/** FN-CHAT-02 — POST /api/v1/chat/sessions/{id}/messages (RAG qua AI service, timeout 110s) */
 export async function sendChatMessage(sessionId: number, message: string): Promise<SendResult> {
   const res = await http.post<ApiEnvelope<SendResult>>(
     `/chat/sessions/${sessionId}/messages`,

@@ -13,7 +13,7 @@ import type { ApiEnvelope } from './types';
  * Các lời gọi phiên (refresh, Khách ẩn danh, đăng xuất cục bộ) đi qua instance axios THUẦN — không có interceptor —
  * để interceptor của `http` không thể tự gọi lại chính nó (không vòng lặp). Cookie HttpOnly (`refresh_token`, `guest_uuid`) cần withCredentials.
  */
-export const rawHttp = axios.create({ baseURL: API_BASE_URL, withCredentials: true, timeout: 15000 });
+export const rawHttp = axios.create({ baseURL: API_BASE_URL, withCredentials: true, timeout: 60000 });
 
 let refreshing: Promise<string> | null = null;
 
