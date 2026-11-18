@@ -218,8 +218,8 @@ describe('Nhật ký kiểm toán (SCR-40)', () => {
       ),
     );
     renderWithProviders(<AuditLogsPage />);
-    expect(await screen.findByText('USER_SANCTION')).toBeInTheDocument();
-    expect(screen.getByText('Xử phạt người dùng')).toBeInTheDocument();
+    expect(await screen.findByText('Xử phạt người dùng')).toBeInTheDocument();
+    expect(screen.getByText('Cảnh báo')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Xóa|Sửa/ })).not.toBeInTheDocument();
   });
 

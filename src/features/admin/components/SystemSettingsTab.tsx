@@ -7,7 +7,8 @@ import { notifyError, notifySuccess } from '@/lib/notify';
 import { AdminQueryError, CARD, CONTROL, TableSkeleton } from './AdminUi';
 import { LegalPdfPreviewModal, type LegalDocumentPreview } from './LegalPdfPreviewModal';
 import { uploadAdminNutritionDocument } from '../api/admin.api';
-import { useAdminSettings, useResetSetting, useUpdateSetting } from '../hooks/useAdminSettings';
+import { useAdminPlans } from '../hooks/useAdminBilling';
+import { VIP_PLAN_QUOTA_SETTING_KEYS, useAdminSettings, useResetSetting, useUpdateSetting } from '../hooks/useAdminSettings';
 import { handleWriteError } from '../lib/writeError';
 import type { SystemSetting } from '../types/admin.types';
 
@@ -22,7 +23,7 @@ interface SettingMeta {
 
 const SETTING_METAS: Record<string, SettingMeta> = {
   MEAL_SWAP_LIMIT_DRAFT: {
-    label: 'Đổi món khi Dự thảo',
+    label: 'Đổi món khi Chưa kích hoạt',
     unit: 'lần',
     icon: 'shuffle',
     min: 1,
@@ -38,7 +39,7 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     step: 7,
   },
   MEAL_PLAN_WEEKLY_LIMIT_FREE: {
-    label: 'Thực đơn tuần (Miễn phí)',
+    label: 'Thực đơn tuần (Thành viên)',
     unit: 'thực đơn',
     icon: 'date_range',
     min: 1,
@@ -51,13 +52,6 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     min: 1,
     max: 20,
   },
-  MEAL_SWAP_CALORIE_TOLERANCE_PERCENT: {
-    label: 'Sai số Calo khi đổi món',
-    unit: '%',
-    icon: 'percent',
-    min: 0,
-    max: 100,
-  },
   CHAT_LIMIT_DAILY_GUEST: {
     label: 'Chatbot / ngày (Khách vãng lai)',
     unit: 'câu',
@@ -66,7 +60,7 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     max: 50,
   },
   CHAT_LIMIT_DAILY_FREE: {
-    label: 'Chatbot / ngày (Miễn phí)',
+    label: 'Chatbot / ngày (Thành viên)',
     unit: 'câu',
     icon: 'chat_bubble',
     min: 0,
@@ -79,8 +73,15 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     min: 10,
     max: 1000,
   },
+  FRIDGE_SCAN_LIMIT_DAILY_GUEST: {
+    label: 'Quét tủ lạnh / ngày (Khách vãng lai)',
+    unit: 'lần',
+    icon: 'kitchen',
+    min: 0,
+    max: 50,
+  },
   FRIDGE_SCAN_LIMIT_DAILY_FREE: {
-    label: 'Quét tủ lạnh / ngày (Miễn phí)',
+    label: 'Quét tủ lạnh / ngày (Thành viên)',
     unit: 'lần',
     icon: 'kitchen',
     min: 0,
@@ -92,6 +93,27 @@ const SETTING_METAS: Record<string, SettingMeta> = {
     icon: 'camera_alt',
     min: 1,
     max: 200,
+  },
+  BARCODE_SCAN_LIMIT_DAILY_GUEST: {
+    label: 'Quét mã vạch / ngày (Khách vãng lai)',
+    unit: 'lần',
+    icon: 'barcode_scanner',
+    min: 0,
+    max: 50,
+  },
+  BARCODE_SCAN_LIMIT_DAILY_FREE: {
+    label: 'Quét mã vạch / ngày (Thành viên)',
+    unit: 'lần',
+    icon: 'barcode_scanner',
+    min: 0,
+    max: 500,
+  },
+  BARCODE_SCAN_LIMIT_DAILY_VIP: {
+    label: 'Quét mã vạch / ngày (VIP)',
+    unit: 'lần',
+    icon: 'barcode_scanner',
+    min: 1,
+    max: 1000,
   },
   LLMOPS_DAILY_BUDGET_USD: {
     label: 'Ngân sách AI tối đa / ngày',
@@ -140,18 +162,30 @@ interface SettingGroup {
   filter: (s: SystemSetting) => boolean;
 }
 
+/** Chỉ số không hiển thị cho Admin chỉnh (vẫn dùng giá trị trong DB/mặc định ở Backend). */
+const HIDDEN_SETTING_KEYS: ReadonlySet<string> = new Set(['MEAL_SWAP_CALORIE_TOLERANCE_PERCENT']);
+
 const GROUPS: SettingGroup[] = [
   {
     id: 'MEAL_PLAN',
-    title: 'Hạn mức Thực đơn & Đổi món',
+    title: 'Hạn mức Thực đơn, Đổi món & Chatbot',
     icon: 'restaurant_menu',
-    filter: (s) => (s.category || (s as any).Category) === 'MEAL_PLAN',
+    // Chatbot (CHAT_LIMIT_*) thuộc nhóm AI_QUOTA trong DB nhưng hiển thị cùng khung Thực đơn
+    filter: (s) => {
+      const cat = s.category || (s as any).Category;
+      const key: string = s.settingKey || (s as any).SettingKey;
+      return cat === 'MEAL_PLAN' || key.startsWith('CHAT_LIMIT_');
+    },
   },
   {
     id: 'AI_QUOTA',
-    title: 'Hạn mức AI Chatbot & Quét tủ lạnh',
-    icon: 'smart_toy',
-    filter: (s) => (s.category || (s as any).Category) === 'AI_QUOTA',
+    title: 'Hạn mức Quét tủ lạnh & Mã vạch',
+    icon: 'document_scanner',
+    filter: (s) => {
+      const cat = s.category || (s as any).Category;
+      const key: string = s.settingKey || (s as any).SettingKey;
+      return cat === 'AI_QUOTA' && !key.startsWith('CHAT_LIMIT_');
+    },
   },
   {
     id: 'LLMOPS',
@@ -195,6 +229,10 @@ export const SystemSettingsTab: React.FC = () => {
 
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
   const [resettingKey, setResettingKey] = useState<SystemSetting | null>(null);
+  // Lưu hạn mức VIP tạo phiên bản mới cho các gói (D121 Q1-B) nên cần Admin xác nhận
+  const [pendingVipSave, setPendingVipSave] = useState<{ key: string; value: string } | null>(null);
+  const { data: plans } = useAdminPlans();
+  const planCount = plans?.length;
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [previewingDoc, setPreviewingDoc] = useState<LegalDocumentPreview | null>(null);
 
@@ -222,6 +260,14 @@ export const SystemSettingsTab: React.FC = () => {
     const valueToSave = editingValues[key] !== undefined ? editingValues[key] : originalVal;
     if (valueToSave === originalVal) return;
 
+    if (VIP_PLAN_QUOTA_SETTING_KEYS.has(key)) {
+      setPendingVipSave({ key, value: valueToSave });
+      return;
+    }
+    saveValue(key, valueToSave);
+  };
+
+  const saveValue = (key: string, valueToSave: string) => {
     updateMutation.mutate(
       { key, body: { settingValue: valueToSave } },
       {
@@ -232,11 +278,18 @@ export const SystemSettingsTab: React.FC = () => {
             delete next[key];
             return next;
           });
+          setPendingVipSave(null);
         },
-        onError: (err) => handleWriteError(err),
+        onError: (err) => {
+          handleWriteError(err);
+          setPendingVipSave(null);
+        },
       }
     );
   };
+
+  const plansAffected = planCount === undefined ? 'mọi gói VIP' : `${planCount} gói VIP`;
+  const vipVersionNote = `Hạn mức VIP dùng chung cho ${plansAffected}: gói nào có hạn mức khác giá trị mới sẽ lên phiên bản mới. Người đã mua giữ quyền lợi ghi trên biên lai; chỉ người mua sau khi lưu nhận hạn mức mới.`;
 
   const confirmReset = () => {
     if (!resettingKey) return;
@@ -305,7 +358,10 @@ export const SystemSettingsTab: React.FC = () => {
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-space-md lg:grid-cols-2">
         {GROUPS.map((group) => {
-          const groupSettings = settings.filter(group.filter);
+          const groupSettings = settings
+            .filter((s) => group.filter(s) && !HIDDEN_SETTING_KEYS.has(getKey(s)))
+            // Khung Thực đơn: Thực đơn & Đổi món trước, Chatbot sau
+            .sort((a, b) => Number(getKey(a).startsWith('CHAT_LIMIT_')) - Number(getKey(b).startsWith('CHAT_LIMIT_')));
           if (groupSettings.length === 0) return null;
 
           const isLegalGroup = group.id === 'GENERAL';
@@ -543,7 +599,9 @@ export const SystemSettingsTab: React.FC = () => {
         title="Khôi phục giá trị mặc định?"
         message={
           resettingKey
-            ? `Khôi phục chỉ số "${SETTING_METAS[getKey(resettingKey)]?.label || getKey(resettingKey)}" về giá trị gốc (${getDefault(resettingKey)})?`
+            ? `Khôi phục chỉ số "${SETTING_METAS[getKey(resettingKey)]?.label || getKey(resettingKey)}" về giá trị gốc (${getDefault(resettingKey)})?${
+                VIP_PLAN_QUOTA_SETTING_KEYS.has(getKey(resettingKey)) ? ` ${vipVersionNote}` : ''
+              }`
             : ''
         }
         confirmLabel="Khôi phục"
@@ -551,6 +609,22 @@ export const SystemSettingsTab: React.FC = () => {
         loading={resetMutation.isPending}
         onConfirm={confirmReset}
         onCancel={() => !resetMutation.isPending && setResettingKey(null)}
+      />
+
+      {/* Dialog xác nhận lưu hạn mức VIP: tạo phiên bản mới cho các gói */}
+      <ConfirmDialog
+        show={!!pendingVipSave}
+        title="Lưu hạn mức VIP?"
+        message={
+          pendingVipSave
+            ? `Đổi "${SETTING_METAS[pendingVipSave.key]?.label || pendingVipSave.key}" thành ${pendingVipSave.value}. ${vipVersionNote}`
+            : ''
+        }
+        confirmLabel="Lưu và tạo phiên bản mới"
+        danger={false}
+        loading={updateMutation.isPending}
+        onConfirm={() => pendingVipSave && saveValue(pendingVipSave.key, pendingVipSave.value)}
+        onCancel={() => !updateMutation.isPending && setPendingVipSave(null)}
       />
 
       {/* Modal xem trước tệp tài liệu pháp lý / chính sách PDF hoặc ảnh trực tiếp */}

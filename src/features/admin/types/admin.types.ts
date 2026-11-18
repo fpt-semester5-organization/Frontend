@@ -133,6 +133,8 @@ export type UpdatePlanBody = {
   durationDays?: number;
   priceVnd?: number;
   isActive?: boolean;
+  /** Ghi vào Nhật ký kiểm toán và lịch sử phiên bản khi tên, thời hạn hoặc giá đổi. */
+  changeReason?: string | null;
 };
 
 /** GET /admin/subscription-plans/{id}/versions: lịch sử phiên bản của một gói, mới nhất trước. */
@@ -598,10 +600,14 @@ export interface VenueQuery {
 export interface AuditLog {
   auditId: number;
   actorUserId?: number | null;
+  actorName?: string | null;
+  actorAvatarUrl?: string | null;
   actorRole?: string;
   action: string;
   targetTable?: string;
   targetId?: string;
+  targetName?: string | null;
+  targetAvatarUrl?: string | null;
   note?: string;
   createdAt: string;
   oldValue?: string | null;

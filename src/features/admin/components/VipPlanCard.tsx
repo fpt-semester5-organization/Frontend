@@ -22,7 +22,6 @@ export interface VipPlanCardProps {
   quotaHint?: string;
   onHistory?: () => void;
   onEdit?: () => void;
-  onQuickPrice?: () => void;
   onToggle?: () => void;
   onDelete?: () => void;
   onMoveLeft?: () => void;
@@ -55,7 +54,6 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
   quotaHint,
   onHistory,
   onEdit,
-  onQuickPrice,
   onToggle,
   onDelete,
   onMoveLeft,
@@ -269,19 +267,6 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
             >
               <Icon name="edit" className="text-[16px]" />
               Sửa
-            </Button>
-            <Button
-              variant={featured ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={onQuickPrice}
-              aria-label={`Đổi giá ${planName}`}
-              className={cn(
-                'flex-1 min-w-[75px]',
-                featured && 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-              )}
-            >
-              <Icon name="payments" className="text-[16px]" />
-              Đổi giá
             </Button>
             <Button
               variant={featured ? 'secondary' : 'outline'}

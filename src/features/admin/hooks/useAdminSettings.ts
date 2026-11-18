@@ -7,11 +7,12 @@ import { retryServerErrorsOnce } from '../lib/endpoint';
 import type { UpdateSystemSettingBody } from '../types/admin.types';
 import { billingKeys } from './useAdminBilling';
 
-/** Ba hạn mức (VIP) của Chỉ số hệ thống dùng chung cho mọi gói VIP: đổi thì thẻ gói và trang Gói VIP phải tải lại. */
+/** Bốn hạn mức (VIP) của Chỉ số hệ thống dùng chung cho mọi gói VIP: đổi thì thẻ gói và trang Gói VIP phải tải lại. */
 export const VIP_PLAN_QUOTA_SETTING_KEYS: ReadonlySet<string> = new Set([
   'CHAT_LIMIT_DAILY_VIP',
   'MEAL_PLAN_WEEKLY_LIMIT_VIP',
   'FRIDGE_SCAN_LIMIT_DAILY_VIP',
+  'BARCODE_SCAN_LIMIT_DAILY_VIP',
 ]);
 
 export function useAdminSettings(category?: string) {

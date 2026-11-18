@@ -1,5 +1,6 @@
 import http from '@/api/http';
 import type { ApiEnvelope, Paged } from '@/api/types';
+import type { QuotaCounter } from '@/lib/guestQuota';
 import type { ProductScanResult, ScanHistoryItem, ScanHistoryParams, ScanMethod } from '../types/scanner.types';
 
 /**
@@ -9,6 +10,15 @@ import type { ProductScanResult, ScanHistoryItem, ScanHistoryParams, ScanMethod 
 export async function lookupBarcode(barcode: string, method: ScanMethod) {
   const res = await http.get<ApiEnvelope<ProductScanResult>>(`/products/barcode/${barcode}`, { params: { method } });
   return res.data;
+}
+
+/**
+ * GET /products/barcode/quota — lượt quét mã vạch hôm nay (đã dùng, tối đa, còn lại) của Khách hoặc Thành viên.
+ * Hạn mức do Admin cấu hình ở Chỉ số hệ thống (D122); VIP theo biên lai.
+ */
+export async function getBarcodeQuota(): Promise<QuotaCounter> {
+  const res = await http.get<ApiEnvelope<QuotaCounter>>('/products/barcode/quota');
+  return res.data.data;
 }
 
 /** Backend (develop, 18/10/2026) bọc trang trong data thay vì trả data[] + meta như OpenAPI. */

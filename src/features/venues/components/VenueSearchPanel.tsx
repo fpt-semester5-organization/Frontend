@@ -339,7 +339,7 @@ export const VenueSearchPanel: React.FC<VenueSearchPanelProps> = ({
                 </div>
               ) : (
                 <p className="font-body-xs text-body-xs text-on-surface-variant leading-relaxed">
-                  Khách vãng lai tìm trong bán kính {QUOTA.guest.mapRadiusKm} km, tối đa {QUOTA.guest.mapSearch} lượt có kết quả (BR-GUEST-03).{' '}
+                  Khách vãng lai tìm trong bán kính {QUOTA.guest.mapRadiusKm} km, tối đa {QUOTA.guest.mapSearch} lượt có kết quả.{' '}
                   <Link
                     to={withReturnUrl(PATHS.AUTH.LOGIN, `${location.pathname}${location.search}`)}
                     className="font-medium text-primary no-underline hover:underline"

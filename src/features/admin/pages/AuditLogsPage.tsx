@@ -154,7 +154,59 @@ const TARGET_TABLE_MAP: Record<string, string> = {
   DietarySchools: 'Trường phái chay',
   ENumbers: 'Phụ gia E-Number',
   Ingredients: 'Nguyên liệu',
+  Products: 'Sản phẩm',
 };
+
+const TARGET_ICON_MAP: Record<string, string> = {
+  Users: 'person',
+  Posts: 'article',
+  Recipes: 'restaurant_menu',
+  Products: 'inventory_2',
+  FoodCategories: 'category',
+  SystemSettings: 'tune',
+  SubscriptionPlans: 'workspace_premium',
+  PaymentTransactions: 'payments',
+  ViolationReports: 'gavel',
+  Comments: 'chat_bubble',
+  DietarySchools: 'nature_people',
+  ENumbers: 'science',
+  Ingredients: 'eco',
+};
+
+function AvatarWithFallback({
+  src,
+  alt,
+  iconName,
+  isCircle = true,
+}: {
+  src?: string | null;
+  alt: string;
+  iconName: string;
+  isCircle?: boolean;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const shapeClass = isCircle ? 'rounded-full' : 'rounded-lg';
+
+  if (!src || hasError) {
+    return (
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center ${shapeClass} bg-surface-container-high text-on-surface-variant border border-outline/15`}
+        title={alt}
+      >
+        <Icon name={iconName} className="text-[18px]" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className={`h-8 w-8 shrink-0 ${shapeClass} object-cover border border-outline/20 bg-surface-container-high`}
+    />
+  );
+}
 
 const ACTION_OPTIONS = [
   ['TOKEN_REUSE_DETECTED', 'Phát hiện tái sử dụng Token (Nguy cấp)'],
@@ -296,18 +348,36 @@ export function AuditLogsPage() {
         return;
       }
 
-      const headers = ['Mã log', 'Thời điểm', 'Mã tác nhân', 'Vai trò', 'Hành động', 'Mã enum', 'Đối tượng', 'Ghi chú'];
+      const headers = [
+        'Mã log',
+        'Thời điểm',
+        'Mã tác nhân',
+        'Tên tác nhân',
+        'Vai trò',
+        'Hành động',
+        'Mã enum',
+        'Bảng đối tượng',
+        'Mã đối tượng',
+        'Tên đối tượng',
+        'Ghi chú',
+      ];
       const rowsCsv = exportRows.map((r) => {
         const meta = getActionMeta(r.action);
         const target = formatTarget(r.targetTable, r.targetId);
+        const actorName = r.actorName || (r.actorUserId ? `Tài khoản #${r.actorUserId}` : 'Hệ thống');
+        const targetName = r.targetName || target;
+
         return [
           r.auditId,
           `"${formatDateTime(r.createdAt)}"`,
           r.actorUserId ? `#${r.actorUserId}` : 'Hệ thống',
+          `"${actorName.replace(/"/g, '""')}"`,
           r.actorRole || '—',
           `"${meta.label}"`,
           r.action,
-          `"${target}"`,
+          r.targetTable || '—',
+          r.targetId ? `#${r.targetId}` : '—',
+          `"${targetName.replace(/"/g, '""')}"`,
           `"${cleanMojibake(r.note).replace(/"/g, '""')}"`,
         ].join(',');
       });
@@ -407,23 +477,36 @@ export function AuditLogsPage() {
           emptyHint="Không có thao tác kiểm toán nào khớp với bộ lọc hiện tại."
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[950px] text-left">
+            <table className="w-full min-w-[850px] text-left">
               <thead className="bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">
                 <tr>
                   <th className="px-space-lg py-space-md font-semibold w-[150px]">Thời điểm</th>
-                  <th className="px-space-md py-space-md font-semibold w-[120px]">Mức độ</th>
-                  <th className="px-space-md py-space-md font-semibold w-[160px]">Người thực hiện</th>
-                  <th className="px-space-md py-space-md font-semibold min-w-[200px]">Hành động</th>
-                  <th className="px-space-md py-space-md font-semibold w-[170px]">Đối tượng</th>
-                  <th className="px-space-md py-space-md font-semibold">Ghi chú</th>
+                  <th className="px-space-md py-space-md font-semibold min-w-[200px]">Người thực hiện</th>
+                  <th className="px-space-md py-space-md font-semibold min-w-[180px]">Hành động</th>
+                  <th className="px-space-md py-space-md font-semibold min-w-[250px]">Nội dung & Mục tiêu</th>
                   <th className="px-space-md py-space-md font-semibold text-right w-[100px]">Chi tiết</th>
                 </tr>
               </thead>
               <tbody className="font-body-sm text-body-sm divide-y divide-surface-container-low">
                 {filteredRows.map((r) => {
                   const meta = getActionMeta(r.action);
-                  const targetText = formatTarget(r.targetTable, r.targetId);
+                  const targetCategory = r.targetTable ? (TARGET_TABLE_MAP[r.targetTable] ?? r.targetTable) : 'Đối tượng';
+                  const targetIcon = (r.targetTable && TARGET_ICON_MAP[r.targetTable]) || 'dns';
+                  const targetDisplayName = r.targetName || formatTarget(r.targetTable, r.targetId);
+                  const isUserTarget = r.targetTable === 'Users';
+
+                  const isSystemActor = !r.actorUserId || r.actorRole === 'SYSTEM';
+                  const actorDisplayName = r.actorName || (r.actorUserId ? `Tài khoản #${r.actorUserId}` : 'Hệ thống');
                   const cleanedNote = cleanMojibake(r.note);
+
+                  // Nhận diện thao tác tự thân (Login/Logout/Profile của chính mình) để tránh nhân đôi Avatar & Tên
+                  const isSelfAction =
+                    (r.targetTable === 'Users' && String(r.targetId) === String(r.actorUserId)) ||
+                    r.action === 'LOGIN' ||
+                    r.action === 'USER_LOGOUT' ||
+                    r.action === 'USER_REGISTERED' ||
+                    r.action === 'USER_ACTIVATED' ||
+                    !r.targetTable;
 
                   return (
                     <tr
@@ -432,49 +515,107 @@ export function AuditLogsPage() {
                         meta.severity === 'critical' ? 'bg-error-container/10' : ''
                       }`}
                     >
-                      {/* Thời điểm (Text sạch sẽ, không icon) */}
+                      {/* 1. Thời điểm */}
                       <td className="whitespace-nowrap px-space-lg py-space-md font-mono text-xs text-on-surface-variant">
                         {formatDateTime(r.createdAt)}
                       </td>
 
-                      {/* Mức độ (Severity) */}
-                      <td className="whitespace-nowrap px-space-md py-space-md">
-                        <StatusPill tone={meta.tone}>{meta.severityLabel}</StatusPill>
+                      {/* 2. Người thực hiện (Avatar tròn + Tên + Role + ID) */}
+                      <td className="px-space-md py-space-md">
+                        <div className="flex items-center gap-2.5">
+                          {isSystemActor ? (
+                            <div
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant border border-outline/15"
+                              title="Hệ thống tự động"
+                            >
+                              <Icon name="smart_toy" className="text-[18px]" />
+                            </div>
+                          ) : (
+                            <AvatarWithFallback
+                              src={r.actorAvatarUrl}
+                              alt={actorDisplayName}
+                              iconName="person"
+                              isCircle
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="truncate font-semibold text-on-surface" title={actorDisplayName}>
+                                {actorDisplayName}
+                              </span>
+                              {r.actorRole && (
+                                <StatusPill tone={r.actorRole === 'SYSTEM' ? 'neutral' : 'ok'}>
+                                  {ROLE_LABEL[r.actorRole] ?? r.actorRole}
+                                </StatusPill>
+                              )}
+                            </div>
+                            {r.actorUserId && (
+                              <div className="font-mono text-xs text-outline">
+                                #{r.actorUserId}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
-                      {/* Người thực hiện (KHÔNG DÙNG ICON, hiển thị ngang hàng thoáng đãng) */}
-                      <td className="whitespace-nowrap px-space-md py-space-md">
-                        <div className="inline-flex items-center gap-2">
-                          <span className="font-mono font-medium text-on-surface">
-                            {r.actorUserId ? `#${r.actorUserId}` : 'Hệ thống'}
+                      {/* 3. Hành động (Tên tiếng Việt + Badge mức độ nếu Cảnh báo/Nguy cấp) */}
+                      <td className="px-space-md py-space-md">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-on-surface leading-snug">
+                            {meta.label}
                           </span>
-                          {r.actorRole && (
-                            <StatusPill tone={r.actorRole === 'SYSTEM' ? 'neutral' : 'ok'}>
-                              {ROLE_LABEL[r.actorRole] ?? r.actorRole}
+                          {meta.severity !== 'info' && (
+                            <StatusPill tone={meta.tone}>
+                              {meta.severityLabel}
                             </StatusPill>
                           )}
                         </div>
                       </td>
 
-                      {/* Hành động (Text rõ ràng, không icon hộp vuông gây vỡ hàng) */}
+                      {/* 4. Nội dung & Mục tiêu (Tránh trùng lặp hình, hiển thị ngữ cảnh hoặc đối tượng) */}
                       <td className="px-space-md py-space-md">
-                        <div className="font-semibold text-on-surface leading-snug">{meta.label}</div>
-                        <div className="font-mono text-xs text-outline font-normal">{r.action}</div>
+                        {isSelfAction ? (
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container-high text-on-surface-variant border border-outline/15"
+                              title="Thao tác tài khoản cá nhân"
+                            >
+                              <Icon name="badge" className="text-[18px] text-outline" />
+                            </div>
+                            <div className="min-w-0 max-w-[340px]">
+                              <div
+                                className="truncate font-medium text-on-surface"
+                                title={cleanedNote !== '—' ? cleanedNote : meta.label}
+                              >
+                                {cleanedNote !== '—' ? cleanedNote : 'Thao tác trên tài khoản cá nhân'}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-outline font-mono">
+                                <span>Tài khoản cá nhân</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2.5">
+                            <AvatarWithFallback
+                              src={r.targetAvatarUrl}
+                              alt={targetDisplayName}
+                              iconName={targetIcon}
+                              isCircle={isUserTarget}
+                            />
+                            <div className="min-w-0 max-w-[340px]">
+                              <div className="truncate font-semibold text-on-surface" title={targetDisplayName}>
+                                {targetDisplayName}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant font-mono">
+                                <span>{targetCategory}</span>
+                                {r.targetId && <span className="text-outline">#{r.targetId}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </td>
 
-                      {/* Đối tượng tác động (Text sạch sẽ, không icon) */}
-                      <td className="whitespace-nowrap px-space-md py-space-md font-mono text-xs text-on-surface-variant">
-                        {targetText}
-                      </td>
-
-                      {/* Ghi chú */}
-                      <td className="max-w-[320px] px-space-md py-space-md text-on-surface-variant">
-                        <span className="line-clamp-2" title={cleanedNote}>
-                          {cleanedNote}
-                        </span>
-                      </td>
-
-                      {/* Nút xem chi tiết */}
+                      {/* 5. Nút xem chi tiết */}
                       <td className="whitespace-nowrap px-space-md py-space-md text-right">
                         <button
                           type="button"
