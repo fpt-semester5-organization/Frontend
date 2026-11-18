@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { MEDICAL_DISCLAIMER, QUOTA } from '@/constants/quota';
+import { useMySubscription } from '@/features/subscription/hooks/useSubscription';
 import { toApiError } from '@/lib/apiError';
 import { formatDateTime } from '@/lib/format';
 import { notifySuccess, notifyInfo, notifyApiError, getErrorMessage } from '@/lib/notify';
@@ -113,6 +114,8 @@ export const ChatPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const isVip = !!user?.isVip;
+  // VIP: hạn mức theo biên lai (snapshot) khi /chat/quota chưa trả về
+  const mySubscription = useMySubscription({ enabled: authed && isVip });
   const guestAi = useGuestStore((s) => s.quota?.ai);
   const memberQuota = useChatQuota();
   const { data: publicSettings } = usePublicSettings();
@@ -201,7 +204,7 @@ export const ChatPage: React.FC = () => {
 
   const limit = !authed
     ? (guestAi?.limit ?? dynamicGuestLimit)
-    : (memberQuota.data?.limit ?? (isVip ? dynamicVipLimit : dynamicFreeLimit));
+    : (memberQuota.data?.limit ?? (isVip ? (mySubscription.data?.features?.chatLimitDaily ?? dynamicVipLimit) : dynamicFreeLimit));
   const used = !authed ? (guestAi?.used ?? 0) : (memberQuota.data?.used ?? 0);
   const unit = authed ? 'câu' : 'lượt';
   const quotaLabel = authed ? 'Lượt hỏi hôm nay' : 'Lượt dùng thử miễn phí';
@@ -233,7 +236,7 @@ export const ChatPage: React.FC = () => {
   const displayName = authed
     ? user?.fullName || user?.email?.split('@')[0] || 'Thành viên VeggieLife'
     : 'Khách trải nghiệm';
-  const planName = !authed ? 'Khách' : isVip ? 'Pro' : 'Thành viên';
+  const planName = !authed ? 'Khách' : isVip ? 'VIP' : 'Thành viên';
   const initials = authed
     ? user?.fullName
       ? user.fullName

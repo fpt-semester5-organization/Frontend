@@ -189,7 +189,7 @@ export const TopSpendersCard: React.FC<TopSpendersCardProps> = ({
               <EmptyState
                 icon="savings"
                 title="Chưa có dữ liệu tiêu thụ"
-                description="Chưa có tài khoản nào phát sinh lượt gọi AI trong khoảng thời gian này."
+                description="Chưa có tài khoản nào phát sinh lượt truy vấn API AI trong khoảng thời gian này."
               />
             </div>
           ) : (

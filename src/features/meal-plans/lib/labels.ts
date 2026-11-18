@@ -45,11 +45,49 @@ export const STATUS_CLASS: Record<PlanStatus, string> = {
   CANCELLED: 'bg-error-container text-error border border-error/20 font-medium',
 };
 
-/** Mức ngân sách (D72). */
-export const BUDGET_OPTIONS: { value: BudgetTier; label: string; description: string; icon: string }[] = [
-  { value: 'ECONOMICAL', label: 'Tiết kiệm', description: 'Nguyên liệu phổ biến, dễ mua ở chợ.', icon: 'savings' },
-  { value: 'STANDARD', label: 'Tiêu chuẩn', description: 'Cân bằng giữa chi phí và độ đa dạng.', icon: 'balance' },
-  { value: 'PREMIUM', label: 'Cao cấp', description: 'Thêm hạt, nấm quý và món cầu kỳ hơn.', icon: 'diamond' },
+export interface BudgetOption {
+  value: BudgetTier;
+  label: string;
+  priceRange: string;
+  description: string;
+  suggestedIngredients: string;
+  icon: string;
+  badge?: string;
+}
+
+/** Mức ngân sách (D72): Chi tiết hóa số tiền và gợi ý nguyên liệu đi kèm. */
+export const BUDGET_TIER_DETAILS: Record<BudgetTier, BudgetOption> = {
+  ECONOMICAL: {
+    value: 'ECONOMICAL',
+    label: 'Tiết kiệm',
+    priceRange: '~30k - 50k',
+    description: 'Nguyên liệu bình dân, dễ mua ở chợ địa phương, tối ưu chi phí sinh hoạt.',
+    suggestedIngredients: 'Đậu hũ, rau muống, nấm rơm, rau củ theo mùa, các loại đậu hạt cơ bản',
+    icon: 'savings',
+  },
+  STANDARD: {
+    value: 'STANDARD',
+    label: 'Tiêu chuẩn',
+    priceRange: '~60k - 100k',
+    description: 'Cân bằng hoàn hảo giữa chi phí, dinh dưỡng và độ đa dạng thực đơn.',
+    suggestedIngredients: 'Nấm tươi (đùi gà, đông cô), đậu hũ non, hạt sen, bông cải xanh, rong biển',
+    icon: 'balance',
+    badge: 'Mặc định',
+  },
+  PREMIUM: {
+    value: 'PREMIUM',
+    label: 'Cao cấp',
+    priceRange: '>120k',
+    description: 'Thực phẩm dinh dưỡng thượng hạng, nguyên liệu hữu cơ và nấm quý bổ dưỡng.',
+    suggestedIngredients: 'Hạt dinh dưỡng cao cấp (óc chó, macca), nấm quý (bụng dê, linh chi), đồ hữu cơ',
+    icon: 'diamond',
+  },
+};
+
+export const BUDGET_OPTIONS: BudgetOption[] = [
+  BUDGET_TIER_DETAILS.ECONOMICAL,
+  BUDGET_TIER_DETAILS.STANDARD,
+  BUDGET_TIER_DETAILS.PREMIUM,
 ];
 
 export const BUDGET_LABEL: Record<BudgetTier, string> = {

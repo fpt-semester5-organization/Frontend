@@ -116,11 +116,16 @@ export function useSwapMealSlot(planId: number) {
       const { slot, swapsRemaining } = res.data;
       queryClient.setQueryData<MealPlanDetail>(mealPlanKeys.detail(planId), (plan) => {
         if (!plan) return plan;
-        const edits =
-          plan.planStatus === 'DRAFT'
-            ? { ...plan.edits, preDeployUsed: plan.edits.preDeployLimit - swapsRemaining }
-            : { ...plan.edits, postDeployUsed: plan.edits.postDeployLimit - swapsRemaining };
-        return { ...plan, edits, slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)) };
+        const isDraft = plan.planStatus === 'DRAFT';
+        const edits = isDraft
+          ? { ...plan.edits, preDeployUsed: plan.edits.preDeployUsed + 1 }
+          : { ...plan.edits, postDeployUsed: plan.edits.postDeployUsed + 1 };
+        return {
+          ...plan,
+          edits,
+          swapsRemaining,
+          slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)),
+        };
       });
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.nutrition(planId) });
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.swapHistory(slot.slotId) });
@@ -138,11 +143,16 @@ export function useSwapMealSlotByNote(planId: number) {
       const { slot, swapsRemaining } = res.data;
       queryClient.setQueryData<MealPlanDetail>(mealPlanKeys.detail(planId), (plan) => {
         if (!plan) return plan;
-        const edits =
-          plan.planStatus === 'DRAFT'
-            ? { ...plan.edits, preDeployUsed: plan.edits.preDeployLimit - swapsRemaining }
-            : { ...plan.edits, postDeployUsed: plan.edits.postDeployLimit - swapsRemaining };
-        return { ...plan, edits, slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)) };
+        const isDraft = plan.planStatus === 'DRAFT';
+        const edits = isDraft
+          ? { ...plan.edits, preDeployUsed: plan.edits.preDeployUsed + 1 }
+          : { ...plan.edits, postDeployUsed: plan.edits.postDeployUsed + 1 };
+        return {
+          ...plan,
+          edits,
+          swapsRemaining,
+          slots: plan.slots.map((item) => (item.slotId === slot.slotId ? slot : item)),
+        };
       });
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.nutrition(planId) });
       void queryClient.invalidateQueries({ queryKey: mealPlanKeys.swapHistory(slot.slotId) });

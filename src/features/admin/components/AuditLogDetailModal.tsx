@@ -111,26 +111,63 @@ export const AuditLogDetailModal: React.FC<AuditLogDetailModalProps> = ({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Thông tin cốt lõi */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Tác nhân thực hiện */}
             <div className="rounded-xl border border-surface-container bg-surface-container-low/40 p-3.5">
               <span className="font-label-sm text-label-sm text-on-surface-variant">Tác nhân thực hiện</span>
-              <div className="mt-1 flex items-center gap-2">
-                <Icon name={log.actorRole === 'SYSTEM' ? 'smart_toy' : 'person'} className="text-[20px] text-primary" />
-                <span className="font-semibold text-on-surface">
-                  {log.actorUserId ? `Tài khoản #${log.actorUserId}` : 'Hệ thống tự động'}
-                </span>
-                {log.actorRole && (
-                  <StatusPill tone={log.actorRole === 'SYSTEM' ? 'neutral' : 'ok'}>
-                    {ROLE_LABEL[log.actorRole] ?? log.actorRole}
-                  </StatusPill>
+              <div className="mt-2 flex items-center gap-3">
+                {log.actorAvatarUrl ? (
+                  <img
+                    src={log.actorAvatarUrl}
+                    alt={log.actorName || 'Actor'}
+                    className="h-9 w-9 shrink-0 rounded-full object-cover border border-outline/20 bg-surface-container-high"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant border border-outline/15">
+                    <Icon name={log.actorRole === 'SYSTEM' ? 'smart_toy' : 'person'} className="text-[20px]" />
+                  </div>
                 )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-on-surface truncate">
+                      {log.actorName || (log.actorUserId ? `Tài khoản #${log.actorUserId}` : 'Hệ thống tự động')}
+                    </span>
+                    {log.actorRole && (
+                      <StatusPill tone={log.actorRole === 'SYSTEM' ? 'neutral' : 'ok'}>
+                        {ROLE_LABEL[log.actorRole] ?? log.actorRole}
+                      </StatusPill>
+                    )}
+                  </div>
+                  {log.actorUserId && (
+                    <p className="font-mono text-xs text-outline">Mã người dùng: #{log.actorUserId}</p>
+                  )}
+                </div>
               </div>
             </div>
 
+            {/* Đối tượng tác động */}
             <div className="rounded-xl border border-surface-container bg-surface-container-low/40 p-3.5">
               <span className="font-label-sm text-label-sm text-on-surface-variant">Đối tượng tác động</span>
-              <div className="mt-1 flex items-center gap-2 font-mono text-on-surface">
-                <Icon name="dns" className="text-[18px] text-outline" />
-                <span className="font-semibold">{targetLabel}</span>
+              <div className="mt-2 flex items-center gap-3">
+                {log.targetAvatarUrl ? (
+                  <img
+                    src={log.targetAvatarUrl}
+                    alt={log.targetName || targetLabel}
+                    className={`h-9 w-9 shrink-0 ${log.targetTable === 'Users' ? 'rounded-full' : 'rounded-lg'} object-cover border border-outline/20 bg-surface-container-high`}
+                  />
+                ) : (
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center ${log.targetTable === 'Users' ? 'rounded-full' : 'rounded-lg'} bg-surface-container-high text-on-surface-variant border border-outline/15`}>
+                    <Icon name={log.targetTable === 'Users' ? 'person' : 'dns'} className="text-[20px]" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-semibold text-on-surface truncate" title={log.targetName || targetLabel}>
+                    {log.targetName || targetLabel}
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono text-xs text-outline">
+                    <span>{log.targetTable || 'Đối tượng'}</span>
+                    {log.targetId && <span>#{log.targetId}</span>}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -14,6 +14,7 @@ import { notifyApiError } from '@/lib/notify';
 import { downloadReceiptPdf } from '../api/subscription.api';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { usePaymentReceipt } from '../hooks/useSubscription';
+import { paidDurationDays, parsePlanQuotas, quotaRows } from '../lib/benefits';
 import { GATEWAY_LABEL, statusInfo, type PaymentReceipt } from '../types/subscription.types';
 
 const TONE = { ok: 'bg-primary-fixed text-on-primary-fixed', wait: 'bg-secondary-fixed text-on-secondary-fixed', bad: 'bg-error-container text-on-error-container' };
@@ -61,6 +62,8 @@ function Group({ id, title, children }: { id: string; title: string; children: R
 
 function ReceiptSheet({ receipt }: { receipt: PaymentReceipt }) {
   const status = statusInfo(receipt.status);
+  // Quyền lợi chụp lại lúc mua: người mua giữ đúng các hạn mức này tới khi hết hạn dù Admin sửa gói sau đó.
+  const purchasedQuotas = quotaRows(parsePlanQuotas(receipt.snapshotFeaturesJson) ?? {}, { short: true });
   return (
     <article aria-labelledby="receipt-title" className="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm print:rounded-none print:p-0 print:shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-space-md border-b border-outline-variant/40 pb-space-md">
@@ -81,10 +84,19 @@ function ReceiptSheet({ receipt }: { receipt: PaymentReceipt }) {
 
       <Group id="receipt-plan" title="Gói dịch vụ">
         <Row label="Tên gói">{receipt.planName}</Row>
-        <Row label="Thời hạn">{receipt.durationDays} ngày</Row>
+        {receipt.planVersion !== undefined && <Row label="Phiên bản gói">{receipt.planVersion}</Row>}
+        <Row label="Thời hạn">{paidDurationDays(receipt.vipStartsAt, receipt.vipEndsAt) ?? receipt.durationDays} ngày</Row>
         <Row label="Hiệu lực từ">{formatServerDateTime(receipt.vipStartsAt)}</Row>
         <Row label="Hiệu lực đến">{formatServerDateTime(receipt.vipEndsAt)}</Row>
       </Group>
+
+      {purchasedQuotas.length > 0 && (
+        <Group id="receipt-benefits" title="Quyền lợi đã mua">
+          {purchasedQuotas.map(([label, value]) => (
+            <Row key={label} label={label}>{value}</Row>
+          ))}
+        </Group>
+      )}
 
       <Group id="receipt-payment" title="Giao dịch">
         <Row label="Mã giao dịch" mono>#{receipt.transactionId}</Row>

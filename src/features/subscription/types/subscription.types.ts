@@ -9,6 +9,10 @@ export interface Plan {
   durationDays: number;
   priceVnd: number;
   isActive: boolean;
+  /** Phiên bản đang bán; ở gói đang dùng (`/subscriptions/me`) là phiên bản lúc mua. */
+  version?: number;
+  /** Ba hạn mức người mua gói nhận được (D121). Backend cũ không trả thì dùng `benefits.vip` của danh sách. */
+  benefits?: { chatLimitDaily: number; mealPlanLimitWeekly: number; fridgeScanLimitDaily: number; barcodeScanLimitDaily?: number } | null;
 }
 
 /**
@@ -19,6 +23,7 @@ export interface TierBenefits {
   mealPlansPerWeek?: number;
   chatPerDay?: number | string | null;
   fridgePhotosPerDay?: number;
+  barcodeScansPerDay?: number;
 }
 export interface PlansResponse {
   plans: Plan[];
@@ -59,11 +64,31 @@ export interface SubscriptionTransaction {
   completedAt?: string | null;
   receiptUrl?: string | null;
   canViewReceipt?: boolean;
+  /** Phiên bản gói lúc mua (BR-PAY-SUB-01). */
+  planVersion?: number;
+}
+
+/**
+ * `features` của GET /users/me/subscription: quyền lợi Backend đã phân giải cho chính người dùng.
+ * VIP đọc từ bản chụp quyền lợi của giao dịch đang hiệu lực (giữ đúng biên lai dù Admin sửa gói sau đó);
+ * Free đọc hạn mức chung trong cấu hình hệ thống.
+ */
+export interface BenefitFeatures {
+  isVip: boolean;
+  planVersion?: number;
+  planName?: string | null;
+  chatLimitDaily: number;
+  mealPlanLimitWeekly: number;
+  fridgeScanLimitDaily: number;
+  barcodeScanLimitDaily?: number;
+  description?: string | null;
 }
 export interface MySubscription {
   isVip: boolean;
   plan?: Plan | null;
   endsAt?: string | null;
+  /** Thiếu khi Backend cũ chưa trả: khi đó dùng bảng quyền lợi chung. */
+  features?: BenefitFeatures | null;
   transactions: SubscriptionTransaction[];
 }
 
@@ -79,8 +104,12 @@ export interface PaymentReceipt {
   fullName: string;
   email: string;
   planId: number;
+  /** Phiên bản gói lúc mua. */
+  planVersion?: number;
   planName: string;
   durationDays: number;
+  /** Bản chụp quyền lợi lúc mua, dạng chuỗi JSON (chatLimitDaily, mealPlanLimitWeekly, fridgeScanLimitDaily…). */
+  snapshotFeaturesJson?: string | null;
   amountVnd: number;
   vipStartsAt: string;
   vipEndsAt: string;

@@ -11,7 +11,7 @@ const MOCK_SETTING = {
   defaultValue: '21',
   dataType: 'INT',
   category: 'MEAL_PLAN',
-  description: 'Hạn mức đổi món khi dự thảo',
+  description: 'Hạn mức đổi món khi Chưa kích hoạt',
   updatedAt: '2026-11-03T10:00:00Z',
 };
 
@@ -50,8 +50,8 @@ describe('Phân hệ Gói VIP, Đối soát & Cấu hình chỉ số hệ thốn
     await userEvent.click(tabBtn);
 
     // Kiểm tra render nhóm thực đơn và setting
-    expect(await screen.findByText('Hạn mức Thực đơn & Đổi món')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Đổi món khi Dự thảo/)).toHaveValue(21);
+    expect(await screen.findByText('Hạn mức Thực đơn, Đổi món & Chatbot')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Đổi món khi Chưa kích hoạt/)).toHaveValue(21);
   });
 
   it('cập nhật chỉ số hệ thống: gửi PUT /admin/settings/{key}', async () => {
@@ -64,7 +64,7 @@ describe('Phân hệ Gói VIP, Đối soát & Cấu hình chỉ số hệ thốn
 
     renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans?tab=settings');
 
-    const input = await screen.findByLabelText(/Đổi món khi Dự thảo/);
+    const input = await screen.findByLabelText(/Đổi món khi Chưa kích hoạt/);
     await userEvent.clear(input);
     await userEvent.type(input, '25');
 

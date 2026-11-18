@@ -1,24 +1,32 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
+import { AiCostSection } from '../../components/AiCostSection';
+import { AiDateRangeFilter, AiSectionJumpNav } from '../../components/AiDateRangeFilter';
+import { useAiDateRange, useScrollToHash } from '../../hooks/useAiDateRange';
 import { LlmopsLogTable } from '../../components/LlmopsLogTable';
-import { useUrlFilters } from '../../hooks/useUrlFilters';
-import { vnDate } from '../../lib/llmops';
 
-const DEFAULT_DAYS = 30;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SECTIONS = [
+  { id: 'cost', label: 'Phân tích Chi phí', icon: 'analytics' },
+  { id: 'logs', label: 'Nhật ký truy vấn', icon: 'receipt_long' },
+];
 
 /**
- * Trang Nhật ký cuộc gọi AI (LLMOps Logs · `/admin/ai/logs`).
- * Bố cục toàn màn hình thoáng đãng giúp Admin và Kỹ sư AI dễ dàng tra cứu, kiểm tra prompt, response, latency và trace ID.
+ * Trang Chi phí & Nhật ký API AI (`/admin/ai/logs`).
+ * Một thanh lọc khoảng ngày dùng chung cho phần Phân tích Chi phí (`#cost`) và bảng Nhật ký truy vấn (`#logs`).
  */
 export const AiLogsPage: React.FC = () => {
-  const { get } = useUrlFilters();
-  const today = vnDate();
-  const from = ISO_DATE.test(get('from')) ? get('from') : vnDate(DEFAULT_DAYS - 1);
-  const to = ISO_DATE.test(get('to')) ? get('to') : today;
+  const { from, to } = useAiDateRange();
+  const { hash } = useLocation();
+  useScrollToHash(hash);
 
   return (
     <div className="flex flex-col gap-space-lg">
-      <LlmopsLogTable from={from} to={to} />
+      <AiDateRangeFilter />
+      <AiSectionJumpNav items={SECTIONS} />
+      <AiCostSection from={from} to={to} />
+      <section id="logs" aria-label="Nhật ký truy vấn API AI" className="scroll-mt-24">
+        <LlmopsLogTable from={from} to={to} />
+      </section>
     </div>
   );
 };

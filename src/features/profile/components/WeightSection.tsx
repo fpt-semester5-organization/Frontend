@@ -30,13 +30,31 @@ const displayDate = (iso: string) => {
   return `${day}/${month}/${year}`;
 };
 
-/** Ghi cân nặng và xem lịch sử (SCR-08, FN-PROF-06). Chưa có hồ sơ sức khỏe thì server trả 409. */
+const signedKg = (value: number) => `${value > 0 ? '+' : ''}${formatNumber(value)} kg`;
+
+const SummaryItem: React.FC<{ label: string; value: string; note: string; tone?: string }> = ({ label, value, note, tone }) => (
+  <div className="flex min-w-0 flex-col gap-0.5 rounded-xl bg-surface-container-low p-space-sm">
+    <dt className="font-label-sm text-label-sm text-on-surface-variant">{label}</dt>
+    <dd className={cn('font-label-lg text-label-lg tabular-nums', tone ?? 'text-on-surface')}>{value}</dd>
+    <dd className="font-label-sm text-label-sm text-outline">{note}</dd>
+  </div>
+);
+
+/**
+ * Ghi cân nặng và xem lịch sử (SCR-08, FN-PROF-06). Chưa có hồ sơ sức khỏe thì server trả 409.
+ * Chỉ ghi cho hôm nay: Backend tự đặt ngày ghi theo giờ server và từ chối ngày quá khứ, tương lai.
+ * Cân nặng khởi điểm là mốc đầu tiên trong lịch sử (Backend không lưu riêng giá trị này).
+ */
 export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ health }) => {
   const [page, setPage] = useState(1);
   const [notCompleted, setNotCompleted] = useState<string | null>(null);
   const chartFrom = todayIso(new Date(Date.now() - CHART_DAYS * 86_400_000));
   const history = useWeightHistory({ page, size: PAGE_SIZE }, true);
   const chart = useWeightHistory({ from: chartFrom, page: 1, size: 100 }, true);
+  // Lịch sử xếp mới nhất trước, nên trang cuối với size = 1 là mốc cũ nhất.
+  const total = history.data?.meta.total ?? 0;
+  const oldest = useWeightHistory({ page: Math.max(total, 1), size: 1 }, total > 0);
+  const startEntry = total > 0 ? (oldest.data?.items.at(-1) ?? null) : null;
   const createEntry = useCreateWeightEntry();
   const {
     register,
@@ -47,7 +65,7 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
     formState: { errors },
   } = useForm<WeightEntryValues>({
     resolver: zodResolver(weightEntrySchema),
-    defaultValues: { weightKg: '', loggedDate: todayIso(), note: '' },
+    defaultValues: { weightKg: '', note: '' },
     mode: 'onTouched',
   });
   const noteLength = watch('note')?.length ?? 0;
@@ -55,19 +73,19 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
   const onSubmit = (values: WeightEntryValues) =>
     createEntry.mutate(
       {
+        // Không gửi loggedDate: Backend lấy ngày hôm nay theo giờ server; gửi ngày theo giờ máy có thể lệch ngày và bị từ chối.
         weightKg: parseDecimal(values.weightKg) as number,
-        ...(values.loggedDate ? { loggedDate: values.loggedDate } : {}),
         ...(values.note ? { note: values.note } : {}),
       },
       {
         onSuccess: (res) => {
           notifySuccess(res.message || 'Đã ghi cân nặng.');
-          reset({ weightKg: '', loggedDate: todayIso(), note: '' });
+          reset({ weightKg: '', note: '' });
           setPage(1);
         },
         onError: (error) => {
           const apiError = toApiError(error);
-          if (applyServerFieldErrors(error, setError, ['weightKg', 'loggedDate', 'note'])) return;
+          if (applyServerFieldErrors(error, setError, ['weightKg', 'note'])) return;
           if (apiError.status === 409) setNotCompleted(getErrorMessage(apiError));
           else notifyApiError(error);
         },
@@ -81,7 +99,7 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
       <form onSubmit={handleSubmit(onSubmit)} noValidate className={cn(CARD, 'flex flex-col gap-space-md lg:col-span-4')}>
         <h2 id="weight-title" className="flex items-center gap-1.5 font-headline-sm text-headline-sm text-on-surface">
           <Icon name="scale" className="text-[22px] text-primary" />
-          Ghi cân nặng
+          Ghi cân nặng hôm nay
         </h2>
         {!health && (
           <p className="rounded-lg bg-surface-container-low p-space-sm font-body-sm text-body-sm text-on-surface-variant">
@@ -104,19 +122,17 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
           />
           <FieldError>{errors.weightKg?.message}</FieldError>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="weight-date" className={LABEL}>
-            Ngày cân
-          </label>
-          <input
-            id="weight-date"
-            type="date"
-            max={todayIso()}
-            aria-invalid={!!errors.loggedDate || undefined}
-            {...register('loggedDate')}
-            className={cn(INPUT_CLASS, 'h-11', errors.loggedDate && INPUT_ERROR_CLASS)}
-          />
-          <FieldError>{errors.loggedDate?.message}</FieldError>
+        <div className="flex flex-col gap-1">
+          <p className="flex items-center justify-between gap-2 rounded-lg bg-surface-container-low px-3.5 py-2.5">
+            <span className={LABEL}>Ngày ghi</span>
+            <span className="flex items-center gap-1 font-label-md text-label-md text-on-surface tabular-nums">
+              <Icon name="today" className="text-[18px] text-primary" />
+              Hôm nay, {displayDate(todayIso())}
+            </span>
+          </p>
+          <p className="font-label-sm text-label-sm text-on-surface-variant">
+            Chỉ ghi được cân nặng của hôm nay. Các mốc đã ghi được giữ nguyên trong lịch sử.
+          </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
@@ -145,7 +161,18 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
       </form>
 
       <div className={cn(CARD, 'flex flex-col gap-space-md lg:col-span-8')}>
-        <h2 className="font-headline-sm text-headline-sm text-on-surface">Lịch sử cân nặng</h2>
+        <h2 className="font-headline-sm text-headline-sm text-on-surface">Lịch sử cân nặng theo ngày</h2>
+        {startEntry && health && (
+          <dl aria-label="Tóm tắt cân nặng" className="grid grid-cols-1 gap-space-sm min-[420px]:grid-cols-3">
+            <SummaryItem label="Cân nặng khởi điểm" value={`${formatNumber(startEntry.weightKg)} kg`} note={`Mốc đầu tiên, ${displayDate(startEntry.loggedDate)}`} />
+            <SummaryItem label="Cân nặng hiện tại" value={`${formatNumber(health.currentWeightKg)} kg`} note="Mốc mới nhất" />
+            <SummaryItem
+              label="So với khởi điểm"
+              value={signedKg(Math.round((health.currentWeightKg - startEntry.weightKg) * 10) / 10)}
+              note="Hiện tại trừ khởi điểm"
+            />
+          </dl>
+        )}
         {chart.data && chart.data.items.length >= 2 && (
           <WeightChart entries={chart.data.items} targetWeightKg={health?.targetWeightKg ?? null} />
         )}
@@ -186,7 +213,7 @@ export const WeightSection: React.FC<{ health: HealthProfile | null }> = ({ heal
                           diff === null || diff === 0 ? 'text-on-surface-variant' : diff < 0 ? 'text-success' : 'text-secondary'
                         )}
                       >
-                        {diff === null ? '—' : `${diff > 0 ? '+' : ''}${formatNumber(diff)} kg`}
+                        {diff === null ? '—' : signedKg(diff)}
                       </td>
                     </tr>
                   );

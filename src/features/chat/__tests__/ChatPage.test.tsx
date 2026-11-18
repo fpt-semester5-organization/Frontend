@@ -254,9 +254,10 @@ describe('ChatPage Screen & Integration Tests', () => {
 
       renderWithProviders(<ChatPage />);
 
-      // Tên người dùng và gói Pro
+      // Tên người dùng và gói VIP (cùng tên gọi với trang Gói VIP, không dùng "Pro")
       expect(screen.getAllByText('Nguyễn Văn Minh Tâm').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('Pro')).toBeInTheDocument();
+      expect(screen.getByText('VIP', { selector: 'span' })).toBeInTheDocument();
+      expect(screen.queryByText('Pro')).not.toBeInTheDocument();
       expect(screen.getByText(/0\/200 câu/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cài đặt tài khoản' })).toBeInTheDocument();
     });

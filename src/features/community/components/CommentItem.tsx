@@ -3,7 +3,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { formatDateTime } from '@/lib/format';
-import { notifyApiError, notifySuccess } from '@/lib/notify';
+import { notifyApiError, notifySuccess, notifyWarning } from '@/lib/notify';
 import { cn } from '@/lib/cn';
 import { useDeleteComment, useUpdateComment } from '../hooks/useCommentMutations';
 import type { ContentRef, PostComment } from '../types/community.types';
@@ -96,7 +96,11 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, context, repl
               onCancel={() => setMode('view')}
               onSubmit={async (content) => {
                 const res = await updateComment.mutateAsync({ commentId: comment.commentId, content });
-                notifySuccess(res.message);
+                if (res.data?.status && res.data.status !== 'ACTIVE') {
+                  notifyWarning('Bình luận của bạn có dấu hiệu vi phạm tiêu chuẩn cộng đồng và đang được tạm ẩn để quản trị viên kiểm duyệt.');
+                } else {
+                  notifySuccess(res.message || 'Đã cập nhật bình luận.');
+                }
                 setMode('view');
               }}
             />

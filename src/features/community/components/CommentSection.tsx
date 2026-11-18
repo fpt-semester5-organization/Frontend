@@ -50,8 +50,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ target, authorId
           setModerationNotice(null);
           notifySuccess(res.message || 'Đã gửi bình luận thành công.');
         }
-      } catch (error) {
-        throw error;
+      } finally {
+        // Hoàn tất gửi bình luận
       }
     },
     [createCommentAsync]

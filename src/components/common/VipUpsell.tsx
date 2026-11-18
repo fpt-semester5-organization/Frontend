@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import { QUOTA } from '@/constants/quota';
+import { usePlans } from '@/features/subscription/hooks/useSubscription';
+import { vipTierFromPlans } from '@/features/subscription/lib/benefits';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { cn } from '@/lib/cn';
 import { PATHS } from '@/routes/paths';
@@ -19,13 +21,21 @@ export const VipUpsellDialog: React.FC<{ show: boolean; onHide: () => void; titl
   message,
 }) => {
   const { data: publicSettings } = usePublicSettings();
-  const vipPlans = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
+  const { data: planList } = usePlans();
+  // VIP: hạn mức của gói đang bán (người mua nhận được); Free: cấu hình hiện hành. QUOTA chỉ dùng khi chưa tải được dữ liệu.
+  const vipTier = vipTierFromPlans(planList?.plans);
+  const vipPlans = vipTier?.mealPlansPerWeek ?? publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
   const freePlans = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
+  const vipChat = vipTier?.chatPerDay ?? publicSettings?.chatLimitDailyVip ?? QUOTA.chatPerDay.vip;
+  const freeChat = publicSettings?.chatLimitDailyFree ?? QUOTA.chatPerDay.free;
+  const vipFridge = vipTier?.fridgePhotosPerDay ?? publicSettings?.fridgeScanLimitDailyVip ?? QUOTA.fridgeImagesPerDay.vip;
+  const freeFridge = publicSettings?.fridgeScanLimitDailyFree ?? QUOTA.fridgeImagesPerDay.free;
 
   const benefits = [
     `Tạo tới ${vipPlans} thực đơn mỗi tuần (gói Free: ${freePlans})`,
+    `Hỏi Trợ lý AI tới ${vipChat} câu mỗi ngày (gói Free: ${freeChat})`,
+    `Quét tủ lạnh tới ${vipFridge} ảnh mỗi ngày (gói Free: ${freeFridge})`,
     'Xem calo từng món, từng bữa và so với mục tiêu mỗi ngày',
-    'Xuất thực đơn và danh sách đi chợ ra PDF để in',
   ];
 
   return (

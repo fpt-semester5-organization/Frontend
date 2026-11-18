@@ -185,7 +185,7 @@ export default function PrivacyPage() {
               </div>
               <h4 className="font-label-lg text-label-lg font-semibold text-on-surface">Tuân thủ PDPD</h4>
               <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-                Tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân nhạy cảm và thời gian ân hạn xóa.
+                Tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân nhạy cảm và thời gian chờ xóa 30 ngày (có thể khôi phục).
               </p>
             </div>
 

@@ -73,6 +73,8 @@ export const useLlmops = (q: DateRange & { groupBy?: 'DAY' | 'FEATURE' }) =>
     queryKey: adminKeys.llmops(q),
     queryFn: async () => (await api.getLlmopsDashboard(q)) ?? null,
     placeholderData: keepPreviousData,
+    // Backend cache LLMOps 1 phút: tự làm mới để biểu đồ chi phí theo giờ cập nhật khi đang mở trang
+    refetchInterval: 60 * 1000,
   });
 
 /** Tự làm mới 3 giây/lần khi còn mục chờ đồng bộ (`pending > 0`) hoặc vừa kích hoạt job. */

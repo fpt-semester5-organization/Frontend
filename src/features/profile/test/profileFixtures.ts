@@ -63,7 +63,11 @@ export function mockProfileApi(
     if (req.url === '/users/me' && req.method === 'GET') return { data: profile() };
     if (req.url === '/dietary-schools') return { data: SCHOOLS };
     if (req.url === '/allergens') return { data: ALLERGENS };
-    if (req.url === '/users/me/weight-history' && req.method === 'GET') return { data: WEIGHTS, meta: { page: 1, size: 10, total: WEIGHTS.length } };
+    if (req.url === '/users/me/weight-history' && req.method === 'GET') {
+      // Giống Backend: mới nhất trước, phân trang theo page/size.
+      const { page = 1, size = 10 } = (req.params ?? {}) as { page?: number; size?: number };
+      return { data: WEIGHTS.slice((page - 1) * size, page * size), meta: { page, size, total: WEIGHTS.length } };
+    }
     return undefined;
   });
 }

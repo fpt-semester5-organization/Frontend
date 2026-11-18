@@ -252,6 +252,25 @@ export const SwapMealDialog: React.FC<SwapMealDialogProps> = ({
             </div>
           </div>
 
+          {/* Tiện ích chọn lại món cũ ban đầu chỉ với 1 thao tác nếu có previousRecipe */}
+          {previousRecipe && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container-low border border-primary/20 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Icon name="history" className="text-[16px] text-primary shrink-0" />
+                <span className="text-on-surface-variant">Món ban đầu / trước đó:</span>
+                <span className="font-semibold text-on-surface truncate">{previousRecipe.title}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onConfirm(null, 'Quay lại món cũ', previousRecipe.recipeId)}
+                className="inline-flex items-center gap-1 rounded-lg bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary hover:bg-primary transition-colors cursor-pointer shrink-0 shadow-2xs"
+              >
+                <Icon name="undo" className="text-[14px]" />
+                <span>Quay lại món cũ</span>
+              </button>
+            </div>
+          )}
+
           {/* THANH CHỌN HÌNH THỨC ĐỔI MÓN */}
           <div className="flex items-center rounded-xl bg-surface-container-low p-1 border border-surface-container text-xs font-medium">
             <button

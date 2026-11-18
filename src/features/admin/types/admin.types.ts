@@ -82,6 +82,18 @@ export type FoodGroup = NonNullable<Row<Schemas['ListAdminIngredientsResponse'][
 export type AdminIngredient = DeepRequired<Row<Schemas['ListAdminIngredientsResponse']['data']>> & {
   imageUrl?: string | null;
   isLocked?: boolean;
+  /** Số ảnh ứng viên PENDING cắt từ ảnh tủ lạnh người dùng (BR-ADM-ING-02). */
+  candidateCount?: number;
+};
+/** GET /admin/ingredients/{id}/candidates — FN-ADM-12-CAND (OpenAPI chưa có). */
+export type IngredientCandidate = {
+  candidateId: number;
+  croppedImageUrl: string;
+  /** Độ tin cậy AI 0..1. */
+  confidenceScore: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  sessionId: number;
+  createdAt: string;
 };
 export type IngredientFilters = Query<'listAdminIngredients'> & {
   foodGroup?: string;
@@ -106,14 +118,41 @@ export interface Allergen {
 
 // ---------- Gói VIP & đối soát (SCR-44: FN-ADM-13) ----------
 
-export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResponse']['data']>>;
+/**
+ * Gói VIP phía Admin. Backend e08f103 bổ sung phiên bản gói (BR-PAY-SUB-01): `version` tăng mỗi lần đổi tên, thời hạn,
+ * giá hoặc quyền lợi; `featuresJson` là quyền lợi người mua từ phiên bản này nhận được (chụp vào giao dịch lúc mua).
+ */
+export type AdminPlan = DeepRequired<Row<Schemas['ListAdminSubscriptionPlansResponse']['data']>> & {
+  version?: number;
+  featuresJson?: string | null;
+  effectiveFrom?: string | null;
+};
 export type CreatePlanBody = Schemas['CreateAdminSubscriptionPlanRequest'];
 export type UpdatePlanBody = {
   planName?: string;
   durationDays?: number;
   priceVnd?: number;
   isActive?: boolean;
+  /** Ghi vào Nhật ký kiểm toán và lịch sử phiên bản khi tên, thời hạn hoặc giá đổi. */
+  changeReason?: string | null;
 };
+
+/** GET /admin/subscription-plans/{id}/versions: lịch sử phiên bản của một gói, mới nhất trước. */
+export interface AdminPlanVersion {
+  versionId: number;
+  planId: number;
+  version: number;
+  planName: string;
+  price: number;
+  durationDays: number;
+  featuresJson?: string | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  updatedByAdminId: number;
+  updatedByAdminName?: string | null;
+  changeReason?: string | null;
+  createdAt: string;
+}
 export type ReconcileAction = Schemas['ReconcileAdminPaymentRequest']['action'];
 export type ReconcileBody = Schemas['ReconcileAdminPaymentRequest'];
 export type ReconcileResult = DeepRequired<Schemas['ReconcileAdminPaymentResponse']['data']>;
@@ -299,6 +338,8 @@ export type KnowledgeSource =
 export type KnowledgeStatus = Omit<DeepRequired<Schemas['ListAdminKnowledgeStatusResponse']['data']>, 'lastIndexedAt' | 'bySource'> & {
   lastIndexedAt: string | null;
   bySource: Record<string, number>;
+  /** Số điểm vector bị Admin ẩn (không được chatbot tìm thấy); totalPoints/bySource chỉ tính điểm đang dùng. */
+  inactivePoints?: number;
 };
 
 export interface NutritionDocument {
@@ -559,10 +600,14 @@ export interface VenueQuery {
 export interface AuditLog {
   auditId: number;
   actorUserId?: number | null;
+  actorName?: string | null;
+  actorAvatarUrl?: string | null;
   actorRole?: string;
   action: string;
   targetTable?: string;
   targetId?: string;
+  targetName?: string | null;
+  targetAvatarUrl?: string | null;
   note?: string;
   createdAt: string;
   oldValue?: string | null;

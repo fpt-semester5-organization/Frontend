@@ -42,6 +42,8 @@ describe('LoginPage (SCR-01)', () => {
     await userEvent.type(screen.getByLabelText(/Email/), 'an@x.vn');
     await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'Veggie@2026');
     await userEvent.click(screen.getByRole('button', { name: /^Đăng nhập/ }));
+    expect(await screen.findByText(/thời gian chờ xóa 30 ngày \(có thể khôi phục\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/ân hạn/)).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: /Khôi phục/ }));
     await waitFor(() => expect(useAuthStore.getState().accessToken).toBe('new-token'));
     expect(calls.map((c) => (c.body as { restoreAccount: boolean }).restoreAccount)).toEqual([false, true]);

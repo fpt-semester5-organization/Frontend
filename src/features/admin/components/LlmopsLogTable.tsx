@@ -63,10 +63,10 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
       {/* Tiêu đề & Mô tả */}
       <div className="flex flex-col gap-1">
         <h3 className="font-headline-sm text-headline-sm text-on-surface">
-          Nhật ký cuộc gọi AI (Request Logs)
+          Nhật ký truy vấn API AI
         </h3>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Tra cứu chi tiết từng lượt gọi AI, mức tiêu thụ token, chi phí và thông tin lỗi hệ thống.
+          Tra cứu chi tiết từng lượt truy vấn API AI, mức tiêu thụ token, chi phí và thông tin lỗi hệ thống.
         </p>
       </div>
 
@@ -182,13 +182,13 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
           description={
             hasActiveFilters
               ? 'Không có yêu cầu nào khớp với bộ lọc hiện tại. Thử xóa hoặc thay đổi điều kiện lọc.'
-              : 'Chưa có lượt gọi AI nào phát sinh trong khoảng thời gian đã chọn.'
+              : 'Chưa có lượt truy vấn API AI nào phát sinh trong khoảng thời gian đã chọn.'
           }
         />
       ) : (
         <>
           <TableShell
-            label="Nhật ký cuộc gọi AI"
+            label="Nhật ký truy vấn API AI"
             busy={logs.isPlaceholderData}
             minWidth="min-w-[800px]"
           >
@@ -317,7 +317,7 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
                           setSelectedLog(item);
                         }}
                         className="h-8 px-2 text-primary hover:bg-primary/10"
-                        aria-label={`Xem chi tiết lượt gọi ${item.logId}`}
+                        aria-label={`Xem chi tiết lượt truy vấn ${item.logId}`}
                       >
                         <Icon name="visibility" className="text-[18px]" />
                         <span className="sr-only">Xem chi tiết</span>
@@ -335,7 +335,7 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
               <p className="font-body-xs text-body-xs text-on-surface-variant">
                 Hiển thị {(logs.data.page - 1) * logs.data.pageSize + 1} -{' '}
                 {Math.min(logs.data.page * logs.data.pageSize, logs.data.total)} trên tổng số{' '}
-                <span className="font-semibold text-on-surface">{formatNumber(logs.data.total)}</span> lượt gọi
+                <span className="font-semibold text-on-surface">{formatNumber(logs.data.total)}</span> lượt truy vấn
               </p>
               <Pagination
                 page={logs.data.page}
@@ -348,7 +348,7 @@ export const LlmopsLogTable: React.FC<LlmopsLogTableProps> = ({ from, to }) => {
         </>
       )}
 
-      {/* Modal Dialog Chi tiết lượt gọi AI căn giữa màn hình */}
+      {/* Modal Dialog Chi tiết lượt truy vấn API AI căn giữa màn hình */}
       <LlmopsLogDetailSheet
         log={selectedLog}
         onClose={() => setSelectedLog(null)}

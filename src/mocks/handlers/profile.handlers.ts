@@ -55,7 +55,7 @@ export const profileHandlers = [
     return ok({ avatarUrl: profile.avatarUrl }, 'Cập nhật ảnh đại diện thành công.');
   }),
 
-  // DELETE /users/me — FN-PROF-07 (ân hạn 30 ngày); tài khoản giả đều dùng mật khẩu chung MOCK_PASSWORD
+  // DELETE /users/me — FN-PROF-07 (thời gian chờ xóa 30 ngày, có thể khôi phục); tài khoản giả đều dùng mật khẩu chung MOCK_PASSWORD
   http.delete(api('/users/me'), async ({ request }) => {
     await latency();
     const me = currentUser(request);
@@ -134,18 +134,20 @@ export const profileHandlers = [
     const body = (await request.json()) as { weightKg?: unknown; loggedDate?: unknown; note?: unknown };
     const details: Detail[] = [];
     if (!inRange(body.weightKg, 20, 300)) details.push({ field: 'weightKg', message: 'Cân nặng phải từ 20 đến 300 kg.' });
-    if (body.loggedDate !== undefined && (!isDate(body.loggedDate) || body.loggedDate > today()))
-      details.push({ field: 'loggedDate', message: 'Ngày ghi không hợp lệ.' });
+    if (body.loggedDate !== undefined && !isDate(body.loggedDate)) details.push({ field: 'loggedDate', message: 'Ngày ghi không hợp lệ.' });
     if (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 255))
       details.push({ field: 'note', message: 'Ghi chú tối đa 255 ký tự.' });
     if (details.length) return validationError(details);
+    // Giống Backend (baaef3e): chỉ ghi cho hôm nay, ngày gửi lên khác hôm nay thì báo lỗi.
+    if (typeof body.loggedDate === 'string' && body.loggedDate < today()) return fail(400, 'ERR_VALIDATION', 'Không được ghi nhận cân nặng cho ngày trong quá khứ.');
+    if (typeof body.loggedDate === 'string' && body.loggedDate > today()) return fail(400, 'ERR_VALIDATION', 'Ngày ghi nhận cân nặng không được ở tương lai.');
     const profile = profileOf(me.userId);
     if (!profile.health) return fail(409, 'ERR_PROFILE_NOT_COMPLETED', 'Bạn cần lập hồ sơ sức khỏe trước khi ghi cân nặng.');
 
     const entry = {
       logId: newLogId(),
       weightKg: body.weightKg as number,
-      loggedDate: (body.loggedDate as string | undefined) ?? today(),
+      loggedDate: today(),
       note: (body.note as string | undefined) ?? null,
     };
     profile.weights.push(entry);

@@ -22,11 +22,14 @@ import {
   useReplaceIngredientAllergens,
   useUpdateIngredient,
   useUploadIngredientImage,
+  useApplyIngredientCandidate,
+  useIngredientCandidates,
+  useToggleIngredientLock,
 } from '../hooks/useAdminMasterData';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { FOOD_GROUP_LABEL, FOOD_GROUPS_MVP, STALL_TYPES, STALL_TYPE_LABEL } from '../lib/labels';
 import { handleWriteError } from '../lib/writeError';
-import type { AdminIngredient, CreateIngredientBody, FoodGroup } from '../types/admin.types';
+import type { AdminIngredient, CreateIngredientBody, FoodGroup, IngredientCandidate } from '../types/admin.types';
 
 const PAGE_SIZE = 20;
 
@@ -242,6 +245,18 @@ const AdminIngredientsPage: React.FC = () => {
                               Ngũ vị tân
                             </StatusBadge>
                           )}
+                          {!item.imageUrl && (item.candidateCount ?? 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setForm({ mode: 'edit', item })}
+                              className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                              aria-label={`${item.candidateCount} ảnh gợi ý từ tủ lạnh cho ${item.name}`}
+                            >
+                              <StatusBadge tone="info" icon="photo_library">
+                                +{item.candidateCount} gợi ý
+                              </StatusBadge>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -263,6 +278,7 @@ const AdminIngredientsPage: React.FC = () => {
                     )}
                   </td>
                   <td className={`${TD} whitespace-nowrap text-right`}>
+                    <LockToggleButton item={item} />
                     <Button variant="ghost" size="sm" onClick={() => setAllergenTarget(item)} aria-label={`Dị ứng của ${item.name}`}>
                       Dị ứng
                     </Button>
@@ -282,6 +298,80 @@ const AdminIngredientsPage: React.FC = () => {
       <IngredientAllergensDialog item={allergenTarget} onClose={() => setAllergenTarget(null)} onCreateAllergen={() => setCreatingAllergen(true)} />
       <CreateAllergenDialog show={creatingAllergen} onClose={() => setCreatingAllergen(false)} />
     </div>
+  );
+};
+
+/** BR-ADM-ING-01: nút 1-click Khóa / Mở khóa (plan/1.Implement/32, mục 5.1). */
+const LockToggleButton: React.FC<{ item: AdminIngredient }> = ({ item }) => {
+  const toggle = useToggleIngredientLock();
+  const locked = !!item.isLocked;
+  const label = locked ? 'Đã khóa — Dữ liệu chuẩn được bảo vệ. Bấm để mở khóa.' : 'Chưa khóa — Bấm để khóa chống ghi đè.';
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      title={label}
+      aria-label={`${locked ? 'Mở khóa' : 'Khóa'} ${item.name}`}
+      aria-pressed={locked}
+      loading={toggle.isPending}
+      onClick={() =>
+        toggle.mutate(
+          { id: item.ingredientId, isLocked: !locked },
+          { onSuccess: (res) => notifySuccess(res.message || (locked ? 'Đã mở khóa.' : 'Đã khóa.')), onError: (error) => handleWriteError(error) },
+        )
+      }
+    >
+      <Icon name={locked ? 'lock' : 'lock_open'} className={cn('text-[18px]', locked ? 'text-error' : 'text-on-surface-variant')} />
+    </Button>
+  );
+};
+
+/** FN-ADM-12-CAND/APPLY: lưới ảnh ứng viên cắt từ ảnh tủ lạnh người dùng; Admin chủ động duyệt (BR-ADM-ING-03). */
+const CandidateGrid: React.FC<{ ingredient: AdminIngredient; disabled: boolean; onApplied: () => void }> = ({ ingredient, disabled, onApplied }) => {
+  const { data, isLoading, isError } = useIngredientCandidates(ingredient.ingredientId);
+  const apply = useApplyIngredientCandidate();
+  const candidates: IngredientCandidate[] = data ?? [];
+
+  if (isLoading) return <p className="text-body-sm text-on-surface-variant">Đang tải ảnh gợi ý…</p>;
+  if (isError) return <p className="text-body-sm text-error">Không tải được ảnh gợi ý.</p>;
+  if (candidates.length === 0) {
+    return <p className="text-body-sm text-on-surface-variant">Chưa có ảnh gợi ý từ tủ lạnh người dùng.</p>;
+  }
+
+  return (
+    <ul className="grid grid-cols-2 gap-space-sm sm:grid-cols-3" aria-label="Ảnh gợi ý từ tủ lạnh">
+      {candidates.map((c) => (
+        <li key={c.candidateId} className="flex flex-col gap-1.5 rounded-xl border border-outline-variant/50 p-2">
+          <div className="aspect-square overflow-hidden rounded-lg bg-surface-container">
+            <img src={c.croppedImageUrl} alt={`Ảnh gợi ý ${ingredient.name}`} loading="lazy" className="h-full w-full object-cover" />
+          </div>
+          <p className="text-body-sm text-on-surface-variant">
+            Độ tin cậy: {Math.round(c.confidenceScore * 100)}% · {new Date(c.createdAt).toLocaleDateString('vi-VN')}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || apply.isPending}
+            loading={apply.isPending && apply.variables?.candidateId === c.candidateId}
+            onClick={() =>
+              apply.mutate(
+                { id: ingredient.ingredientId, candidateId: c.candidateId },
+                {
+                  onSuccess: (res) => {
+                    notifySuccess(res.message || 'Đã cập nhật ảnh đại diện.');
+                    onApplied();
+                  },
+                  onError: (error) => handleWriteError(error),
+                },
+              )
+            }
+          >
+            Chọn làm ảnh đại diện
+          </Button>
+        </li>
+      ))}
+    </ul>
   );
 };
 
@@ -417,6 +507,7 @@ const IngredientDialog: React.FC<{
   });
 
   const shownImage = previewUrl ?? editing?.imageUrl ?? null;
+  const locked = !!editing?.isLocked;
 
   return (
     <>
@@ -427,8 +518,12 @@ const IngredientDialog: React.FC<{
         onSubmit={submit}
         submitLabel={editing ? 'Lưu thay đổi' : 'Thêm'}
         loading={pending}
+        submitDisabled={locked}
         size="lg"
       >
+        {locked && (
+          <FormAlert tone="warning">Nguyên liệu đang bị KHÓA để bảo vệ dữ liệu chuẩn. Mở khóa trong danh sách để sửa hoặc đổi ảnh.</FormAlert>
+        )}
         {formError && <FormAlert tone="error">{formError}</FormAlert>}
         <FormRow id="ing-name" label="Tên nguyên liệu" required error={errors.name?.message}>
           <input id="ing-name" maxLength={100} aria-invalid={!!errors.name} className={CONTROL} {...register('name')} />
@@ -445,7 +540,7 @@ const IngredientDialog: React.FC<{
             <div className="flex flex-col items-start gap-1.5">
               <input id="ing-image" ref={fileInputRef} type="file" accept={IMAGE_TYPES} className="hidden" onChange={handleFileChange} />
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => fileInputRef.current?.click()}>
+                <Button type="button" variant="outline" size="sm" disabled={pending || locked} onClick={() => fileInputRef.current?.click()}>
                   <Icon name="upload" className="text-[18px]" />
                   {shownImage ? 'Đổi ảnh' : 'Tải ảnh lên'}
                 </Button>
@@ -463,6 +558,13 @@ const IngredientDialog: React.FC<{
             </div>
           </div>
         </FormRow>
+        {editing && (
+          <section aria-labelledby="ing-candidates-title" className="flex flex-col gap-1.5">
+            <h3 id="ing-candidates-title" className="font-label-md text-label-md text-on-surface">Ảnh gợi ý từ tủ lạnh người dùng</h3>
+            <p className="text-body-sm text-on-surface-variant">Cắt tự động từ ảnh quét tủ lạnh (độ tin cậy AI từ 80%). Chỉ thành ảnh đại diện khi bạn chọn.</p>
+            <CandidateGrid ingredient={editing} disabled={locked || pending} onApplied={onClose} />
+          </section>
+        )}
         <div className="grid gap-space-md sm:grid-cols-2">
           <FormRow id="ing-stall" label="Quầy hàng" required error={errors.defaultStallType?.message} hint="Dùng để nhóm danh sách đi chợ.">
             <select id="ing-stall" aria-invalid={!!errors.defaultStallType} className={CONTROL} {...register('defaultStallType')}>

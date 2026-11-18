@@ -15,6 +15,9 @@ const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 const MEALS: MealType[] = ['BREAKFAST', 'LUNCH', 'DINNER'];
 const AISLES: Aisle[] = ['PRODUCE', 'PLANT_PROTEIN', 'DRY_GOODS', 'CONDIMENTS'];
 const EDIT_LIMIT = 21;
+function getPlanEditLimit(days: number = 7, baseLimit: number = EDIT_LIMIT): number {
+  return Math.max(1, Math.ceil((baseLimit * days) / 7));
+}
 const PLANS_PER_WEEK = { free: 1, vip: 3 };
 /** Calo mục tiêu mỗi ngày theo hồ sơ sức khỏe giả (gần tổng 3 bữa của món mẫu để thấy cả ngày đạt lẫn lệch). */
 const TARGET_KCAL: Record<number, number> = { 1024: 1350, 2048: 1400 };
@@ -363,7 +366,7 @@ const planDto = (plan: MockPlan) => ({
   planStatus: plan.planStatus,
   generatedByAi: plan.generatedByAi,
   slots: plan.slots.map(slotDto),
-  edits: { preDeployUsed: plan.preDeployUsed, preDeployLimit: EDIT_LIMIT, postDeployUsed: plan.postDeployUsed, postDeployLimit: EDIT_LIMIT },
+  edits: { preDeployUsed: plan.preDeployUsed, preDeployLimit: getPlanEditLimit(7), postDeployUsed: plan.postDeployUsed, postDeployLimit: getPlanEditLimit(7) },
 });
 const listDto = (list: MockShoppingList) => ({
   listId: list.listId,
@@ -547,9 +550,10 @@ export const mealPlansHandlers = [
       return validationError([{ field: 'excludedRecipeIds', message: 'Danh sách món loại trừ không hợp lệ.' }]);
     }
     const isDraft = plan.planStatus === 'DRAFT';
+    const limit = getPlanEditLimit(7);
     const used = isDraft ? plan.preDeployUsed : plan.postDeployUsed;
-    if (used >= EDIT_LIMIT) {
-      return fail(403, 'ERR_QUOTA_MEAL_SWAP_EXCEEDED', `Bạn đã dùng hết ${EDIT_LIMIT} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`);
+    if (used >= limit) {
+      return fail(403, 'ERR_QUOTA_MEAL_SWAP_EXCEEDED', `Bạn đã dùng hết ${limit} lần ${isDraft ? 'chỉnh sửa' : 'đổi món'} của thực đơn này.`);
     }
 
     const oldRecipeId = slot.recipeId;
@@ -593,7 +597,7 @@ export const mealPlansHandlers = [
       slot.recipeId = chosen.recipeId;
       if (isDraft) plan.preDeployUsed += 1;
       else plan.postDeployUsed += 1;
-      return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, `Đã đổi sang món: ${chosen.title}.`);
+      return ok({ slot: slotDto(slot), swapsRemaining: Math.max(0, limit - used - 1) }, `Đã đổi sang món: ${chosen.title}.`);
     }
 
     // 2. Nếu người dùng nhập customNote cho AI
@@ -613,7 +617,7 @@ export const mealPlansHandlers = [
         slot.recipeId = aiCandidate.recipeId;
         if (isDraft) plan.preDeployUsed += 1;
         else plan.postDeployUsed += 1;
-        return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, `AI đã đổi món theo ghi chú: ${aiCandidate.title}.`);
+        return ok({ slot: slotDto(slot), swapsRemaining: Math.max(0, limit - used - 1) }, `AI đã đổi món theo ghi chú: ${aiCandidate.title}.`);
       }
     }
 
@@ -633,7 +637,7 @@ export const mealPlansHandlers = [
     slot.recipeId = substitute.recipeId;
     if (isDraft) plan.preDeployUsed += 1;
     else plan.postDeployUsed += 1;
-    return ok({ slot: slotDto(slot), swapsRemaining: EDIT_LIMIT - used - 1 }, 'Đã đổi món.');
+    return ok({ slot: slotDto(slot), swapsRemaining: Math.max(0, limit - used - 1) }, 'Đã đổi món.');
   }),
 
   // GET /meal-plans/slots/{slotId}/swap-history — FN-MEAL-03

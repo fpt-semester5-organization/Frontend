@@ -9,15 +9,17 @@ import { QUOTA } from '@/constants/quota';
 import { toApiError } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
 import { getErrorMessage, notifyApiError } from '@/lib/notify';
+import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { PATHS } from '@/routes/paths';
-import { useAuthStore } from '@/stores/auth.store';
+import { selectIsVip, useAuthStore } from '@/stores/auth.store';
+import { useGuestStore } from '@/stores/guest.store';
 import { useUiStore } from '@/stores/ui.store';
 import { CameraScanner } from '../components/CameraScanner';
 import { ManualBarcodeForm } from '../components/ManualBarcodeForm';
 import { ScanQuotaBadge } from '../components/ScanQuotaBadge';
 import { ScanResultCard } from '../components/ScanResultCard';
 import type { CameraState } from '../hooks/useBarcodeCamera';
-import { useLookupBarcode } from '../hooks/useScanner';
+import { useBarcodeQuota, useLookupBarcode } from '../hooks/useScanner';
 import { VERDICT_INFO } from '../lib/verdict';
 import { BARCODE_PATTERN } from '../types/scanner.schemas';
 import type { ScanMethod } from '../types/scanner.types';
@@ -43,14 +45,22 @@ const CAMERA_NOTICE: Partial<Record<CameraState, { title: string; text: string }
 
 /**
  * SCR-15 scanner/BarcodeScan — /scanner. GET /products/barcode/{barcode} (FN-BAR-01).
- * Quét bằng camera (ZXing) hoặc nhập tay; từ chối camera thì chuyển sang nhập tay. Khách 03 lượt/ngày.
+ * Quét bằng camera (ZXing) hoặc nhập tay; từ chối camera thì chuyển sang nhập tay.
+ * Hạn mức lượt quét/ngày của Khách, Free và VIP do Admin cấu hình ở Chỉ số hệ thống (D122).
  */
 const BarcodeScan: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isMember = useAuthStore((state) => state.isAuthenticated);
+  const isVip = useAuthStore(selectIsVip);
+  const { data: publicSettings } = usePublicSettings();
+  const guestLimit =
+    useGuestStore((state) => state.quota?.barcodeDaily?.limit) ??
+    publicSettings?.barcodeScanLimitDailyGuest ??
+    QUOTA.guest.barcodeDaily;
   const openSignupPrompt = useUiStore((state) => state.openSignupPrompt);
   const lookup = useLookupBarcode();
+  const barcodeQuota = useBarcodeQuota();
   const [mode, setMode] = useState<Mode>(() => (canUseCamera() ? 'camera' : 'manual'));
   const [cameraNotice, setCameraNotice] = useState<CameraState | null>(() => (canUseCamera() ? null : 'unsupported'));
   const [initialBarcode, setInitialBarcode] = useState<string | undefined>();
@@ -151,8 +161,8 @@ const BarcodeScan: React.FC = () => {
           return (
             <EmptyState
               icon="lock"
-              title={`Bạn đã dùng hết ${QUOTA.guest.barcodeDaily} lượt quét hôm nay`}
-              description="Đăng ký tài khoản miễn phí để quét không giới hạn, được cảnh báo dị ứng cá nhân và lưu lịch sử quét."
+              title={`Bạn đã dùng hết ${guestLimit} lượt quét hôm nay`}
+              description="Đăng ký tài khoản miễn phí để quét thêm mỗi ngày, được cảnh báo dị ứng cá nhân và lưu lịch sử quét."
               action={<Button onClick={() => openSignupPrompt('quota')}>Đăng ký miễn phí</Button>}
             />
           );
@@ -161,8 +171,10 @@ const BarcodeScan: React.FC = () => {
           <EmptyState
             icon="lock"
             title="Bạn đã đạt giới hạn lượt quét hôm nay"
-            description="Nâng cấp gói tài khoản để mở rộng hạn mức và quét không giới hạn."
-            action={<Button onClick={() => navigate(PATHS.SUBSCRIPTION.PRICING)}>Nâng cấp ngay</Button>}
+            description={getErrorMessage(error)}
+            action={
+              isVip ? undefined : <Button onClick={() => navigate(PATHS.SUBSCRIPTION.PRICING)}>Nâng cấp VIP</Button>
+            }
           />
         );
       }
@@ -228,15 +240,18 @@ const BarcodeScan: React.FC = () => {
           </p>
         </div>
         {isMember ? (
-          <Link
-            to={PATHS.SCANNER.HISTORY}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
-          >
-            <Icon name="history" className="text-[18px]" />
-            Lịch sử quét
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <ScanQuotaBadge quota={barcodeQuota.data ?? null} />
+            <Link
+              to={PATHS.SCANNER.HISTORY}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface no-underline hover:bg-surface-container-high"
+            >
+              <Icon name="history" className="text-[18px]" />
+              Lịch sử quét
+            </Link>
+          </div>
         ) : (
-          <ScanQuotaBadge />
+          <ScanQuotaBadge quota={barcodeQuota.data ?? null} />
         )}
       </header>
 
@@ -297,7 +312,7 @@ const BarcodeScan: React.FC = () => {
 
           {!isMember && (
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Khách quét được {QUOTA.guest.barcodeDaily} lượt mỗi ngày (mã không tìm thấy không bị tính).
+              Khách quét được {guestLimit} lượt mỗi ngày (mã không tìm thấy không bị tính).
             </p>
           )}
 

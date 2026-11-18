@@ -15,7 +15,8 @@ import { FormAlert } from '@/components/ui/forms';
 import { formatVnd } from '@/lib/format';
 import { notifyApiError } from '@/lib/notify';
 import { PATHS } from '@/routes/paths';
-import { selectIsVip, useAuthStore } from '@/stores/auth.store';
+import { formatServerDateTime } from '@/lib/serverDate';
+import { useAuthStore } from '@/stores/auth.store';
 import { toast, useUiStore } from '@/stores/ui.store';
 import { PageEmpty, PageError, PageSkeleton } from '../components/SubStates';
 import { useCancelPending, useCheckout, useMySubscription, useNow, usePlans } from '../hooks/useSubscription';
@@ -28,7 +29,9 @@ export function CheckoutPage() {
   const plans = usePlans();
   const plan = plans.data?.plans.find((p) => p.planId === planId && p.isActive);
   const user = useAuthStore((s) => s.user);
-  const isVip = useAuthStore(selectIsVip);
+  // Backend chặn tạo đơn khi VIP còn hiệu lực (ERR_VIP_ALREADY_ACTIVE, không còn cộng dồn thời hạn): báo trước thay vì để người dùng chọn cổng rồi mới bị từ chối.
+  const sub = useMySubscription();
+  const activeVipEndsAt = sub.data?.isVip ? (sub.data.endsAt ?? '') : null;
   const [order, setOrder] = useState<PendingOrder | null>(() => {
     const saved = readPendingOrder(user?.userId);
     return saved && saved.planId === planId && new Date(saved.expiresAt).getTime() > Date.now() ? saved : null;
@@ -45,6 +48,13 @@ export function CheckoutPage() {
           <PageEmpty title="Không tìm thấy gói" hint="Gói không tồn tại hoặc đã ngừng bán.">
             <Link to={PATHS.SUBSCRIPTION.PRICING} className="mt-2 rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary">Xem các gói VIP</Link>
           </PageEmpty>
+        ) : activeVipEndsAt !== null && !order ? (
+          <PageEmpty
+            title="Bạn đang có gói VIP còn hiệu lực"
+            hint={`Gói hiện tại còn hiệu lực${activeVipEndsAt ? ` đến ${formatServerDateTime(activeVipEndsAt)}` : ''}. Bạn có thể đăng ký gói mới sau khi gói này hết hạn.`}
+          >
+            <Link to={PATHS.ME.SUBSCRIPTION} className="mt-2 rounded-lg bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary hover:bg-primary">Xem gói của tôi</Link>
+          </PageEmpty>
         ) : (
           <div className="grid w-full grid-cols-1 gap-gutter lg:grid-cols-5">
             {order ? <PayPanel order={order} /> : <GatewayForm planId={plan.planId} planName={plan.planName} onCreated={setOrder} />}
@@ -54,10 +64,7 @@ export function CheckoutPage() {
                 <span className="font-body-md text-body-md">{plan.planName}</span>
                 <span className="font-headline-sm text-headline-sm text-primary">{formatVnd(plan.priceVnd)}</span>
               </div>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Tài khoản: {user?.email}
-                {isVip ? ', đang là VIP, thời hạn mới được cộng dồn' : ''}
-              </p>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">Tài khoản: {user?.email}</p>
               <Link to={PATHS.SUBSCRIPTION.PRICING} className="text-center font-label-md text-label-md text-on-surface-variant hover:text-on-surface">Chọn gói khác</Link>
             </aside>
           </div>

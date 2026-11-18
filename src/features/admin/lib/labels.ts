@@ -245,7 +245,7 @@ export const ACCOUNT_STATUS_LABEL: Record<string, { text: string; tone: Tone }> 
   QUARANTINED: { text: 'Hạn chế bình luận', tone: 'warn' },
   SUSPENDED: { text: 'Tạm khóa', tone: 'warn' },
   BANNED: { text: 'Cấm vĩnh viễn', tone: 'bad' },
-  SOFT_DELETED: { text: 'Chờ xóa (ân hạn)', tone: 'wait' },
+  SOFT_DELETED: { text: 'Chờ xóa (có thể khôi phục)', tone: 'wait' },
   ANONYMIZED_DELETED: { text: 'Đã ẩn danh', tone: 'neutral' },
 };
 

@@ -13,8 +13,14 @@ export interface PublicSystemSettings {
   chatLimitDailyGuest: number;
   chatLimitDailyFree: number;
   chatLimitDailyVip: number;
+  fridgeScanLimitDailyGuest?: number;
   fridgeScanLimitDailyFree: number;
   fridgeScanLimitDailyVip: number;
+
+  // Định mức quét mã vạch / ngày (D122)
+  barcodeScanLimitDailyGuest?: number;
+  barcodeScanLimitDailyFree?: number;
+  barcodeScanLimitDailyVip?: number;
 
   // Tài liệu pháp lý
   legalUserAgreementUrl?: string;

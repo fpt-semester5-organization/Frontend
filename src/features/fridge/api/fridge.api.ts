@@ -10,7 +10,8 @@ import type {
   RecipeSuggestion,
 } from '../types/fridge.types';
 
-export const AI_DETECTION_TIMEOUT_MS = 35000;
+// Lớn hơn VISION_TIMEOUT_SECONDS (55s) của ai-service để nhận lỗi AI_TIMEOUT từ server thay vì tự cắt.
+export const AI_DETECTION_TIMEOUT_MS = 65000;
 
 /**
  * GET /fridge/quota

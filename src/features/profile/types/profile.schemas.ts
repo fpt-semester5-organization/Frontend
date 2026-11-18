@@ -174,14 +174,10 @@ export function healthBodyFrom(
 }
 
 // --- SCR-08: ghi cân nặng (FN-PROF-06; Weight_Kg là DECIMAL(5,2)) ---
+// Chỉ ghi cho hôm nay: Backend tự đặt ngày ghi và từ chối ngày quá khứ hoặc tương lai, nên biểu mẫu không có ô chọn ngày.
 
 export const weightEntrySchema = z.object({
   weightKg: weightField(2),
-  loggedDate: z
-    .string()
-    .trim()
-    .refine((value) => value === '' || ageFrom(value) !== null, 'Ngày không hợp lệ.')
-    .refine((value) => value === '' || value <= todayIso(), 'Không ghi cân nặng cho ngày trong tương lai.'),
   note: z.string().trim().max(NOTE_MAX, `Ghi chú tối đa ${NOTE_MAX} ký tự.`),
 });
 export type WeightEntryValues = z.infer<typeof weightEntrySchema>;

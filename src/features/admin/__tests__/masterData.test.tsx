@@ -124,6 +124,7 @@ describe('SCR-42 Từ điển E-number', () => {
 describe('SCR-43 Nguyên liệu & dị ứng', () => {
   const handler = (req: { method: string; url: string }) => {
     if (req.url === '/allergens') return { data: ALLERGENS };
+    if (req.url.endsWith('/candidates')) return { data: [] };
     if (req.method === 'GET') return { data: [PEANUT], meta: { page: 1, size: 20, total: 1 } };
     return { message: 'Đã cập nhật.', data: { ingredientId: 12 } };
   };
@@ -162,5 +163,55 @@ describe('SCR-43 Nguyên liệu & dị ứng', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Thêm' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Chọn quầy hàng');
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+});
+
+describe('SCR-43 Ảnh gợi ý từ tủ lạnh & khóa nguyên liệu (plan/1.Implement/32)', () => {
+  const CANDIDATES = [
+    { candidateId: 41, croppedImageUrl: 'https://res.cloudinary.com/x/image/upload/c_crop,x_0.100/a.jpg', confidenceScore: 0.92, status: 'PENDING', sessionId: 7, createdAt: '2026-11-12T10:00:00Z' },
+    { candidateId: 42, croppedImageUrl: 'https://res.cloudinary.com/x/image/upload/c_crop,x_0.300/a.jpg', confidenceScore: 0.81, status: 'PENDING', sessionId: 8, createdAt: '2026-11-13T10:00:00Z' },
+  ];
+  const handlerFor = (item: Record<string, unknown>) => (req: { method: string; url: string }) => {
+    if (req.url === '/allergens') return { data: ALLERGENS };
+    if (req.url === '/admin/ingredients/12/candidates') return { data: CANDIDATES };
+    if (req.method === 'GET') return { data: [item], meta: { page: 1, size: 20, total: 1 } };
+    return { message: 'Đã cập nhật ảnh đại diện từ ảnh ứng viên.', data: { ingredientId: 12, isLocked: true } };
+  };
+
+  it('hiện badge "+2 gợi ý" khi chưa có ảnh và có ảnh ứng viên chờ duyệt', async () => {
+    mockApi(handlerFor({ ...PEANUT, imageUrl: null, isLocked: false, candidateCount: 2 }));
+    renderWithProviders(<AdminIngredientsPage />, '/admin/ingredients');
+    expect(await screen.findByRole('button', { name: '2 ảnh gợi ý từ tủ lạnh cho Đậu phộng' })).toHaveTextContent('+2 gợi ý');
+  });
+
+  it('chọn ảnh gợi ý: gửi POST .../apply-candidate với candidateId', async () => {
+    const calls = mockApi(handlerFor({ ...PEANUT, imageUrl: null, isLocked: false, candidateCount: 2 }));
+    renderWithProviders(<AdminIngredientsPage />, '/admin/ingredients');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa Đậu phộng' }));
+    const dialog = screen.getByRole('dialog');
+    const list = await within(dialog).findByRole('list', { name: 'Ảnh gợi ý từ tủ lạnh' });
+    expect(within(list).getByText(/Độ tin cậy: 92%/)).toBeInTheDocument();
+    await userEvent.click(within(list).getAllByRole('button', { name: 'Chọn làm ảnh đại diện' })[1]);
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')).toBeDefined());
+    expect(calls.find((c) => c.method === 'POST')).toMatchObject({ url: '/admin/ingredients/12/apply-candidate', body: { candidateId: 42 } });
+  });
+
+  it('nguyên liệu đang khóa: cảnh báo, khóa nút lưu và nút chọn ảnh', async () => {
+    mockApi(handlerFor({ ...PEANUT, imageUrl: null, isLocked: true, candidateCount: 2 }));
+    renderWithProviders(<AdminIngredientsPage />, '/admin/ingredients');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa Đậu phộng' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/đang bị KHÓA/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
+    const list = await within(dialog).findByRole('list', { name: 'Ảnh gợi ý từ tủ lạnh' });
+    within(list).getAllByRole('button', { name: 'Chọn làm ảnh đại diện' }).forEach((b) => expect(b).toBeDisabled());
+  });
+
+  it('nút khóa 1-click: gửi PATCH .../lock với trạng thái ngược lại', async () => {
+    const calls = mockApi(handlerFor({ ...PEANUT, imageUrl: null, isLocked: false, candidateCount: 0 }));
+    renderWithProviders(<AdminIngredientsPage />, '/admin/ingredients');
+    await userEvent.click(await screen.findByRole('button', { name: 'Khóa Đậu phộng' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')).toBeDefined());
+    expect(calls.find((c) => c.method === 'PATCH')).toMatchObject({ url: '/admin/ingredients/12/lock', body: { isLocked: true } });
   });
 });

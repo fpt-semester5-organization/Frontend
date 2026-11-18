@@ -15,13 +15,13 @@ import { formatDateTime } from '@/lib/format';
 import { getRecipe } from '@/features/recipes/api/recipes.api';
 import { getPost, listComments } from '@/features/community/api/community.api';
 import { DecisionModal, type DecisionTarget } from '../components/DecisionModal';
-import { FormModal, ReasonConfirmModal } from '../components/FormModal';
+import { FormModal } from '../components/FormModal';
 import { AdminPage } from '../components/AdminPage';
 import { FilterBar, ResetButton, SelectFilter } from '../components/Filters';
 import { Pager } from '../components/Pager';
 import { QueryState } from '../components/QueryState';
 import { StatusPill } from '../components/StatusPill';
-import { useDecideReport, useDeleteComment, useModerationCount, useModerationQueue } from '../hooks/useModeration';
+import { useDecideReport, useModerationCount, useModerationQueue } from '../hooks/useModeration';
 import { useListState } from '../hooks/useListState';
 import { SOURCE_LABEL, TARGET_LABEL, VIOLATION_LABEL } from '../lib/labels';
 import { toastApiError } from '../lib/api';
@@ -63,10 +63,8 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
   const userCount = useModerationCount(USER_COUNT_FILTER);
 
   const decide = useDecideReport();
-  const del = useDeleteComment();
 
   const [target, setTarget] = useState<DecisionTarget | null>(null);
-  const [toDelete, setToDelete] = useState<ModerationItem | null>(null);
   const [inspecting, setInspecting] = useState<ModerationItem | null>(null);
 
   const selectTab = (tab: ModerationTab) => {
@@ -267,19 +265,6 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
                           >
                             Bác bỏ
                           </button>
-                          {isComment && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                del.reset();
-                                setToDelete(it);
-                              }}
-                              className="rounded-lg bg-error/15 px-2.5 py-1.5 font-label-sm text-label-sm font-semibold text-error hover:bg-error/25 transition-colors cursor-pointer"
-                              title="Xóa bình luận này"
-                            >
-                              Xóa
-                            </button>
-                          )}
                           <button
                             type="button"
                             onClick={() => open(it, 'UPHOLD')}
@@ -320,27 +305,6 @@ export function AdminModerationQueuePage({ initialTab }: AdminModerationQueuePag
         }
       />
 
-      <ReasonConfirmModal
-        show={toDelete !== null}
-        title="Xóa bình luận vi phạm?"
-        consequence={`Bình luận #${toDelete?.targetId ?? ''} và toàn bộ trả lời bên dưới sẽ bị ẩn khỏi người dùng (xóa mềm). Lý do xóa được lưu vào nhật ký kiểm toán.`}
-        confirmLabel="Xóa bình luận"
-        pending={del.isPending}
-        error={del.error ? apiErrorMessage(del.error) : null}
-        onHide={() => setToDelete(null)}
-        onConfirm={(reason) =>
-          toDelete &&
-          del.mutate(
-            { id: toDelete.targetId, reason },
-            {
-              onSuccess: () => {
-                setToDelete(null);
-                void q.refetch();
-              },
-            },
-          )
-        }
-      />
 
       {inspecting && (
         <InspectionModal

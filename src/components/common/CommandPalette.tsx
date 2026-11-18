@@ -8,9 +8,9 @@ const EXTRA_ADMIN_COMMANDS = [
   { label: 'Trường phái ăn chay', to: PATHS.ADMIN.DIETARY_SCHOOLS, icon: 'eco' },
   { label: 'Từ điển E-number', to: PATHS.ADMIN.E_NUMBERS, icon: 'menu_book' },
   { label: 'Nguyên liệu & dị ứng', to: PATHS.ADMIN.INGREDIENTS, icon: 'nutrition' },
-  { label: 'Phân tích Chi phí AI', to: PATHS.ADMIN.AI_ANALYTICS, icon: 'analytics' },
-  { label: 'Nhật ký cuộc gọi AI (Logs)', to: PATHS.ADMIN.AI_LOGS, icon: 'receipt_long' },
-  { label: 'Kho tri thức RAG (Qdrant)', to: PATHS.ADMIN.AI_RAG, icon: 'database' },
+  { label: 'Phân tích Chi phí AI', to: PATHS.ADMIN.AI_COST, icon: 'analytics' },
+  { label: 'Nhật ký truy vấn API AI', to: PATHS.ADMIN.AI_LOGS, icon: 'receipt_long' },
+  { label: 'Kho tri thức RAG (Qdrant)', to: PATHS.ADMIN.AI_KNOWLEDGE, icon: 'database' },
   { label: 'Chất lượng AI & SLA', to: PATHS.ADMIN.AI_QUALITY, icon: 'verified' },
 ];
 

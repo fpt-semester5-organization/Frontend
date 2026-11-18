@@ -227,7 +227,7 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
         </div>
       </div>
 
-      {/* Tabs chuyển đổi giữa Tổng quan & Biểu đồ và Nhật ký cuộc gọi */}
+      {/* Tabs chuyển đổi giữa Tổng quan & Biểu đồ và Nhật ký truy vấn API AI */}
       <div className="flex border-b border-surface-container gap-6">
         <button
           type="button"
@@ -257,7 +257,7 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
           )}
         >
           <Icon name="receipt_long" className="text-[20px]" />
-          Nhật ký cuộc gọi (Logs)
+          Nhật ký truy vấn API AI
         </button>
       </div>
 
@@ -291,7 +291,7 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
               <EmptyState
                 icon="query_stats"
                 title="Chưa có dữ liệu chi phí"
-                description="Không có lượt gọi AI nào trong khoảng thời gian đã chọn. Thử chọn khoảng dài hơn."
+                description="Không có lượt truy vấn API AI nào trong khoảng thời gian đã chọn. Thử chọn khoảng dài hơn."
               />
             ) : view === 'day' ? (
               <>
@@ -325,7 +325,7 @@ const CostSection: React.FC<{ from: string; to: string }> = ({ from, to }) => {
           />
         </>
       ) : (
-        /* Khối Nhật ký cuộc gọi AI */
+        /* Khối Nhật ký truy vấn API AI */
         <LlmopsLogTable from={from} to={to} />
       )}
     </section>
@@ -361,7 +361,7 @@ const QualitySection: React.FC<{ from: string; to: string; module?: AiModule }> 
 
           {metrics.data.modules.length === 0 ? (
             <div className={CARD}>
-              <EmptyState icon="monitoring" title="Chưa có dữ liệu chất lượng" description="Chưa có lượt gọi AI hoặc đánh giá nào trong khoảng thời gian đã chọn." />
+              <EmptyState icon="monitoring" title="Chưa có dữ liệu chất lượng" description="Chưa có lượt truy vấn API AI hoặc đánh giá nào trong khoảng thời gian đã chọn." />
             </div>
           ) : (
             <TableShell label="Chất lượng theo tính năng AI">

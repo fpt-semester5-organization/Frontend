@@ -145,7 +145,34 @@ describe('HealthProfile (SCR-08)', () => {
       await waitFor(() =>
         expect(writes(calls)[0]).toMatchObject({ method: 'POST', url: '/users/me/weight-history', body: { weightKg: 54, note: 'Cân buổi sáng' } })
       );
+      expect(writes(calls)[0].body).not.toHaveProperty('loggedDate');
       expect(toastMessages()).toContain('Đã ghi cân nặng.');
+    });
+
+    it('ghi cân nặng chỉ cho hôm nay: không có ô chọn ngày, hiện rõ ngày ghi là hôm nay', async () => {
+      mockProfileApi();
+      renderPage(<HealthProfile />);
+      expect(await screen.findByRole('heading', { name: /Ghi cân nặng hôm nay/ })).toBeInTheDocument();
+      const now = new Date();
+      const today = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      expect(screen.getByText(`Hôm nay, ${today}`)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Ngày cân/)).not.toBeInTheDocument();
+      expect(document.querySelector('input[type="date"]#weight-date')).toBeNull();
+    });
+
+    it('phân định cân nặng khởi điểm (mốc đầu tiên) với lịch sử cân nặng theo ngày', async () => {
+      const calls = mockProfileApi();
+      renderPage(<HealthProfile />);
+      expect(await screen.findByRole('heading', { name: 'Lịch sử cân nặng theo ngày' })).toBeInTheDocument();
+      const summary = within(await screen.findByLabelText('Tóm tắt cân nặng'));
+      expect(summary.getByText('Cân nặng khởi điểm')).toBeInTheDocument();
+      expect(summary.getByText('55,6 kg')).toBeInTheDocument();
+      expect(summary.getByText('Mốc đầu tiên, 01/10/2026')).toBeInTheDocument();
+      expect(summary.getByText('54,5 kg')).toBeInTheDocument();
+      expect(summary.getByText('So với khởi điểm')).toBeInTheDocument();
+      expect(summary.getByText('-1,1 kg')).toBeInTheDocument();
+      // Mốc đầu tiên lấy từ trang cuối của lịch sử (mới nhất trước), không đoán từ trang đang xem.
+      expect(calls.some((c) => c.url === '/users/me/weight-history' && (c.params as { page?: number; size?: number }).page === 3 && (c.params as { size?: number }).size === 1)).toBe(true);
     });
 
     it('chưa có hồ sơ sức khỏe: nhắc lập hồ sơ; ghi cân nặng nhận 409 thì mở hộp thoại', async () => {

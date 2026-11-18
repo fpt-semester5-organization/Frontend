@@ -6,6 +6,7 @@ import type {
   AdminPaymentFilters,
   AdminPaymentTransaction,
   AdminPlan,
+  AdminPlanVersion,
   AdminSurveyFilters,
   AdminSurveyListResult,
   AdminUser,
@@ -43,6 +44,7 @@ import type {
   UpdateUserStatusResult,
   UploadNutritionDocumentPayload,
   WriteResult,
+  IngredientCandidate,
 } from '../types/admin.types';
 
 /** Bỏ tham số rỗng để URL gọn và Backend không nhận chuỗi rỗng (`?keyword=`). */
@@ -135,6 +137,16 @@ export const uploadAdminIngredientImage = (id: number, file: File) => {
   );
 };
 
+/** GET /admin/ingredients/{id}/candidates — FN-ADM-12-CAND: tối đa 05 ảnh ứng viên PENDING từ tủ lạnh người dùng. */
+export const listAdminIngredientCandidates = (id: number) =>
+  unwrap<IngredientCandidate[]>(http.get(`/admin/ingredients/${id}/candidates`));
+
+/** POST /admin/ingredients/{id}/apply-candidate — FN-ADM-12-APPLY (BR-ADM-ING-03): Admin duyệt ảnh ứng viên làm ảnh đại diện. */
+export const applyAdminIngredientCandidate = (id: number, candidateId: number) =>
+  write<{ ingredientId: number; candidateId: number; imageUrl: string }>(
+    http.post(`/admin/ingredients/${id}/apply-candidate`, { candidateId }),
+  );
+
 /** POST /admin/allergens — FN-ADM-12. */
 export const createAdminAllergen = (body: CreateAllergenBody) =>
   write<{ allergenId: number }>(http.post('/admin/allergens', body));
@@ -150,7 +162,14 @@ export const listAdminPlans = () => unwrap<AdminPlan[]>(http.get('/admin/subscri
 /** POST /admin/subscription-plans — FN-ADM-13. */
 export const createAdminPlan = (body: CreatePlanBody) => write<{ planId: number }>(http.post('/admin/subscription-plans', body));
 
-/** PUT /admin/subscription-plans/{id} — FN-ADM-13: giá mới chỉ áp dụng cho đơn mới (BR-ADM-PAY-001). */
+/** GET /admin/subscription-plans/{id}/versions — lịch sử phiên bản gói (BR-PAY-SUB-01), mới nhất trước. */
+export const listAdminPlanVersions = (id: number) =>
+  unwrap<AdminPlanVersion[]>(http.get(`/admin/subscription-plans/${id}/versions`));
+
+/**
+ * PUT /admin/subscription-plans/{id} — FN-ADM-13: đổi tên, thời hạn, giá hoặc quyền lợi tạo phiên bản mới;
+ * chỉ đơn tạo sau khi lưu theo phiên bản mới, người đã mua giữ quyền lợi trên biên lai (BR-ADM-PAY-001, BR-PAY-SUB-01).
+ */
 export const updateAdminPlan = (id: number, body: UpdatePlanBody) =>
   write<{ planId: number; priceVnd: number }>(http.put(`/admin/subscription-plans/${id}`, body));
 
@@ -229,6 +248,8 @@ export async function uploadAdminNutritionDocument(payload: UploadNutritionDocum
   return unwrap<NutritionDocument>(
     http.post('/admin/knowledge/documents/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // Sách dài cần nhúng hàng trăm đoạn; PDF scan còn phải OCR bằng Gemini (~1 giây/trang) → không dùng timeout chung 15 giây
+      timeout: 15 * 60 * 1000,
     })
   );
 }

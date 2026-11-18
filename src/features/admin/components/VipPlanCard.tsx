@@ -15,8 +15,13 @@ export interface VipPlanCardProps {
   badgeText?: string;
   isAdmin?: boolean;
   isLivePreview?: boolean;
+  /** Chỉ Admin thấy: phiên bản hiện hành của gói, vd "Phiên bản 2 · áp dụng từ 17/11/2026 16:23". */
+  versionLabel?: string;
+  /** Chỉ Admin thấy: hạn mức người mua phiên bản này nhận được. Rỗng thì hiện `quotaHint`. */
+  quotaRows?: [string, string][];
+  quotaHint?: string;
+  onHistory?: () => void;
   onEdit?: () => void;
-  onQuickPrice?: () => void;
   onToggle?: () => void;
   onDelete?: () => void;
   onMoveLeft?: () => void;
@@ -44,8 +49,11 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
   badgeText = 'Tiết kiệm nhất',
   isAdmin = false,
   isLivePreview = false,
+  versionLabel,
+  quotaRows,
+  quotaHint,
+  onHistory,
   onEdit,
-  onQuickPrice,
   onToggle,
   onDelete,
   onMoveLeft,
@@ -220,6 +228,24 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
       {/* Bảng công cụ quản trị Admin (khi render trong trang cấu hình) */}
       {isAdmin && !isLivePreview && (
         <div className="mt-5 border-t border-surface-container/40 pt-4">
+          {(versionLabel || quotaRows || quotaHint) && (
+            <div className={cn('mb-4 flex flex-col gap-1.5 font-body-sm text-body-sm', featured ? 'text-white/90' : 'text-on-surface')}>
+              {versionLabel && (
+                <p className={cn('font-label-sm text-label-sm font-semibold', featured ? 'text-white' : 'text-primary')}>{versionLabel}</p>
+              )}
+              {quotaRows && quotaRows.length > 0 && (
+                <dl className="flex flex-col gap-0.5">
+                  {quotaRows.map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-2">
+                      <dt className={featured ? 'text-white/75' : 'text-on-surface-variant'}>{label}</dt>
+                      <dd className="text-right font-semibold">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {quotaHint && <p className={featured ? 'text-white/80' : 'text-on-surface-variant'}>{quotaHint}</p>}
+            </div>
+          )}
           <p
             className={cn(
               'mb-2 font-label-sm text-[11px] font-semibold uppercase tracking-wider',
@@ -245,19 +271,6 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
             <Button
               variant={featured ? 'secondary' : 'outline'}
               size="sm"
-              onClick={onQuickPrice}
-              aria-label={`Đổi giá ${planName}`}
-              className={cn(
-                'flex-1 min-w-[75px]',
-                featured && 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-              )}
-            >
-              <Icon name="payments" className="text-[16px]" />
-              Đổi giá
-            </Button>
-            <Button
-              variant={featured ? 'secondary' : 'outline'}
-              size="sm"
               onClick={onToggle}
               aria-label={`${isActive ? 'Ẩn gói' : 'Mở bán lại'} ${planName}`}
               className={cn(
@@ -268,6 +281,21 @@ export const VipPlanCard: React.FC<VipPlanCardProps> = ({
               <Icon name={isActive ? 'visibility_off' : 'visibility'} className="text-[16px]" />
               {isActive ? 'Ẩn' : 'Bán'}
             </Button>
+            {onHistory && (
+              <Button
+                variant={featured ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={onHistory}
+                aria-label={`Lịch sử phiên bản ${planName}`}
+                className={cn(
+                  'flex-1 min-w-[75px]',
+                  featured && 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+                )}
+              >
+                <Icon name="history" className="text-[16px]" />
+                Lịch sử
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

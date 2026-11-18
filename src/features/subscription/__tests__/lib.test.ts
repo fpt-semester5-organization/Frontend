@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { benefitRows, perThirtyDays } from '../lib/benefits';
+import { VIP_EXCLUSIVE_FEATURES, benefitRows, paidDurationDays, parsePlanQuotas, perThirtyDays, quotaRows } from '../lib/benefits';
 import { clearPendingOrder, displayStatus, formatCountdown, isQrImageUrl, isSameOrder, payosCheckoutUrl, readPendingOrder, safePayUrl, savePendingOrder, secondsLeft, type PendingOrder } from '../lib/pendingOrder';
 import { decodeJwtClaims } from '../lib/sessionClaims';
 import { checkoutSchema, parsePlanId } from '../schemas/checkout.schemas';
@@ -88,6 +88,35 @@ describe('benefits & claims', () => {
     expect(rows.free[0][1]).toBe('20 câu/ngày');
   });
   it('perThirtyDays', () => expect(perThirtyDays(129000, 90)).toBe(43000));
+  it('paidDurationDays: số ngày đã mua lấy từ ngày hiệu lực của giao dịch', () => {
+    // Backend làm tròn hạn tới 23:59:59 UTC
+    expect(paidDurationDays('2026-11-03T10:00:00', '2026-12-03T23:59:59')).toBe(30);
+    expect(paidDurationDays('2026-11-17T00:00:30Z', '2027-02-15T23:59:59Z')).toBe(90);
+    // Dữ liệu cũ chưa làm tròn: hạn = bắt đầu + số ngày
+    expect(paidDurationDays('2026-10-05T10:00:00Z', '2026-11-04T10:00:00Z')).toBe(30);
+    expect(paidDurationDays(null, '2026-11-04T10:00:00Z')).toBeNull();
+    expect(paidDurationDays('2026-11-04T10:00:00Z', '2026-11-04T09:00:00Z')).toBeNull();
+  });
+  it('parsePlanQuotas đọc hạn mức như Backend: camelCase trước, snake_case sau, không phân biệt hoa thường', () => {
+    expect(parsePlanQuotas('{"chatLimitDaily":200,"mealPlanLimitWeekly":3,"fridgeScanLimitDaily":30,"adFree":true}')).toEqual({ chatLimitDaily: 200, mealPlanLimitWeekly: 3, fridgeScanLimitDaily: 30 });
+    expect(parsePlanQuotas('{"chat_limit_daily":150,"MEALPLANLIMITWEEKLY":4}')).toEqual({ chatLimitDaily: 150, mealPlanLimitWeekly: 4, fridgeScanLimitDaily: undefined });
+    // Backend chỉ nhận số nguyên: giá trị khác bị bỏ qua (dùng cấu hình chung)
+    expect(parsePlanQuotas('{"chatLimitDaily":"200","fridgeScanLimitDaily":2.5}')).toEqual({ chatLimitDaily: undefined, mealPlanLimitWeekly: undefined, fridgeScanLimitDaily: undefined });
+    expect(parsePlanQuotas('khong-phai-json')).toBeNull();
+    expect(parsePlanQuotas('[1,2]')).toBeNull();
+    expect(parsePlanQuotas(null)).toBeNull();
+  });
+  it('quotaRows chỉ có dòng cho hạn mức có giá trị; nhãn ngắn cho chỗ hẹp', () => {
+    expect(quotaRows({ chatLimitDaily: 300, mealPlanLimitWeekly: 5, fridgeScanLimitDaily: 50 })).toEqual([
+      ['Số lần người dùng được hỏi Trợ lý AI', '300 câu/ngày'],
+      ['Số lần được tạo Thực đơn tuần', '5 lần/tuần'],
+      ['Số lần được dùng tính năng Quét tủ lạnh', '50 ảnh/ngày'],
+    ]);
+    expect(quotaRows({ fridgeScanLimitDaily: 50 }, { short: true })).toEqual([['Quét tủ lạnh', '50 ảnh/ngày']]);
+  });
+  it('không quảng cáo xuất PDF thực đơn: Backend chưa có API này', () => {
+    expect(VIP_EXCLUSIVE_FEATURES.join(' ')).not.toMatch(/PDF/);
+  });
   it('decodeJwtClaims đọc role + isVip', () => {
     const t = `h.${b64({ role: 'VIP', isVip: true })}.s`;
     expect(decodeJwtClaims(t)).toEqual({ role: 'VIP', isVip: true });

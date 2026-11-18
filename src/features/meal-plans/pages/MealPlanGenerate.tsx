@@ -25,6 +25,7 @@ import { QUOTA } from '@/constants/quota';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { listFridgeItems } from '@/features/fridge/api/fridge.api';
 import { useCurrentUser } from '@/features/profile/hooks/useProfile';
+import { useMySubscription } from '@/features/subscription/hooks/useSubscription';
 import { GENDER_OPTIONS, GOAL_OPTIONS, labelOf } from '@/features/profile/lib/healthMetrics';
 import { toApiError, type ApiError } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
@@ -37,7 +38,8 @@ import {
   getQuickStartDates,
   todayInVietnam,
 } from '../lib/dates';
-import { BUDGET_LABEL } from '../lib/labels';
+import { BUDGET_LABEL, BUDGET_TIER_DETAILS } from '../lib/labels';
+import { scaledSwapLimit } from '../lib/plan.utils';
 import { generatePlanSchema, type GeneratePlanValues } from '../types/mealPlan.schemas';
 import type { BudgetTier } from '../types/mealPlan.types';
 import {
@@ -59,6 +61,9 @@ const SECTION_TITLE = 'font-serif font-headline-sm text-headline-sm text-primary
 export const MealPlanGenerate: React.FC = () => {
   const navigate = useNavigate();
   const isVip = useAuthStore((state) => state.user?.isVip ?? false);
+  const signedIn = useAuthStore((state) => !!state.user);
+  // Hạn mức tuần của chính người dùng: VIP theo gói đã mua (bản chụp lúc mua), Free theo cấu hình chung.
+  const mySubscription = useMySubscription({ enabled: signedIn });
   const profile = useCurrentUser();
   const createPlan = useCreateMealPlan();
 
@@ -315,7 +320,10 @@ export const MealPlanGenerate: React.FC = () => {
   const { data: publicSettings } = usePublicSettings();
   const vipLimit = publicSettings?.mealPlanWeeklyLimitVip ?? QUOTA.mealPlanPerWeek.vip;
   const freeLimit = publicSettings?.mealPlanWeeklyLimitFree ?? QUOTA.mealPlanPerWeek.free;
-  const limit = isVip ? vipLimit : freeLimit;
+  const limit = mySubscription.data?.features?.mealPlanLimitWeekly ?? (isVip ? vipLimit : freeLimit);
+  // Lượt đổi món do Admin cấu hình cho thực đơn 7 ngày, Backend quy đổi theo số ngày đang chọn.
+  const draftSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitDraft ?? QUOTA.mealsPerPlan, numberOfDays);
+  const activeSwapLimit = scaledSwapLimit(publicSettings?.mealSwapLimitActive ?? QUOTA.mealsPerPlan, numberOfDays);
   const generating = createPlan.isPending;
 
   // Tính toán tiêu đề kế hoạch dạng chuẩn: "Thực đơn từ Thứ Hai 03/11/2026 đến Chủ Nhật 09/11/2026 (7 ngày)"
@@ -538,6 +546,7 @@ export const MealPlanGenerate: React.FC = () => {
                   render={({ field }) => (
                     <div aria-label="Mức ngân sách" className="grid grid-cols-1 gap-space-md md:grid-cols-3" role="radiogroup">
                       {TIERS.map((t) => {
+                        const meta = BUDGET_TIER_DETAILS[t];
                         const on = field.value === t;
                         return (
                           <button
@@ -547,21 +556,46 @@ export const MealPlanGenerate: React.FC = () => {
                             aria-checked={on}
                             onClick={() => field.onChange(t)}
                             className={cn(
-                              'flex flex-col justify-between rounded-xl p-space-md text-left transition-all border',
+                              'flex flex-col justify-between rounded-2xl p-4 text-left transition-all border cursor-pointer relative',
                               on
-                                ? 'bg-primary-fixed/40 border-primary ring-2 ring-primary/20 text-on-surface'
-                                : 'bg-surface-container-lowest border-surface-container-high hover:bg-surface-container-low'
+                                ? 'bg-primary-fixed/30 border-primary ring-2 ring-primary/20 text-on-surface shadow-xs'
+                                : 'bg-surface-container-lowest border-surface-container-high hover:border-outline-variant hover:bg-surface-container-low'
                             )}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className={cn('font-label-md text-label-md', on ? 'font-bold text-primary' : 'text-on-surface-variant')}>
-                                {BUDGET_LABEL[t]}
-                                {t === 'STANDARD' ? ' (mặc định)' : ''}
-                              </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={cn(
+                                    'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                                    on ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'
+                                  )}
+                                >
+                                  <Icon name={meta.icon} className="text-[18px]" />
+                                </div>
+                                <div>
+                                  <span className={cn('font-label-md text-label-md font-bold', on ? 'text-primary' : 'text-on-surface')}>
+                                    {meta.label}
+                                  </span>
+                                  {meta.badge && (
+                                    <span className="ml-1.5 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold">
+                                      {meta.badge}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                               <Icon
-                                name="check_circle"
-                                className={cn('text-[18px]', on ? 'text-primary' : 'text-transparent')}
+                                name={on ? 'check_circle' : 'radio_button_unchecked'}
+                                className={cn('text-[20px] transition-colors', on ? 'text-primary' : 'text-outline')}
                               />
+                            </div>
+
+                            <div className="mt-3">
+                              <div className="text-base font-bold text-primary font-serif tabular-nums tracking-tight">
+                                {meta.priceRange} <span className="text-xs font-normal text-on-surface-variant">/ ngày</span>
+                              </div>
+                              <p className="mt-1 text-xs text-on-surface-variant leading-relaxed line-clamp-2">
+                                {meta.description}
+                              </p>
                             </div>
                           </button>
                         );
@@ -894,8 +928,9 @@ export const MealPlanGenerate: React.FC = () => {
                   <li className="flex items-start gap-space-xs">
                     <Icon name="swap_horiz" className="shrink-0 text-[18px] text-secondary" />
                     <span>
-                      Chỉnh sửa tối đa <strong className="text-on-surface">{QUOTA.mealsPerPlan} lần</strong> khi còn bản nháp
-                      và {QUOTA.mealsPerPlan} lần đổi món sau khi kích hoạt.
+                      Với thực đơn {numberOfDays} ngày: chỉnh sửa tối đa{' '}
+                      <strong className="text-on-surface">{draftSwapLimit} lần</strong> khi còn bản nháp và{' '}
+                      <strong className="text-on-surface">{activeSwapLimit} lần</strong> đổi món sau khi kích hoạt.
                     </span>
                   </li>
                   <li className="flex items-start gap-space-xs">

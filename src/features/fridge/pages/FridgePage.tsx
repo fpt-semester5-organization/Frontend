@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { QUOTA } from '@/constants/quota';
+import { useMySubscription } from '@/features/subscription/hooks/useSubscription';
 import { usePublicSettings } from '@/features/system/hooks/usePublicSettings';
 import { apiErrorMessage } from '@/api/http';
 import { toApiError } from '@/lib/apiError';
@@ -173,6 +174,8 @@ const saveThumbnailsToCache = (items: DetectedItem[]) => {
 export const FridgePage: React.FC = () => {
   const authed = useAuthStore(selectIsAuthenticated);
   const vip = useAuthStore(selectIsVip);
+  // VIP: hạn mức theo biên lai (snapshot) khi /fridge/quota chưa trả về
+  const mySubscription = useMySubscription({ enabled: authed && vip });
   const guestAiLeft = useGuestStore((s) => s.quota?.ai.remaining);
   const openSignupPrompt = useUiStore((s) => s.openSignupPrompt);
 
@@ -542,7 +545,7 @@ export const FridgePage: React.FC = () => {
   const dynamicFridgeVip = publicSettings?.fridgeScanLimitDailyVip ?? QUOTA.fridgeImagesPerDay.vip;
   const dynamicFridgeFree = publicSettings?.fridgeScanLimitDailyFree ?? QUOTA.fridgeImagesPerDay.free;
   const dynamicGuestLimit = publicSettings?.chatLimitDailyGuest ?? QUOTA.guest.ai;
-  const imageLimit = vip ? dynamicFridgeVip : dynamicFridgeFree;
+  const imageLimit = vip ? (mySubscription.data?.features?.fridgeScanLimitDaily ?? dynamicFridgeVip) : dynamicFridgeFree;
 
   // Xóa nguyên liệu khỏi tủ lạnh ảo
   const handleConfirmDelete = () => {

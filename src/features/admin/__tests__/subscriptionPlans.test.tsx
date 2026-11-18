@@ -32,7 +32,8 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
 
     // Các nút thao tác quản trị
     expect(screen.getByRole('button', { name: 'Sửa VIP 1 tháng' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Đổi giá VIP 1 tháng' })).toBeInTheDocument();
+    // Giá sửa trong "Sửa" nên không còn nút "Đổi giá" trùng chức năng
+    expect(screen.queryByRole('button', { name: 'Đổi giá VIP 1 tháng' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ẩn gói VIP 1 tháng' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Xóa VIP 1 tháng' })).toBeInTheDocument();
   });
@@ -51,28 +52,6 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Xem dạng thẻ' }));
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('VIP 1 tháng')).toBeInTheDocument();
-  });
-
-  it('đổi giá nhanh: nhắc giá mới chỉ áp dụng cho đơn mới, PUT priceVnd', async () => {
-    const calls = mockApi((req) =>
-      req.method === 'GET'
-        ? { data: [PLAN] }
-        : { message: 'Đã cập nhật giá gói.', data: { planId: 1, priceVnd: 45000 } }
-    );
-    renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
-    expect(await screen.findByText('VIP 1 tháng')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Đổi giá VIP 1 tháng' }));
-    const dialog = screen.getByRole('dialog');
-    await userEvent.clear(within(dialog).getByLabelText(/Giá mới/));
-    await userEvent.type(within(dialog).getByLabelText(/Giá mới/), '45000');
-    expect(within(dialog).getByText(/chỉ áp dụng cho đơn hàng tạo sau khi lưu/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu giá mới' }));
-    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
-    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
-      url: '/admin/subscription-plans/1',
-      body: { priceVnd: 45000 },
-    });
   });
 
   it('sửa toàn diện gói VIP: chỉnh sửa tên, thời hạn, giá và trạng thái kèm live preview', async () => {
@@ -95,6 +74,7 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
     await userEvent.type(within(dialog).getByRole('spinbutton', { name: /^Thời hạn/ }), '45');
     await userEvent.clear(within(dialog).getByRole('spinbutton', { name: /^Giá bán/ }));
     await userEvent.type(within(dialog).getByRole('spinbutton', { name: /^Giá bán/ }), '59000');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /^Lý do thay đổi/ }), 'Điều chỉnh giá tháng 12');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
@@ -105,6 +85,7 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
         durationDays: 45,
         priceVnd: 59000,
         isActive: true,
+        changeReason: 'Điều chỉnh giá tháng 12',
       },
     });
   });
@@ -174,6 +155,100 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
         durationDays: 90,
         priceVnd: 129000,
       },
+    });
+  });
+
+  describe('phiên bản gói và quyền lợi người mua (BR-PAY-SUB-01)', () => {
+    const PLAN_V2 = {
+      ...PLAN,
+      priceVnd: 59000,
+      version: 2,
+      effectiveFrom: '2026-11-17T09:23:28',
+      featuresJson: '{"chatLimitDaily":300,"mealPlanLimitWeekly":5,"fridgeScanLimitDaily":50,"adFree":true}',
+    };
+    const VERSIONS = [
+      { versionId: 4, planId: 1, version: 2, planName: 'VIP 1 tháng', price: 59000, durationDays: 30, featuresJson: PLAN_V2.featuresJson, effectiveFrom: '2026-11-17T09:23:28', effectiveTo: null, updatedByAdminId: 1, updatedByAdminName: 'Quản trị viên', changeReason: 'Tăng hạn mức AI', createdAt: '2026-11-17T09:23:28' },
+      { versionId: 2, planId: 1, version: 1, planName: 'VIP 1 tháng', price: 49000, durationDays: 30, featuresJson: '{"chatLimitDaily":200,"mealPlanLimitWeekly":3,"fridgeScanLimitDaily":30}', effectiveFrom: '2026-11-04T07:07:19', effectiveTo: '2026-11-17T09:23:28', updatedByAdminId: 1, updatedByAdminName: 'Quản trị viên', changeReason: null, createdAt: '2026-11-04T07:07:19' },
+    ];
+
+    it('thẻ gói hiện phiên bản hiện hành, quyền lợi người mua và mở được lịch sử phiên bản', async () => {
+      const calls = mockApi((req) => (req.url.endsWith('/versions') ? { data: VERSIONS } : { data: [PLAN_V2] }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      const card = await screen.findByRole('article', { name: 'VIP 1 tháng' });
+      expect(within(card).getByText('Phiên bản 2 · từ 17/11/2026 16:23')).toBeInTheDocument();
+      expect(within(card).getByText('Hỏi Trợ lý AI').nextElementSibling).toHaveTextContent('300 câu/ngày');
+      expect(within(card).getByText('Tạo thực đơn tuần').nextElementSibling).toHaveTextContent('5 lần/tuần');
+
+      await userEvent.click(within(card).getByRole('button', { name: 'Lịch sử phiên bản VIP 1 tháng' }));
+      const dialog = screen.getByRole('dialog');
+      const items = await within(dialog).findAllByRole('listitem');
+      expect(calls.some((c) => c.method === 'GET' && c.url === '/admin/subscription-plans/1/versions')).toBe(true);
+      expect(items).toHaveLength(2);
+      expect(within(items[0]).getByRole('heading', { name: 'Phiên bản 2' })).toBeInTheDocument();
+      expect(within(items[0]).getByText('Đang áp dụng')).toBeInTheDocument();
+      expect(within(items[0]).getByText('Lý do: Tăng hạn mức AI')).toBeInTheDocument();
+      expect(within(items[1]).getByText('200 câu/ngày')).toBeInTheDocument();
+      expect(within(items[1]).getByText(/Áp dụng từ 04\/11\/2026 14:07 đến 17\/11\/2026 16:23/)).toBeInTheDocument();
+      expect(within(items[1]).queryByText('Đang áp dụng')).not.toBeInTheDocument();
+    });
+
+    it('gói chưa lưu hạn mức riêng: nói rõ người mua theo Chỉ số hệ thống', async () => {
+      mockApi(() => ({ data: [{ ...PLAN, version: 1, effectiveFrom: '2026-11-04T07:07:19', featuresJson: null }] }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      const card = await screen.findByRole('article', { name: 'VIP 1 tháng' });
+      expect(within(card).getByText(/Gói chưa lưu hạn mức: người mua nhận hạn mức VIP trong "Chỉ số hệ thống" tại thời điểm thanh toán/)).toBeInTheDocument();
+    });
+
+    it('sửa gói: hạn mức chỉ xem kèm liên kết Chỉ số hệ thống, có ô lý do thay đổi, không gửi featuresJson (D121 Q1-B)', async () => {
+      const calls = mockApi((req) =>
+        req.method === 'GET' ? { data: [PLAN_V2] } : { message: 'Đã cập nhật gói.', data: { planId: 1, priceVnd: 59000 } }
+      );
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      await userEvent.click(await screen.findByRole('button', { name: 'Sửa VIP 1 tháng' }));
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).queryByText(/tạo phiên bản mới của gói/)).not.toBeInTheDocument();
+      expect(within(dialog).queryByText('Quyền lợi người mua nhận được')).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole('spinbutton', { name: /Hỏi Trợ lý AI/ })).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Quyền lợi gói (chỉ xem)')).toBeInTheDocument();
+      expect(within(dialog).getByText('Hỏi Trợ lý AI').nextElementSibling).toHaveTextContent('300 câu/ngày');
+      expect(within(dialog).getByRole('link', { name: 'Chỉ số hệ thống' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('textbox', { name: /Lý do thay đổi/ })).toBeInTheDocument();
+      await userEvent.clear(within(dialog).getByRole('textbox', { name: /^Tên gói/ }));
+      await userEvent.type(within(dialog).getByRole('textbox', { name: /^Tên gói/ }), 'VIP 1 tháng mới');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+
+      await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
+      const body = calls.find((c) => c.method === 'PUT')?.body;
+      expect(body).toMatchObject({ planName: 'VIP 1 tháng mới' });
+      expect(body).not.toHaveProperty('featuresJson');
+      expect(body).toMatchObject({ changeReason: null });
+    });
+
+    it('tạo gói: không có ô quyền lợi người mua (hạn mức chỉnh ở Chỉ số hệ thống), không gửi featuresJson', async () => {
+      const calls = mockApi((req) => (req.method === 'GET' ? { data: [PLAN] } : { message: 'Đã tạo gói.', data: { planId: 2 } }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      expect(await screen.findByText('VIP 1 tháng')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /Thêm gói/ }));
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).queryByText('Quyền lợi người mua nhận được')).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole('spinbutton', { name: /Quét tủ lạnh/ })).not.toBeInTheDocument();
+      await userEvent.type(within(dialog).getByLabelText(/Tên gói/), 'Gói VIP 6 Tháng');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo gói' }));
+
+      await waitFor(() => expect(calls.find((c) => c.method === 'POST')).toBeDefined());
+      const body = calls.find((c) => c.method === 'POST')?.body;
+      expect(body).toEqual({ planName: 'Gói VIP 6 Tháng', durationDays: 30, priceVnd: 49000 });
+    });
+
+    it('dạng bảng: không còn cột Quyền lợi người mua', async () => {
+      mockApi(() => ({ data: [PLAN_V2] }));
+      renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
+      expect(await screen.findByText('VIP 1 tháng')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Xem dạng bảng' }));
+      const table = screen.getByRole('table');
+      expect(within(table).getByRole('columnheader', { name: 'Phiên bản' })).toBeInTheDocument();
+      expect(within(table).queryByRole('columnheader', { name: 'Quyền lợi người mua' })).not.toBeInTheDocument();
+      expect(within(table).queryByText(/300 câu\/ngày/)).not.toBeInTheDocument();
     });
   });
 

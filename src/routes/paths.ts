@@ -99,10 +99,16 @@ export const PATHS = {
     USER_DETAIL: (id: string | number) => `/admin/users/${id}`,
     AUDIT_LOGS: '/admin/audit-logs',
     AI: '/admin/ai',
+    /** Địa chỉ cũ, chỉ còn để chuyển hướng sang AI_COST. */
     AI_ANALYTICS: '/admin/ai/analytics',
     AI_LOGS: '/admin/ai/logs',
+    /** Phần Phân tích Chi phí trong trang Chi phí & Nhật ký API AI. */
+    AI_COST: '/admin/ai/logs#cost',
+    /** Địa chỉ cũ, chỉ còn để chuyển hướng sang AI_KNOWLEDGE. */
     AI_RAG: '/admin/ai/rag',
     AI_QUALITY: '/admin/ai/quality',
+    /** Phần Kho tri thức RAG trong trang Chất lượng & Tri thức Chatbot. */
+    AI_KNOWLEDGE: '/admin/ai/quality#rag',
     DIETARY_SCHOOLS: '/admin/dietary-schools',
     E_NUMBERS: '/admin/e-numbers',
     INGREDIENTS: '/admin/ingredients',

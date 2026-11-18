@@ -206,4 +206,31 @@ describe('SwapHistoryModal & MealSlotCard Swap Badge [TASK-T2]', () => {
 
     expect(screen.queryByText(/Đã đổi/)).not.toBeInTheDocument();
   });
+
+  it('kích hoạt onRevertToRecipe khi click nút "Quay lại món cũ" hoặc món gạch bỏ', async () => {
+    const user = userEvent.setup();
+    const handleRevert = vi.fn();
+
+    renderPage(
+      <SwapHistoryModal
+        slot={mockSlot}
+        dayLabel="Thứ Hai"
+        planId={41}
+        onClose={vi.fn()}
+        onRevertToRecipe={handleRevert}
+      />
+    );
+
+    // Tìm nút "Quay lại món cũ" trong card đối chứng
+    const revertBtn = screen.getByRole('button', { name: /quay lại món cũ/i });
+    expect(revertBtn).toBeInTheDocument();
+    await user.click(revertBtn);
+    expect(handleRevert).toHaveBeenCalledWith(201, 'Cơm gạo lứt đậu phụ sốt cà');
+
+    // Tìm các nút quay lại trong dòng thời gian đổi món
+    const timelineRevertBtns = screen.getAllByRole('button', { name: /quay lại món này/i });
+    expect(timelineRevertBtns.length).toBeGreaterThanOrEqual(1);
+    await user.click(timelineRevertBtns[0]);
+    expect(handleRevert).toHaveBeenCalledWith(201, 'Cơm gạo lứt đậu phụ sốt cà');
+  });
 });

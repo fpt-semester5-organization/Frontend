@@ -121,11 +121,12 @@ describe('profileFormSchema (SCR-07)', () => {
 });
 
 describe('weightEntrySchema & allergiesFormSchema', () => {
-  it('ghi cân nặng: 20–300 kg, tối đa 2 chữ số thập phân, không ghi ngày tương lai', () => {
-    expect(weightEntrySchema.safeParse({ weightKg: '53,25', loggedDate: '', note: '' }).success).toBe(true);
-    expect(weightEntrySchema.safeParse({ weightKg: '53,255', loggedDate: '', note: '' }).success).toBe(false);
-    expect(weightEntrySchema.safeParse({ weightKg: '15', loggedDate: '', note: '' }).success).toBe(false);
-    expect(weightEntrySchema.safeParse({ weightKg: '60', loggedDate: '2999-01-01', note: '' }).success).toBe(false);
+  it('ghi cân nặng: 20–300 kg, tối đa 2 chữ số thập phân; biểu mẫu không có ngày ghi (luôn là hôm nay)', () => {
+    expect(weightEntrySchema.safeParse({ weightKg: '53,25', note: '' }).success).toBe(true);
+    expect(weightEntrySchema.safeParse({ weightKg: '53,255', note: '' }).success).toBe(false);
+    expect(weightEntrySchema.safeParse({ weightKg: '15', note: '' }).success).toBe(false);
+    const parsed = weightEntrySchema.safeParse({ weightKg: '60', loggedDate: '2026-01-01', note: '' });
+    expect(parsed.success && 'loggedDate' in parsed.data).toBe(false);
   });
 
   it('dị ứng tối đa 20 mục, ghi chú ≤ 255 ký tự', () => {
