@@ -98,23 +98,23 @@ describe('Hàng đợi kiểm duyệt 2 Tab (SCR-34)', () => {
 });
 
 describe('Kiểm duyệt bình luận vi phạm (SCR-35)', () => {
-  it('hộp xác nhận xóa yêu cầu lý do 10–500 ký tự và cảnh báo xóa mềm cascade', async () => {
-    vi.mocked(moderation.deleteComment).mockResolvedValue(ok({ deleted: true }, 'Đã xóa'));
+  it('xác nhận vi phạm bình luận yêu cầu lý do 10–500 ký tự', async () => {
+    vi.mocked(moderation.decideReport).mockResolvedValue(ok({ reportId: 91, status: 'RESOLVED' }, 'Đã xử lý'));
     renderWithProviders(<CommentModerationPage />);
     expect(await screen.findByText('#RPT-91')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /(?:Xóa bình luận|Xóa)/ }));
+    await userEvent.click(screen.getByRole('button', { name: /(?:Xác nhận|Xác nhận vi phạm)/ }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/toàn bộ trả lời bên dưới sẽ bị ẩn/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Xác nhận vi phạm: Nội dung này sẽ bị gỡ bỏ khỏi cộng đồng/)).toBeInTheDocument();
 
-    const input = within(dialog).getByLabelText(/Lý do/);
+    const input = within(dialog).getByLabelText(/Ghi chú quyết định/);
     await userEvent.type(input, 'Spam thô thiển quảng cáo bài bạc');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Xóa bình luận' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận vi phạm' }));
 
     await waitFor(() =>
-      expect(moderation.deleteComment).toHaveBeenCalledWith(
-        301,
-        'Spam thô thiển quảng cáo bài bạc',
+      expect(moderation.decideReport).toHaveBeenCalledWith(
+        91,
+        expect.objectContaining({ decision: 'UPHOLD', note: 'Spam thô thiển quảng cáo bài bạc' }),
       ),
     );
   });
