@@ -60,7 +60,7 @@ describe('Chat API Service (chat.api.ts)', () => {
     expect(result.meta.total).toBe(1);
   });
 
-  it('sendChatMessage: gọi với timeout 25s (AI_TIMEOUT_MS) theo đặc tả FN-CHAT-02', async () => {
+  it('sendChatMessage: gọi với timeout 110s (AI_TIMEOUT_MS) theo đặc tả FN-CHAT-02', async () => {
     const postSpy = vi.spyOn(http, 'post').mockResolvedValue({
       data: {
         success: true,

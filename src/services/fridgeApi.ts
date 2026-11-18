@@ -488,7 +488,7 @@ async function realUploadFridgeImage(
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
-    xhr.timeout = 40000; // 40 giây cho AI vision
+    xhr.timeout = 110000; // 110 giây cho AI vision (dưới giới hạn 120 giây của proxy Vercel)
 
     const formData = new FormData();
     const fileName = blob instanceof File ? blob.name : 'fridge_scan.jpg';

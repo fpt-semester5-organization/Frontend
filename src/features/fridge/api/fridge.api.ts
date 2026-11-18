@@ -11,7 +11,7 @@ import type {
 } from '../types/fridge.types';
 
 // Lớn hơn VISION_TIMEOUT_SECONDS (55s) của ai-service để nhận lỗi AI_TIMEOUT từ server thay vì tự cắt.
-export const AI_DETECTION_TIMEOUT_MS = 65000;
+export const AI_DETECTION_TIMEOUT_MS = 110000; // dưới giới hạn 120 giây của proxy Vercel
 
 /**
  * GET /fridge/quota

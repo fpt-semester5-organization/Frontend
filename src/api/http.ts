@@ -24,7 +24,7 @@ export { refreshAccessToken };
 export const http = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // refresh_token là cookie HttpOnly
-  timeout: 15000,
+  timeout: 60000, // Một số API gọi AI (đổi món, phân loại mã vạch, kiểm duyệt) mất hơn 15 giây khi Gemini tải cao
 });
 
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
