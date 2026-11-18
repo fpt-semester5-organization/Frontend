@@ -11,9 +11,7 @@ import { toast } from '@/stores/ui.store';
 import { apiErrorCode, apiErrorMessage, apiErrorStatus, http } from '@/api/http';
 import { endSession, handleAccountBanned } from '@/api/session';
 import { logout as logoutSession } from '@/features/auth/api/auth.api';
-import { useAiMetrics } from '@/features/admin/hooks/useSystem';
 import { useModerationQueue } from '@/features/admin/hooks/useModeration';
-import { circuitView } from '@/features/admin/lib/circuit';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -132,8 +130,6 @@ export function AdminLayout() {
     return () => http.interceptors.response.eject(id);
   }, []);
 
-  const ai = useAiMetrics({});
-  const circuit = circuitView(ai.data?.circuit?.state);
   const queue = useModerationQueue({ page: 1, size: 1 });
   const queueTotal = queue.data?.meta.total ?? 0;
 
@@ -186,22 +182,6 @@ export function AdminLayout() {
               </button>
             </div>
             <div className="flex items-center gap-gutter">
-              <Link
-                to={PATHS.ADMIN.AI}
-                className="hidden items-center gap-2 rounded-lg bg-surface-container-high px-space-sm py-1 text-primary-container no-underline md:flex"
-                title="Trạng thái Circuit Breaker AI (BR-ADM-AI-002)"
-              >
-                <span
-                  className={`material-symbols-outlined text-[16px] ${
-                    circuit.tone === 'ok' ? 'text-surface-tint' : circuit.tone === 'bad' ? 'text-error' : 'text-outline'
-                  }`}
-                >
-                  smart_toy
-                </span>
-                <span className="font-label-sm text-label-sm text-on-surface">
-                  {ai.isLoading ? 'Đang kiểm tra AI…' : ai.isError ? 'Chưa rõ trạng thái AI' : circuit.text}
-                </span>
-              </Link>
               <Link
                 to={PATHS.ADMIN.MODERATION}
                 className="relative rounded-lg p-2 text-on-surface-variant no-underline transition-colors hover:bg-surface-container hover:text-on-surface"

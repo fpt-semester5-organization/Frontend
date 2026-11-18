@@ -9,6 +9,10 @@ export interface Plan {
   durationDays: number;
   priceVnd: number;
   isActive: boolean;
+  /** Phiên bản đang bán; ở gói đang dùng (`/subscriptions/me`) là phiên bản lúc mua. */
+  version?: number;
+  /** Ba hạn mức người mua gói nhận được (D121). Backend cũ không trả thì dùng `benefits.vip` của danh sách. */
+  benefits?: { chatLimitDaily: number; mealPlanLimitWeekly: number; fridgeScanLimitDaily: number; barcodeScanLimitDaily?: number } | null;
 }
 
 /**
@@ -19,6 +23,7 @@ export interface TierBenefits {
   mealPlansPerWeek?: number;
   chatPerDay?: number | string | null;
   fridgePhotosPerDay?: number;
+  barcodeScansPerDay?: number;
 }
 export interface PlansResponse {
   plans: Plan[];
@@ -75,6 +80,7 @@ export interface BenefitFeatures {
   chatLimitDaily: number;
   mealPlanLimitWeekly: number;
   fridgeScanLimitDaily: number;
+  barcodeScanLimitDaily?: number;
   description?: string | null;
 }
 export interface MySubscription {

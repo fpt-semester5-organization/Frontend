@@ -8,6 +8,7 @@ export const QUOTA = {
   mealPlanPerWeek: { free: 1, vip: 3 },
   mealsPerPlan: 21,
   fridgeImagesPerDay: { free: 10, vip: 30 },
+  barcodePerDay: { free: 20, vip: 50 }, // D122: dự phòng cuối, số thật lấy từ Chỉ số hệ thống
   memberMapRadiusKm: { min: 1, max: 10 },
   guestFeedPostsBeforePrompt: 5, // BR-GUEST-01: xem tới bài thứ 5 thì hiện popup đăng ký
 } as const;

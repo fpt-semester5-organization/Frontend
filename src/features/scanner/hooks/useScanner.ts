@@ -3,12 +3,14 @@ import { QUOTA } from '@/constants/quota';
 import { toApiError } from '@/lib/apiError';
 import { mergeGuestQuota } from '@/lib/guestQuota';
 import { useAuthStore } from '@/stores/auth.store';
-import { listMyScans, lookupBarcode } from '../api/scanner.api';
+import { useGuestStore } from '@/stores/guest.store';
+import { getBarcodeQuota, listMyScans, lookupBarcode } from '../api/scanner.api';
 import type { ScanHistoryParams, ScanMethod } from '../types/scanner.types';
 
 export const scannerKeys = {
   history: (params: ScanHistoryParams) => ['scanner', 'history', params] as const,
   historyAll: () => ['scanner', 'history'] as const,
+  quota: ['scanner', 'quota'] as const,
 };
 
 /**
@@ -21,16 +23,29 @@ export function useLookupBarcode() {
     mutationFn: ({ barcode, method }: { barcode: string; method: ScanMethod }) => lookupBarcode(barcode, method),
     onSuccess: (res) => {
       const isGuest = !useAuthStore.getState().isAuthenticated;
-      if (res.data.quota) mergeGuestQuota({ barcodeDaily: res.data.quota }, isGuest);
+      if (res.data.quota) {
+        mergeGuestQuota({ barcodeDaily: res.data.quota }, isGuest);
+        queryClient.setQueryData(scannerKeys.quota, res.data.quota);
+      }
       if (!isGuest) void queryClient.invalidateQueries({ queryKey: scannerKeys.historyAll() });
     },
     onError: (error) => {
-      // Hết lượt: hiện GuestQuotaBadge = 0 (UI Spec 1.1).
+      // Hết lượt: hiện GuestQuotaBadge = 0 (UI Spec 1.1); hạn mức giữ theo số server đã báo trước đó.
       if (toApiError(error).errorCode === 'ERR_QUOTA_BARCODE_EXCEEDED') {
-        const limit = QUOTA.guest.barcodeDaily;
+        const limit = useGuestStore.getState().quota?.barcodeDaily?.limit ?? QUOTA.guest.barcodeDaily;
         mergeGuestQuota({ barcodeDaily: { limit, used: limit, remaining: 0 } }, !useAuthStore.getState().isAuthenticated);
+        void queryClient.invalidateQueries({ queryKey: scannerKeys.quota });
       }
     },
+  });
+}
+
+/** Lượt quét còn lại hôm nay, hiện ngay khi vào trang (chưa cần quét lần nào). */
+export function useBarcodeQuota() {
+  return useQuery({
+    queryKey: scannerKeys.quota,
+    queryFn: getBarcodeQuota,
+    retry: (failureCount, error) => failureCount < 1 && toApiError(error).status >= 500,
   });
 }
 

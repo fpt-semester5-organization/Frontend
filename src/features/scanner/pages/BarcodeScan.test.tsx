@@ -54,9 +54,10 @@ describe('BarcodeScan (SCR-15 / FN-BAR-01)', () => {
     expect(screen.getByText('E120')).toBeInTheDocument();
     expect(screen.getByTestId('product-image-frame')).toBeInTheDocument();
 
-    // Kiểm tra API call đúng format và method
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({
+    // Kiểm tra API call đúng format và method (bỏ qua request đọc hạn mức /system/settings/public và /products/barcode/quota - D122)
+    const scanCalls = calls.filter((c) => c.url.startsWith('/products/barcode/') && !c.url.endsWith('/quota'));
+    expect(scanCalls).toHaveLength(1);
+    expect(scanCalls[0]).toMatchObject({
       method: 'GET',
       url: '/products/barcode/8934563138165',
       params: { method: 'MANUAL_INPUT' },
@@ -78,8 +79,8 @@ describe('BarcodeScan (SCR-15 / FN-BAR-01)', () => {
     const submitBtn = screen.getByRole('button', { name: /Kiểm tra/i });
     await user.click(submitBtn);
 
-    // Không gọi API do validate phía client
-    expect(calls).toHaveLength(0);
+    // Không gọi API tra mã do validate phía client
+    expect(calls.filter((c) => c.url.startsWith('/products/barcode/') && !c.url.endsWith('/quota'))).toHaveLength(0);
   });
 
   it('chặn quét trùng liên tiếp cùng một mã (debounce) khi kết quả đã hiển thị', async () => {
@@ -102,12 +103,13 @@ describe('BarcodeScan (SCR-15 / FN-BAR-01)', () => {
     const submitBtn = screen.getByRole('button', { name: /Kiểm tra/i });
     await user.click(submitBtn);
 
+    const scanCalls = () => calls.filter((c) => c.url.startsWith('/products/barcode/') && !c.url.endsWith('/quota'));
     expect(await screen.findByText('Mì Hảo Hảo Tôm Chua Cay')).toBeInTheDocument();
-    expect(calls).toHaveLength(1);
+    expect(scanCalls()).toHaveLength(1);
 
     // Bấm kiểm tra lại cùng mã đó khi đã có kết quả
     await user.click(submitBtn);
-    expect(calls).toHaveLength(1); // Vẫn chỉ có 1 call, không bị gọi lại tốn quota
+    expect(scanCalls()).toHaveLength(1); // Vẫn chỉ có 1 call, không bị gọi lại tốn quota
   });
 
   it('xử lý 404 ERR_PRODUCT_NOT_FOUND: hiển thị trạng thái "Không tìm thấy sản phẩm" và nút quét lại', async () => {

@@ -1,11 +1,16 @@
 import React from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import type { QuotaCounter } from '@/lib/guestQuota';
 import { useGuestStore } from '@/stores/guest.store';
 
-/** Lượt quét còn lại hôm nay của Khách (BR-GUEST-07: 03 lượt/ngày). Chỉ hiện khi server đã báo hạn mức. */
-export const ScanQuotaBadge: React.FC = () => {
-  const quota = useGuestStore((state) => state.quota?.barcodeDaily ?? null);
+/**
+ * Lượt quét mã vạch còn lại hôm nay (D122: hạn mức cấu hình ở Chỉ số hệ thống). Chỉ hiện khi server đã báo hạn mức.
+ * Thành viên truyền `quota` từ lần quét gần nhất; Khách đọc từ store Khách.
+ */
+export const ScanQuotaBadge: React.FC<{ quota?: QuotaCounter | null }> = ({ quota: memberQuota }) => {
+  const guestQuota = useGuestStore((state) => state.quota?.barcodeDaily ?? null);
+  const quota = memberQuota ?? guestQuota;
   if (!quota) return null;
   const exhausted = quota.remaining <= 0;
 

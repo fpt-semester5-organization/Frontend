@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: {
         '/api/v1/ai-stt': {
-          target: 'http://127.0.0.1:8080',
+          target: env.VITE_AI_URL || 'http://127.0.0.1:8081',
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/api\/v1\/ai-stt/, ''),
@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/ai-stt': {
-          target: 'http://127.0.0.1:8080',
+          target: env.VITE_AI_URL || 'http://127.0.0.1:8081',
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/ai-stt/, ''),

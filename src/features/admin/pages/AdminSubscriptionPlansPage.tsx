@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -61,6 +61,7 @@ const editPlanSchema = z.object({
   durationDays: positiveInt('Nhập số ngày'),
   priceVnd: positiveInt('Nhập giá'),
   isActive: z.boolean().default(true),
+  changeReason: z.string().trim().max(255, 'Lý do tối đa 255 ký tự').optional(),
 });
 type EditPlanValues = z.infer<typeof editPlanSchema>;
 
@@ -75,13 +76,10 @@ const planQuotaRows = (plan: AdminPlan) => quotaRows(parsePlanQuotas(plan.featur
 function planQuotaHint(plan: AdminPlan) {
   if (plan.featuresJson === undefined) return undefined;
   const count = planQuotaRows(plan).length;
-  if (count === 0) return 'Gói chưa lưu hạn mức riêng: người mua nhận hạn mức VIP trong "Chỉ số hệ thống" tại thời điểm sử dụng.';
-  if (count < QUOTA_KEYS.length) return 'Hạn mức chưa lưu trong gói sẽ theo "Chỉ số hệ thống" tại thời điểm sử dụng.';
+  if (count === 0) return 'Gói chưa lưu hạn mức: người mua nhận hạn mức VIP trong "Chỉ số hệ thống" tại thời điểm thanh toán.';
+  if (count < QUOTA_KEYS.length) return 'Hạn mức chưa lưu trong gói lấy theo "Chỉ số hệ thống" tại thời điểm thanh toán.';
   return undefined;
 }
-
-/** PUT /admin/subscription-plans/{id}: priceVnd > 0. */
-const priceSchema = z.object({ priceVnd: positiveInt('Nhập giá') });
 
 type PageTab = 'plans' | 'transactions' | 'settings';
 type ViewMode = 'cards' | 'table';
@@ -100,7 +98,7 @@ const INITIAL_TABS: TabItem[] = [
 
 /**
  * SCR-44 admin/SubscriptionPlans · `/admin/subscription-plans` — FN-ADM-13.
- * Thêm gói, sửa toàn diện, đổi giá, ẩn/hiện gói, xóa gói VIP và sắp xếp vị trí hiển thị bằng kéo thả.
+ * Thêm gói, sửa toàn diện (tên, thời hạn, giá), ẩn/hiện gói, xóa gói VIP và sắp xếp vị trí hiển thị bằng kéo thả.
  */
 const AdminSubscriptionPlansPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -150,7 +148,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
   const deletePlan = useDeletePlan();
 
   const [creating, setCreating] = useState(false);
-  const [editingPrice, setEditingPrice] = useState<AdminPlan | null>(null);
   const [editingFull, setEditingFull] = useState<AdminPlan | null>(null);
   const [toggling, setToggling] = useState<AdminPlan | null>(null);
   const [deleting, setDeleting] = useState<AdminPlan | null>(null);
@@ -476,7 +473,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
                       onMoveLeft={() => moveCard(idx, idx - 1)}
                       onMoveRight={() => moveCard(idx, idx + 1)}
                       onEdit={() => setEditingFull(plan)}
-                      onQuickPrice={() => setEditingPrice(plan)}
                       onToggle={() => setToggling(plan)}
                       onDelete={() => setDeleting(plan)}
                     />
@@ -576,15 +572,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditingPrice(plan)}
-                            aria-label={`Đổi giá ${plan.planName}`}
-                          >
-                            <Icon name="payments" className="text-[16px]" />
-                            Đổi giá
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
                             onClick={() => setToggling(plan)}
                             aria-label={`${plan.isActive ? 'Ẩn gói' : 'Mở bán lại'} ${plan.planName}`}
                           >
@@ -632,8 +619,6 @@ const AdminSubscriptionPlansPage: React.FC = () => {
       {/* Modal Chỉnh sửa toàn diện gói VIP với Live Preview */}
       <EditPlanDialog plan={editingFull} onClose={() => setEditingFull(null)} />
 
-      {/* Modal Đổi giá nhanh gói VIP */}
-      <PriceDialog plan={editingPrice} onClose={() => setEditingPrice(null)} />
 
       {/* Lịch sử phiên bản của gói */}
       <PlanVersionsDialog plan={history} onClose={() => setHistory(null)} />
@@ -896,6 +881,7 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
         durationDays: plan.durationDays,
         priceVnd: plan.priceVnd,
         isActive: plan.isActive,
+        changeReason: '',
       });
       setPreviewFeatured(plan.durationDays >= 365);
     }
@@ -909,8 +895,9 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
   const submit = handleSubmit((values) => {
     if (!plan) return;
     setFormError(null);
+    const { changeReason, ...rest } = values;
     update.mutate(
-      { id: plan.planId, body: values },
+      { id: plan.planId, body: { ...rest, changeReason: changeReason || null } },
       {
         onSuccess: (res) => {
           notifySuccess(res.message || `Đã cập nhật gói ${values.planName}.`);
@@ -919,7 +906,7 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
         onError: (error) => {
           const apiError = handleWriteError(error, {
             setError,
-            fields: ['planName', 'durationDays', 'priceVnd', 'isActive'],
+            fields: ['planName', 'durationDays', 'priceVnd', 'isActive', 'changeReason'],
             onConflict: setConflict,
           });
           if (apiError.status === 400 && apiError.details.length === 0) setFormError(apiError.message);
@@ -927,6 +914,8 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
       }
     );
   });
+
+  const quotas = plan ? planQuotaRows(plan) : [];
 
   return (
     <>
@@ -1008,11 +997,40 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
               </span>
             </label>
 
-            <FormAlert tone="info">
-              Đổi tên, thời hạn hoặc giá sẽ tạo phiên bản mới của gói
-              {plan?.version !== undefined ? ` (hiện là phiên bản ${plan.version})` : ''}. Chỉ đơn hàng tạo sau khi lưu theo
-              thông số mới; người đã mua giữ nguyên giá, thời hạn và quyền lợi ghi trên biên lai (BR-ADM-PAY-001).
-            </FormAlert>
+            <FormRow id="edit-plan-reason" label="Lý do thay đổi" error={errors.changeReason?.message}>
+              <input
+                id="edit-plan-reason"
+                maxLength={255}
+                placeholder="Ví dụ: Điều chỉnh giá khuyến mãi tháng 12"
+                aria-invalid={!!errors.changeReason}
+                className={CONTROL}
+                {...register('changeReason')}
+              />
+            </FormRow>
+
+            {/* Hạn mức VIP chung mọi gói, chỉnh tại Chỉ số hệ thống (D121 Q1-B) */}
+            <section aria-labelledby="edit-plan-quotas" className="rounded-xl border border-surface-container bg-surface-container-low p-3">
+              <h3 id="edit-plan-quotas" className="mb-1.5 font-label-md text-label-md font-semibold text-on-surface">
+                Quyền lợi gói (chỉ xem)
+              </h3>
+              {quotas.length > 0 && (
+                <dl className="mb-2 flex flex-col gap-0.5 font-body-sm text-body-sm">
+                  {quotas.map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-2">
+                      <dt className="text-on-surface-variant">{label}</dt>
+                      <dd className="text-right font-semibold text-on-surface">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                Hạn mức VIP áp dụng chung cho mọi gói, chỉnh tại{' '}
+                <Link to={{ search: '?tab=settings' }} onClick={onClose} className="font-semibold text-primary underline">
+                  Chỉ số hệ thống
+                </Link>
+                .
+              </p>
+            </section>
           </div>
 
           {/* Cột phải: Live Preview */}
@@ -1037,79 +1055,6 @@ const EditPlanDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> 
       </FormDialog>
       <ServerMessageDialog message={conflict} onClose={() => setConflict(null)} />
     </>
-  );
-};
-
-/**
- * Hộp thoại Đổi giá nhanh gói VIP (giữ nguyên quy trình tối ưu thao tác nhanh).
- */
-const PriceDialog: React.FC<{ plan: AdminPlan | null; onClose: () => void }> = ({ plan, onClose }) => {
-  const update = useUpdatePlan();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    watch,
-    formState: { errors },
-  } = useForm<{ priceVnd: number }>({ resolver: zodResolver(priceSchema) });
-
-  useEffect(() => {
-    if (plan) reset({ priceVnd: plan.priceVnd });
-  }, [plan, reset]);
-
-  const price = watch('priceVnd');
-  const submit = handleSubmit((values) => {
-    if (!plan) return;
-    if (values.priceVnd === plan.priceVnd) {
-      notifyInfo('Giá chưa thay đổi.');
-      return;
-    }
-    update.mutate(
-      { id: plan.planId, body: { priceVnd: values.priceVnd } },
-      {
-        onSuccess: (res) => {
-          notifySuccess(res.message || 'Đã cập nhật giá gói.');
-          onClose();
-        },
-        onError: (error) => {
-          if (handleWriteError(error, { setError, fields: ['priceVnd'] }).status === 404) onClose();
-        },
-      }
-    );
-  });
-
-  return (
-    <FormDialog
-      show={!!plan}
-      title={plan ? `Đổi giá: ${plan.planName}` : ''}
-      onClose={() => !update.isPending && onClose()}
-      onSubmit={submit}
-      submitLabel="Lưu giá mới"
-      loading={update.isPending}
-    >
-      <FormRow
-        id="plan-new-price"
-        label="Giá mới (VND)"
-        required
-        error={errors.priceVnd?.message}
-        hint={plan ? `Giá hiện tại: ${formatVnd(plan.priceVnd)}` : undefined}
-      >
-        <input
-          id="plan-new-price"
-          type="number"
-          min={1}
-          step={1000}
-          inputMode="numeric"
-          aria-invalid={!!errors.priceVnd}
-          className={CONTROL}
-          {...register('priceVnd', { setValueAs: toNumber })}
-        />
-      </FormRow>
-      <FormAlert tone="info">
-        Giá mới {Number.isFinite(price) && price > 0 ? `(${formatVnd(price)}) ` : ''}tạo phiên bản mới của gói và chỉ áp dụng cho đơn hàng tạo sau khi lưu. Người dùng đang có VIP không bị tính lại tiền, vẫn giữ quyền lợi trên biên lai.
-      </FormAlert>
-    </FormDialog>
   );
 };
 

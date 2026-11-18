@@ -32,7 +32,8 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
 
     // Các nút thao tác quản trị
     expect(screen.getByRole('button', { name: 'Sửa VIP 1 tháng' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Đổi giá VIP 1 tháng' })).toBeInTheDocument();
+    // Giá sửa trong "Sửa" nên không còn nút "Đổi giá" trùng chức năng
+    expect(screen.queryByRole('button', { name: 'Đổi giá VIP 1 tháng' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ẩn gói VIP 1 tháng' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Xóa VIP 1 tháng' })).toBeInTheDocument();
   });
@@ -51,28 +52,6 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Xem dạng thẻ' }));
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('VIP 1 tháng')).toBeInTheDocument();
-  });
-
-  it('đổi giá nhanh: nhắc giá mới chỉ áp dụng cho đơn mới, PUT priceVnd', async () => {
-    const calls = mockApi((req) =>
-      req.method === 'GET'
-        ? { data: [PLAN] }
-        : { message: 'Đã cập nhật giá gói.', data: { planId: 1, priceVnd: 45000 } }
-    );
-    renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
-    expect(await screen.findByText('VIP 1 tháng')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Đổi giá VIP 1 tháng' }));
-    const dialog = screen.getByRole('dialog');
-    await userEvent.clear(within(dialog).getByLabelText(/Giá mới/));
-    await userEvent.type(within(dialog).getByLabelText(/Giá mới/), '45000');
-    expect(within(dialog).getByText(/chỉ áp dụng cho đơn hàng tạo sau khi lưu/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu giá mới' }));
-    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
-    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
-      url: '/admin/subscription-plans/1',
-      body: { priceVnd: 45000 },
-    });
   });
 
   it('sửa toàn diện gói VIP: chỉnh sửa tên, thời hạn, giá và trạng thái kèm live preview', async () => {
@@ -95,6 +74,7 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
     await userEvent.type(within(dialog).getByRole('spinbutton', { name: /^Thời hạn/ }), '45');
     await userEvent.clear(within(dialog).getByRole('spinbutton', { name: /^Giá bán/ }));
     await userEvent.type(within(dialog).getByRole('spinbutton', { name: /^Giá bán/ }), '59000');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /^Lý do thay đổi/ }), 'Điều chỉnh giá tháng 12');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toBeDefined());
@@ -105,6 +85,7 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
         durationDays: 45,
         priceVnd: 59000,
         isActive: true,
+        changeReason: 'Điều chỉnh giá tháng 12',
       },
     });
   });
@@ -215,20 +196,23 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
       mockApi(() => ({ data: [{ ...PLAN, version: 1, effectiveFrom: '2026-11-04T07:07:19', featuresJson: null }] }));
       renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
       const card = await screen.findByRole('article', { name: 'VIP 1 tháng' });
-      expect(within(card).getByText(/Gói chưa lưu hạn mức riêng/)).toBeInTheDocument();
+      expect(within(card).getByText(/Gói chưa lưu hạn mức: người mua nhận hạn mức VIP trong "Chỉ số hệ thống" tại thời điểm thanh toán/)).toBeInTheDocument();
     });
 
-    it('sửa gói: không có ô quyền lợi người mua và lý do thay đổi (hạn mức chỉnh ở Chỉ số hệ thống), không gửi featuresJson', async () => {
+    it('sửa gói: hạn mức chỉ xem kèm liên kết Chỉ số hệ thống, có ô lý do thay đổi, không gửi featuresJson (D121 Q1-B)', async () => {
       const calls = mockApi((req) =>
         req.method === 'GET' ? { data: [PLAN_V2] } : { message: 'Đã cập nhật gói.', data: { planId: 1, priceVnd: 59000 } }
       );
       renderWithProviders(<AdminSubscriptionPlansPage />, '/admin/subscription-plans');
       await userEvent.click(await screen.findByRole('button', { name: 'Sửa VIP 1 tháng' }));
       const dialog = screen.getByRole('dialog');
-      expect(within(dialog).getByText(/tạo phiên bản mới của gói \(hiện là phiên bản 2\)/)).toBeInTheDocument();
+      expect(within(dialog).queryByText(/tạo phiên bản mới của gói/)).not.toBeInTheDocument();
       expect(within(dialog).queryByText('Quyền lợi người mua nhận được')).not.toBeInTheDocument();
       expect(within(dialog).queryByRole('spinbutton', { name: /Hỏi Trợ lý AI/ })).not.toBeInTheDocument();
-      expect(within(dialog).queryByRole('textbox', { name: /Lý do thay đổi/ })).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Quyền lợi gói (chỉ xem)')).toBeInTheDocument();
+      expect(within(dialog).getByText('Hỏi Trợ lý AI').nextElementSibling).toHaveTextContent('300 câu/ngày');
+      expect(within(dialog).getByRole('link', { name: 'Chỉ số hệ thống' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('textbox', { name: /Lý do thay đổi/ })).toBeInTheDocument();
       await userEvent.clear(within(dialog).getByRole('textbox', { name: /^Tên gói/ }));
       await userEvent.type(within(dialog).getByRole('textbox', { name: /^Tên gói/ }), 'VIP 1 tháng mới');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
@@ -237,7 +221,7 @@ describe('SCR-44 Gói VIP & Cấu hình quản trị', () => {
       const body = calls.find((c) => c.method === 'PUT')?.body;
       expect(body).toMatchObject({ planName: 'VIP 1 tháng mới' });
       expect(body).not.toHaveProperty('featuresJson');
-      expect(body).not.toHaveProperty('changeReason');
+      expect(body).toMatchObject({ changeReason: null });
     });
 
     it('tạo gói: không có ô quyền lợi người mua (hạn mức chỉnh ở Chỉ số hệ thống), không gửi featuresJson', async () => {
