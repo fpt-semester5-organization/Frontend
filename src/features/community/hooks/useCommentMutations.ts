@@ -265,7 +265,24 @@ export function useUpdateComment(target: ContentRef) {
       }
     },
 
-    onSuccess: invalidate,
+    onSuccess: (res, variables) => {
+      if (res.data?.status && res.data.status !== 'ACTIVE') {
+        queryClient.setQueryData<InfiniteData<Paged<PostComment>>>(
+          communityKeys.comments(target),
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              pages: old.pages.map((page) => ({
+                ...page,
+                items: removeCommentNode(page.items, variables.commentId),
+              })),
+            };
+          }
+        );
+      }
+      invalidate();
+    },
   });
 }
 
